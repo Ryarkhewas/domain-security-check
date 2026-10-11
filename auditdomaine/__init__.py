@@ -1,4 +1,4 @@
-"""audit-domaine — audit de sécurité passif d'un nom de domaine."""
+"""domain-security-check — audit de sécurité passif d'un nom de domaine."""
 
 from .audit import DomaineInvalide, auditer, normaliser_domaine
 
