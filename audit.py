@@ -1,5 +1,5 @@
 """
-audit-domaine — Audit de sécurité passif d'un nom de domaine.
+domain-security-check — Audit de sécurité passif d'un nom de domaine.
 
 Usage :
     python audit.py exemple.fr
