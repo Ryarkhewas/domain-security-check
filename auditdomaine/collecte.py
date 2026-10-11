@@ -22,7 +22,7 @@ SELECTEURS_DKIM = [
     "s1", "s2", "smtp", "mandrill", "mxvault", "zoho", "protonmail", "sib",
 ]
 TIMEOUT = 8
-USER_AGENT = "audit-domaine/1.0 (audit passif)"
+USER_AGENT = "domain-security-check/1.0 (audit passif)"
 
 
 class ErreurCollecte(RuntimeError):
