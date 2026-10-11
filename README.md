@@ -1,4 +1,4 @@
-# audit-domaine
+# domain-security-check
 
 **Audit de sécurité passif d'un nom de domaine, avec un rapport clair pour un non-spécialiste.**
 
@@ -25,8 +25,8 @@ Même passif, un audit doit se faire **sur vos propres domaines ou avec l'accord
 ## Installation
 
 ```bash
-git clone https://github.com/Ryarkhewas/audit-domaine.git
-cd audit-domaine
+git clone https://github.com/Ryarkhewas/domain-security-check.git
+cd domain-security-check
 python -m venv .venv
 source .venv/bin/activate      # Windows : .venv\Scripts\activate
 pip install -r requirements.txt
