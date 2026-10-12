@@ -95,7 +95,13 @@ def _dmarc_tags(record: str) -> dict[str, str]:
     return tags
 
 
-def check_dmarc(dmarc_txt: list[str]) -> list[Finding]:
+def check_dmarc(dmarc_txt: list[str], inherited_from: str = "") -> list[Finding]:
+    """Analyse a DMARC record.
+
+    `inherited_from` is set when the record belongs to a parent domain: per the
+    DMARC standard, a subdomain without its own record is covered by its parent's
+    policy, using the subdomain policy tag (sp=) when present, otherwise p=.
+    """
     title = "DMARC (anti-spoofing policy)"
     dmarc = [t for t in dmarc_txt if t.lower().replace(" ", "").startswith("v=dmarc1")]
 
@@ -114,28 +120,30 @@ def check_dmarc(dmarc_txt: list[str]) -> list[Finding]:
         )]
 
     t = _dmarc_tags(dmarc[0])
-    policy = t.get("p", "").lower()
+    tag = "sp" if inherited_from and "sp" in t else "p"
+    policy = t.get(tag, "").lower()
+    origin = f"Inherited from {inherited_from}: " if inherited_from else ""
     findings: list[Finding] = []
 
     if policy == "reject":
-        findings.append(Finding(C, title, Status.OK, "\"reject\" policy: spoofed emails are rejected."))
+        findings.append(Finding(C, title, Status.OK, f"{origin}\"reject\" policy: spoofed emails are rejected."))
     elif policy == "quarantine":
         findings.append(Finding(
             C, title, Status.OK,
-            "\"quarantine\" policy: spoofed emails go to spam.",
-            "Move to \"p=reject\" once the reports confirm your legitimate email passes.",
+            f"{origin}\"quarantine\" policy: spoofed emails go to spam.",
+            "Move to \"reject\" once the reports confirm your legitimate email passes.",
         ))
     elif policy == "none":
         findings.append(Finding(
             C, title, Status.WARNING,
-            "\"none\" policy: DMARC monitors but blocks nothing.",
-            "After a few weeks of report analysis, move to \"p=quarantine\", then \"p=reject\".",
+            f"{origin}\"none\" policy: DMARC monitors but blocks nothing.",
+            "After a few weeks of report analysis, move to \"quarantine\", then \"reject\".",
         ))
     else:
         findings.append(Finding(
             C, title, Status.CRITICAL,
-            f"Missing or invalid DMARC policy (p={policy or '?'}).",
-            "Fix the record: the p= tag must be none, quarantine or reject.",
+            f"{origin}Missing or invalid DMARC policy ({tag}={policy or '?'}).",
+            f"Fix the record: the {tag}= tag must be none, quarantine or reject.",
         ))
 
     pct = t.get("pct")

@@ -76,3 +76,16 @@ def test_dkim():
 def test_mx():
     assert check_mx([])[0].status == Status.INFO
     assert check_mx(["mx.example.com"])[0].status == Status.OK
+
+
+def test_dmarc_inherited_from_parent():
+    f = check_dmarc(["v=DMARC1; p=reject; rua=mailto:a@b.com"], inherited_from="example.com")
+    assert f[0].status == Status.OK
+    assert f[0].detail.startswith("Inherited from example.com")
+
+
+def test_dmarc_inherited_uses_subdomain_policy():
+    # sp= applies to subdomains and takes precedence over p=
+    record = ["v=DMARC1; p=reject; sp=none; rua=mailto:a@b.com"]
+    assert check_dmarc(record, inherited_from="example.com")[0].status == Status.WARNING
+    assert check_dmarc(record)[0].status == Status.OK  # on the domain itself, p= applies

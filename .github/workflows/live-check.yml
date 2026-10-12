@@ -14,8 +14,8 @@ jobs:
   live:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -28,13 +28,13 @@ jobs:
             echo
             python scripts/live_summary.py reports \
               github.com google.com cloudflare.com wikipedia.org \
-              badssl.com expired.badssl.com self-signed.badssl.com wrong.host.badssl.com
+              docs.github.com badssl.com expired.badssl.com self-signed.badssl.com wrong.host.badssl.com
           } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Live tests
         run: python -m pytest -m live -v -rA
       - name: Keep the HTML reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: live-reports
           path: reports/

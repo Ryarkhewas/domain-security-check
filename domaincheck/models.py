@@ -62,6 +62,7 @@ class CollectedData:
     dkim_selectors: list[str]
     certificate: CertificateInfo | None
     http: HTTPInfo
+    dmarc_inherited_from: str = ""  # parent domain whose DMARC policy applies, if any
 
 
 @dataclass

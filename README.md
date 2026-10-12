@@ -14,7 +14,7 @@ In a single command, the tool checks what anyone can see from the Internet about
 |---|---|
 | **Website** | Valid certificate and expiry date, TLS version, HTTP to HTTPS redirect |
 | **Security headers** | HSTS, Content-Security-Policy, clickjacking protection, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, software version disclosure |
-| **Email** | MX servers, SPF (presence, `all` rule, 10 DNS lookup limit), DMARC (policy, coverage, reports), DKIM (common selectors) |
+| **Email** | MX servers, SPF (presence, `all` rule, 10 DNS lookup limit), DMARC (policy, coverage, reports, inheritance from the parent domain for subdomains), DKIM (common selectors) |
 
 Each item is rated **Critical**, **To improve**, **Compliant** or **Info**, with a plain-language recommendation.
 
@@ -81,7 +81,7 @@ domaincheck/
   audit.py                  Orchestration and scoring
   report.py                 HTML report, console summary, JSON
   demo.py                   Fictitious data for the demo
-tests/                      63 unit tests + live tests (tests/live)
+tests/                      69 unit tests + live tests (tests/live)
 scripts/live_summary.py     Audits a list of domains for the Live check workflow
 ```
 
@@ -90,7 +90,7 @@ Collection is kept separate from analysis: every rule can be tested on fixed dat
 ## Tests
 
 ```bash
-python -m pytest -q          # 63 unit tests, no network needed
+python -m pytest -q          # 69 unit tests, no network needed
 python -m pytest -m live -v  # live tests against real domains (Internet required)
 ```
 
@@ -99,7 +99,8 @@ Two GitHub Actions workflows keep the tool honest:
 - **Tests** runs the unit tests on every push, on Python 3.10 to 3.13.
 - **Live check** runs every Monday (and on demand) against real domains:
   - hosts from [badssl.com](https://badssl.com), deliberately misconfigured for testing (expired, self-signed and wrong-host certificates), must be flagged as critical;
-  - for github.com, google.com, cloudflare.com and wikipedia.org, the SPF and DMARC records read by the tool must match those returned by an independent resolver (Google DNS-over-HTTPS).
+  - for github.com, google.com, cloudflare.com and wikipedia.org, the SPF and DMARC records read by the tool must match those returned by an independent resolver (Google DNS-over-HTTPS);
+  - a subdomain (docs.github.com) must inherit its parent's DMARC policy.
 
   The results table is published in the workflow summary and the HTML reports are kept as artifacts.
 

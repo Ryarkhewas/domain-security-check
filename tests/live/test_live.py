@@ -77,7 +77,25 @@ def test_well_known_domains(domain):
     result = run_audit(domain)
     by_title = {f.title: f for f in result.findings}
     assert by_title["HTTPS certificate"].status == Status.OK
-    assert by_title["HTTP to HTTPS redirect"].status == Status.OK
     assert by_title["SPF (authorized senders)"].status in (Status.OK, Status.WARNING)
     assert by_title["DMARC (anti-spoofing policy)"].status != Status.CRITICAL
     assert result.grade in "ABCDF"
+
+
+def test_http_redirect_detected():
+    # github.com redirects plain HTTP to HTTPS. (google.com is not used here:
+    # http://google.com redirects to http://www.google.com, which stays on plain
+    # HTTP and relies on browsers' HSTS preload list instead, so the tool is
+    # right to flag it.)
+    by_title = {f.title: f for f in run_audit("github.com").findings}
+    assert by_title["HTTP to HTTPS redirect"].status == Status.OK
+
+
+def test_subdomain_inherits_parent_dmarc():
+    # A subdomain without its own DMARC record is covered by its parent's policy.
+    sub, parent = "docs.github.com", "github.com"
+    own_record = any(t.lower().startswith("v=dmarc1") for t in doh_txt(f"_dmarc.{sub}"))
+    dmarc = next(f for f in run_audit(sub).findings if f.title == "DMARC (anti-spoofing policy)")
+    assert dmarc.status != Status.CRITICAL, dmarc
+    if not own_record:
+        assert f"Inherited from {parent}" in dmarc.detail, dmarc

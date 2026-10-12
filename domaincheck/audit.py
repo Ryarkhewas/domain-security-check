@@ -53,7 +53,7 @@ def analyze(data: CollectedData, tested_selectors: list[str], now: datetime | No
         findings += check_headers(data.http.headers)
     findings += check_mx(data.mx)
     findings += check_spf(data.root_txt)
-    findings += check_dmarc(data.dmarc_txt)
+    findings += check_dmarc(data.dmarc_txt, data.dmarc_inherited_from)
     findings += check_dkim(data.dkim_selectors, tested_selectors)
 
     score, grade = compute_score(findings)
@@ -66,6 +66,30 @@ def analyze(data: CollectedData, tested_selectors: list[str], now: datetime | No
     )
 
 
+def _has_dmarc(records: list[str]) -> bool:
+    return any(r.lower().replace(" ", "").startswith("v=dmarc1") for r in records)
+
+
+def find_dmarc(collector, domain: str) -> tuple[list[str], str]:
+    """Return (records, inherited_from).
+
+    Look for _dmarc.<domain> first; if there is none, walk up the parent
+    domains (shop.eu.example.com -> eu.example.com -> example.com), as a
+    subdomain is covered by its parent's policy. The top-level domain itself
+    is never queried.
+    """
+    records = collector.txt(f"_dmarc.{domain}")
+    if _has_dmarc(records):
+        return records, ""
+    labels = domain.split(".")
+    for i in range(1, len(labels) - 1):
+        parent = ".".join(labels[i:])
+        parent_records = collector.txt(f"_dmarc.{parent}")
+        if _has_dmarc(parent_records):
+            return parent_records, parent
+    return records, ""
+
+
 def run_audit(text: str, collector=None) -> Result:
     from .collector import DKIM_SELECTORS, Collector
 
@@ -76,10 +100,12 @@ def run_audit(text: str, collector=None) -> Result:
     if hasattr(collector, "check_exists"):
         collector.check_exists(domain)
 
+    dmarc_records, dmarc_parent = find_dmarc(collector, mail_domain)
     data = CollectedData(
         domain=domain,
         root_txt=collector.txt(mail_domain),
-        dmarc_txt=collector.txt(f"_dmarc.{mail_domain}"),
+        dmarc_txt=dmarc_records,
+        dmarc_inherited_from=dmarc_parent,
         mx=collector.mx(mail_domain),
         dkim_selectors=collector.dkim_selectors(mail_domain),
         certificate=collector.certificate(domain),

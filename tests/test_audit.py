@@ -3,7 +3,7 @@ import json
 import pytest
 
 import domain_check as cli
-from domaincheck.audit import InvalidDomain, compute_score, email_domain, normalize_domain, run_audit
+from domaincheck.audit import InvalidDomain, compute_score, email_domain, find_dmarc, normalize_domain, run_audit
 from domaincheck.demo import DemoCollector
 from domaincheck.models import Category, Finding, Status
 from domaincheck.report import render_html, render_json
@@ -99,3 +99,47 @@ def test_cli_demo(tmp_path, capsys):
 
 def test_cli_invalid_domain(capsys):
     assert cli.main(["not a domain"]) == 1
+
+
+class TxtOnly(DemoCollector):
+    """Collector whose TXT answers come from a dict, recording each query."""
+
+    def __init__(self, records):
+        self.records = records
+        self.queries = []
+
+    def txt(self, name):
+        self.queries.append(name)
+        return self.records.get(name, [])
+
+
+def test_find_dmarc_on_the_domain_itself():
+    c = TxtOnly({"_dmarc.shop.example.com": ["v=DMARC1; p=none"]})
+    assert find_dmarc(c, "shop.example.com") == (["v=DMARC1; p=none"], "")
+
+
+def test_find_dmarc_walks_up_to_parent():
+    c = TxtOnly({"_dmarc.example.com": ["v=DMARC1; p=reject"]})
+    records, parent = find_dmarc(c, "a.b.example.com")
+    assert (records, parent) == (["v=DMARC1; p=reject"], "example.com")
+    assert c.queries == ["_dmarc.a.b.example.com", "_dmarc.b.example.com", "_dmarc.example.com"]
+
+
+def test_find_dmarc_never_queries_the_tld():
+    c = TxtOnly({})
+    assert find_dmarc(c, "shop.example.com") == ([], "")
+    assert "_dmarc.com" not in c.queries
+
+
+def test_subdomain_audit_inherits_parent_policy():
+    class Sub(DemoCollector):
+        def txt(self, name):
+            if name == "_dmarc.example.com":
+                return ["v=DMARC1; p=reject; rua=mailto:d@example.com"]
+            if name.startswith("_dmarc."):
+                return []
+            return super().txt(name)
+
+    r = run_audit("docs.example.com", collector=Sub())
+    dmarc = next(f for f in r.findings if f.title == "DMARC (anti-spoofing policy)")
+    assert dmarc.status == Status.OK and "Inherited from example.com" in dmarc.detail
