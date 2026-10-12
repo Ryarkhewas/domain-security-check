@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Security audit — bakery-example.com</title><style>
+:root{--bg:#f6f7f9;--card:#fff;--text:#1d2330;--muted:#5d6677;--border:#e3e6eb;
+--ok:#1f7a4d;--ok-bg:#e3f4ea;--warn:#9a5b00;--warn-bg:#fdf0d9;--crit:#b3261e;--crit-bg:#fbe4e2;
+--info:#2f5d9e;--info-bg:#e5edf8;--accent:#1f4e78}
+@media (prefers-color-scheme:dark){:root{--bg:#14171c;--card:#1c2027;--text:#e7e9ee;--muted:#a0a8b6;
+--border:#2c323c;--ok:#6fd19b;--ok-bg:#16301f;--warn:#f2b552;--warn-bg:#33270f;--crit:#ff8a80;--crit-bg:#3a1a18;
+--info:#8ab4f8;--info-bg:#18243a;--accent:#8ab4f8}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:860px;margin:0 auto;padding:32px 16px 48px}
+header{display:flex;gap:24px;align-items:center;flex-wrap:wrap;margin-bottom:24px}
+.grade{width:96px;height:96px;border-radius:20px;display:grid;place-items:center;font-size:52px;font-weight:700;flex:none}
+.grade.ok{background:var(--ok-bg);color:var(--ok)}.grade.warning{background:var(--warn-bg);color:var(--warn)}
+.grade.critical{background:var(--crit-bg);color:var(--crit)}
+h1{margin:0;font-size:26px;word-break:break-all}
+.sub{color:var(--muted);margin:2px 0 0}
+.summary{margin:8px 0 0;font-weight:500}
+.counters{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 28px}
+.counter{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center}
+.counter b{display:block;font-size:24px}.counter span{color:var(--muted);font-size:13px}
+.c-critical b{color:var(--crit)}.c-warning b{color:var(--warn)}.c-ok b{color:var(--ok)}.c-info b{color:var(--info)}
+h2{font-size:18px;margin:32px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--border)}
+.item{background:var(--card);border:1px solid var(--border);border-left-width:4px;border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.item.critical{border-left-color:var(--crit)}.item.warning{border-left-color:var(--warn)}
+.item.ok{border-left-color:var(--ok)}.item.info{border-left-color:var(--info)}
+.row{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}
+.title{font-weight:600}
+.badge{font-size:12px;font-weight:600;padding:2px 10px;border-radius:99px;white-space:nowrap}
+.badge.critical{background:var(--crit-bg);color:var(--crit)}.badge.warning{background:var(--warn-bg);color:var(--warn)}
+.badge.ok{background:var(--ok-bg);color:var(--ok)}.badge.info{background:var(--info-bg);color:var(--info)}
+.detail{margin:6px 0 0;color:var(--muted)}
+.fix{margin:8px 0 0;padding:8px 12px;background:var(--bg);border-radius:8px;font-size:14px}
+.fix::before{content:"→ ";font-weight:700;color:var(--accent)}
+ol.priority{padding-left:22px}ol.priority li{margin-bottom:8px}
+footer{margin-top:40px;color:var(--muted);font-size:13px;border-top:1px solid var(--border);padding-top:16px}
+@media (max-width:560px){.counters{grid-template-columns:repeat(2,1fr)}.grade{width:76px;height:76px;font-size:40px}}
+@media print{body{background:#fff}.item,.counter{break-inside:avoid}}
+</style></head>
+<body><main>
+<header><div class="grade warning">C</div>
+<div><h1>bakery-example.com</h1><p class="sub">Passive security audit · 2026-10-12 · score 60/100</p>
+<p class="summary">Partial protection: several important settings are missing.</p></div></header>
+<section class="counters"><div class="counter c-critical"><b>0</b><span>Critical</span></div><div class="counter c-warning"><b>8</b><span>To improve</span></div><div class="counter c-ok"><b>3</b><span>Compliant</span></div><div class="counter c-info"><b>4</b><span>Info</span></div></section>
+<h2>Priority actions</h2><ol class="priority"><li><b>HTTPS certificate</b> <span class="badge warning">To improve</span><br>Check that automatic renewal is in place.</li><li><b>HTTP to HTTPS redirect</b> <span class="badge warning">To improve</span><br>Set up a permanent (301) redirect from HTTP to HTTPS.</li><li><b>HSTS</b> <span class="badge warning">To improve</span><br>Add &quot;Strict-Transport-Security: max-age=31536000; includeSubDomains&quot;.</li><li><b>Content-Security-Policy</b> <span class="badge warning">To improve</span><br>Define a CSP suited to the site, starting in &quot;Report-Only&quot; mode.</li><li><b>Clickjacking protection</b> <span class="badge warning">To improve</span><br>Add &quot;X-Frame-Options: SAMEORIGIN&quot; or &quot;frame-ancestors &#x27;self&#x27;&quot; in the CSP.</li><li><b>Software version disclosure</b> <span class="badge warning">To improve</span><br>Hide version numbers in the server configuration.</li><li><b>SPF (authorized senders)</b> <span class="badge warning">To improve</span><br>Move to &quot;~all&quot;, then &quot;-all&quot; once your senders are listed.</li><li><b>DMARC (anti-spoofing policy)</b> <span class="badge warning">To improve</span><br>After a few weeks of report analysis, move to &quot;p=quarantine&quot;, then &quot;p=reject&quot;.</li></ol>
+<h2>Website (HTTPS)</h2><div class="item warning"><div class="row"><span class="title">HTTPS certificate</span><span class="badge warning">To improve</span></div><p class="detail">The certificate expires in 20 days (2026-11-02).</p><p class="fix">Check that automatic renewal is in place.</p></div><div class="item warning"><div class="row"><span class="title">HTTP to HTTPS redirect</span><span class="badge warning">To improve</span></div><p class="detail">The site is still reachable over unencrypted HTTP, without a redirect.</p><p class="fix">Set up a permanent (301) redirect from HTTP to HTTPS.</p></div><div class="item ok"><div class="row"><span class="title">TLS protocol version</span><span class="badge ok">Compliant</span></div><p class="detail">Connection negotiated with TLSv1.3.</p></div><h2>Security headers</h2><div class="item warning"><div class="row"><span class="title">HSTS</span><span class="badge warning">To improve</span></div><p class="detail">Missing: the browser is not required to use HTTPS on later visits.</p><p class="fix">Add &quot;Strict-Transport-Security: max-age=31536000; includeSubDomains&quot;.</p></div><div class="item warning"><div class="row"><span class="title">Content-Security-Policy</span><span class="badge warning">To improve</span></div><p class="detail">Missing: no limit on which scripts the page can load (protection against XSS injection).</p><p class="fix">Define a CSP suited to the site, starting in &quot;Report-Only&quot; mode.</p></div><div class="item warning"><div class="row"><span class="title">Clickjacking protection</span><span class="badge warning">To improve</span></div><p class="detail">The site can be displayed inside a frame on another site (clickjacking risk).</p><p class="fix">Add &quot;X-Frame-Options: SAMEORIGIN&quot; or &quot;frame-ancestors &#x27;self&#x27;&quot; in the CSP.</p></div><div class="item warning"><div class="row"><span class="title">Software version disclosure</span><span class="badge warning">To improve</span></div><p class="detail">The server announces its versions (Server: Apache/2.4.41 (Ubuntu); X-Powered-By: PHP/7.4.3), which helps an attacker target known vulnerabilities.</p><p class="fix">Hide version numbers in the server configuration.</p></div><div class="item info"><div class="row"><span class="title">Referrer-Policy</span><span class="badge info">Info</span></div><p class="detail">Missing: full page addresses may be sent to external sites.</p><p class="fix">Add &quot;Referrer-Policy: strict-origin-when-cross-origin&quot;.</p></div><div class="item info"><div class="row"><span class="title">Permissions-Policy</span><span class="badge info">Info</span></div><p class="detail">Missing: no restriction on access to browser features (camera, microphone, geolocation).</p><p class="fix">Add for example &quot;Permissions-Policy: camera=(), microphone=(), geolocation=()&quot;.</p></div><div class="item ok"><div class="row"><span class="title">X-Content-Type-Options</span><span class="badge ok">Compliant</span></div><p class="detail">Present (nosniff).</p></div><h2>Email protection</h2><div class="item warning"><div class="row"><span class="title">SPF (authorized senders)</span><span class="badge warning">To improve</span></div><p class="detail">The SPF record ends with &quot;?all&quot; (neutral): it provides almost no protection.</p><p class="fix">Move to &quot;~all&quot;, then &quot;-all&quot; once your senders are listed.</p></div><div class="item warning"><div class="row"><span class="title">DMARC (anti-spoofing policy)</span><span class="badge warning">To improve</span></div><p class="detail">&quot;none&quot; policy: DMARC monitors but blocks nothing.</p><p class="fix">After a few weeks of report analysis, move to &quot;p=quarantine&quot;, then &quot;p=reject&quot;.</p></div><div class="item info"><div class="row"><span class="title">DMARC: reports</span><span class="badge info">Info</span></div><p class="detail">No report address (rua): you cannot see who sends email on your behalf.</p><p class="fix">Add &quot;rua=mailto:...&quot; to receive aggregate reports.</p></div><div class="item info"><div class="row"><span class="title">DKIM (email signing)</span><span class="badge info">Info</span></div><p class="detail">No DKIM key found among the common selectors tested (16). This is not necessarily a problem: the selector may have another name.</p><p class="fix">Check in your email service (Google Workspace, Microsoft 365...) that DKIM signing is enabled.</p></div><div class="item ok"><div class="row"><span class="title">Mail servers (MX)</span><span class="badge ok">Compliant</span></div><p class="detail">2 server(s): mx1.hosting-example.com, mx2.hosting-example.com</p></div>
+<footer>
+<p><b>Method.</b> Passive audit carried out by Loïc Tellier using public information only: DNS records, the certificate
+presented by the server and the home page headers. No intrusion testing was performed.</p>
+<p><b>Limits.</b> This audit does not cover the site's applications, workstations or user accounts.
+It gives an overview of the exposure visible from the Internet on the date shown.</p>
+</footer>
+</main></body></html>

@@ -2,100 +2,100 @@ import json
 
 import pytest
 
-import audit as cli
-from auditdomaine.audit import DomaineInvalide, auditer, calculer_score, domaine_email, normaliser_domaine
-from auditdomaine.demo import CollecteurDemo
-from auditdomaine.modeles import Categorie, Constat, Statut
-from auditdomaine.rapport import generer_html, generer_json
+import domain_check as cli
+from domaincheck.audit import InvalidDomain, compute_score, email_domain, normalize_domain, run_audit
+from domaincheck.demo import DemoCollector
+from domaincheck.models import Category, Finding, Status
+from domaincheck.report import render_html, render_json
 
 
-@pytest.mark.parametrize("saisie, attendu", [
-    ("exemple.fr", "exemple.fr"),
-    ("  HTTPS://WWW.Exemple.fr/contact?x=1 ", "www.exemple.fr"),
-    ("http://exemple.fr:8080/", "exemple.fr"),
-    ("exemple.fr.", "exemple.fr"),
+@pytest.mark.parametrize("text, expected", [
+    ("example.com", "example.com"),
+    ("  HTTPS://WWW.Example.com/contact?x=1 ", "www.example.com"),
+    ("http://example.com:8080/", "example.com"),
+    ("example.com.", "example.com"),
     ("Boulangerie-Élysée.fr", "boulangerie-élysée.fr".encode("idna").decode()),
 ])
-def test_normalisation(saisie, attendu):
-    assert normaliser_domaine(saisie) == attendu
+def test_normalization(text, expected):
+    assert normalize_domain(text) == expected
 
 
-@pytest.mark.parametrize("saisie", ["", "localhost", "exemple", "-exemple.fr", "ex ample.fr", "192.168.1.1"])
-def test_domaine_invalide(saisie):
-    with pytest.raises(DomaineInvalide):
-        normaliser_domaine(saisie)
+@pytest.mark.parametrize("text", ["", "localhost", "example", "-example.com", "ex ample.com", "192.168.1.1"])
+def test_invalid_domain(text):
+    with pytest.raises(InvalidDomain):
+        normalize_domain(text)
 
 
-def test_domaine_email():
-    assert domaine_email("www.exemple.fr") == "exemple.fr"
-    assert domaine_email("boutique.exemple.fr") == "boutique.exemple.fr"
+def test_email_domain():
+    assert email_domain("www.example.com") == "example.com"
+    assert email_domain("shop.example.com") == "shop.example.com"
 
 
-def _c(statut):
-    return Constat(Categorie.WEB, "t", statut, "d")
+def _f(status):
+    return Finding(Category.WEB, "t", status, "d")
 
 
 def test_score():
-    assert calculer_score([_c(Statut.OK)] * 5) == (100, "A")
-    assert calculer_score([_c(Statut.CRITIQUE)] * 2) == (60, "C")
-    assert calculer_score([_c(Statut.CRITIQUE)] * 6) == (0, "F")
-    assert calculer_score([_c(Statut.INFO)] * 10) == (100, "A")
+    assert compute_score([_f(Status.OK)] * 5) == (100, "A")
+    assert compute_score([_f(Status.CRITICAL)] * 2) == (60, "C")
+    assert compute_score([_f(Status.CRITICAL)] * 6) == (0, "F")
+    assert compute_score([_f(Status.INFO)] * 10) == (100, "A")
 
 
-class Espion(CollecteurDemo):
-    """Enregistre les noms interrogés pour vérifier l'orchestration."""
+class Spy(DemoCollector):
+    """Record the names queried, to check the orchestration."""
 
     def __init__(self):
-        self.appels = []
+        self.calls = []
 
-    def txt(self, nom):
-        self.appels.append(("txt", nom))
-        return super().txt(nom)
+    def txt(self, name):
+        self.calls.append(("txt", name))
+        return super().txt(name)
 
-    def certificat(self, hote):
-        self.appels.append(("cert", hote))
-        return super().certificat(hote)
-
-
-def test_www_email_sur_domaine_racine():
-    espion = Espion()
-    r = auditer("https://www.exemple.fr", collecteur=espion)
-    assert r.domaine == "www.exemple.fr"
-    assert ("txt", "exemple.fr") in espion.appels
-    assert ("txt", "_dmarc.exemple.fr") in espion.appels
-    assert ("cert", "www.exemple.fr") in espion.appels
+    def certificate(self, host):
+        self.calls.append(("cert", host))
+        return super().certificate(host)
 
 
-def test_demo_complet():
-    r = auditer("boulangerie-exemple.fr", collecteur=CollecteurDemo())
-    assert r.note == "C"
-    assert {c.categorie for c in r.constats} == set(Categorie)
+def test_www_email_checks_on_root_domain():
+    spy = Spy()
+    r = run_audit("https://www.example.com", collector=spy)
+    assert r.domain == "www.example.com"
+    assert ("txt", "example.com") in spy.calls
+    assert ("txt", "_dmarc.example.com") in spy.calls
+    assert ("cert", "www.example.com") in spy.calls
 
 
-def test_html_echappe_le_contenu():
-    class Piege(CollecteurDemo):
-        def http(self, hote):
-            info = super().http(hote)
-            info.entetes["Server"] = "<script>alert(1)</script>/1.0"
+def test_full_demo():
+    r = run_audit("bakery-example.com", collector=DemoCollector())
+    assert r.grade == "C"
+    assert {f.category for f in r.findings} == set(Category)
+
+
+def test_html_escapes_content():
+    class Trap(DemoCollector):
+        def http(self, host):
+            info = super().http(host)
+            info.headers["Server"] = "<script>alert(1)</script>/1.0"
             return info
 
-    html = generer_html(auditer("exemple.fr", collecteur=Piege()))
+    html = render_html(run_audit("example.com", collector=Trap()))
     assert "<script>alert(1)" not in html
     assert "&lt;script&gt;" in html
 
 
-def test_json_valide():
-    data = json.loads(generer_json(auditer("exemple.fr", collecteur=CollecteurDemo())))
-    assert data["domaine"] == "exemple.fr"
-    assert data["constats"][0]["statut"] in {"ok", "attention", "critique", "info"}
+def test_valid_json():
+    data = json.loads(render_json(run_audit("example.com", collector=DemoCollector())))
+    assert data["domain"] == "example.com"
+    assert data["findings"][0]["status"] in {"ok", "warning", "critical", "info"}
 
 
 def test_cli_demo(tmp_path, capsys):
-    sortie = tmp_path / "r.html"
-    assert cli.main(["--demo", "-o", str(sortie), "--auteur", "Test"]) == 0
-    assert "par Test" in sortie.read_text(encoding="utf-8")
-    assert "note C" in capsys.readouterr().out
+    output = tmp_path / "r.html"
+    assert cli.main(["--demo", "-o", str(output), "--author", "Test"]) == 0
+    assert "by Test" in output.read_text(encoding="utf-8")
+    assert "grade C" in capsys.readouterr().out
 
 
-def test_cli_domaine_invalide(capsys):
-    assert cli.main(["pas un domaine"]) == 1
+def test_cli_invalid_domain(capsys):
+    assert cli.main(["not a domain"]) == 1

@@ -1,26 +1,26 @@
 # domain-security-check
 
-**Audit de sécurité passif d'un nom de domaine, avec un rapport clair pour un non-spécialiste.**
+**Passive security audit of a domain name, with a clear report for non-specialists.**
 
-En une commande, l'outil vérifie ce que tout le monde peut voir depuis Internet sur un domaine : le site est-il bien protégé en HTTPS, le serveur envoie-t-il les bons en-têtes de sécurité, et surtout, **quelqu'un peut-il envoyer des emails en se faisant passer pour l'entreprise ?** Il produit un rapport HTML noté de A à F, avec des actions concrètes à mener.
+In a single command, the tool checks what anyone can see from the Internet about a domain: is the website properly protected with HTTPS, does the server send the right security headers, and above all, **can someone send emails pretending to be the company?** It produces an HTML report graded from A to F, with concrete actions to take.
 
-![Aperçu du rapport](exemples/apercu.png)
+![Report preview](examples/preview.png)
 
-## Ce qui est vérifié
+## What is checked
 
-| Domaine | Contrôles |
+| Area | Checks |
 |---|---|
-| **Site web** | Certificat valide et date d'expiration, version TLS, redirection HTTP → HTTPS |
-| **En-têtes de sécurité** | HSTS, Content-Security-Policy, protection anti-clickjacking, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, divulgation de versions logicielles |
-| **Emails** | Serveurs MX, SPF (présence, règle `all`, limite des 10 requêtes DNS), DMARC (politique, couverture, rapports), DKIM (sélecteurs courants) |
+| **Website** | Valid certificate and expiry date, TLS version, HTTP to HTTPS redirect |
+| **Security headers** | HSTS, Content-Security-Policy, clickjacking protection, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, software version disclosure |
+| **Email** | MX servers, SPF (presence, `all` rule, 10 DNS lookup limit), DMARC (policy, coverage, reports), DKIM (common selectors) |
 
-Chaque point est classé **Critique**, **À améliorer**, **Conforme** ou **Info**, avec une recommandation en langage simple.
+Each item is rated **Critical**, **To improve**, **Compliant** or **Info**, with a plain-language recommendation.
 
-## Un audit strictement passif
+## A strictly passive audit
 
-L'outil ne fait que ce que fait n'importe quel visiteur ou serveur de messagerie : des lectures DNS publiques, une connexion HTTPS et une requête sur la page d'accueil. **Aucun scan de ports, aucun test d'intrusion.**
+The tool only does what any visitor or mail server does: public DNS lookups, an HTTPS connection and one request to the home page. **No port scanning, no intrusion testing.**
 
-Même passif, un audit doit se faire **sur vos propres domaines ou avec l'accord du propriétaire**.
+Even passive, an audit should only be run **on your own domains or with the owner's permission**.
 
 ## Installation
 
@@ -28,61 +28,61 @@ Même passif, un audit doit se faire **sur vos propres domaines ou avec l'accord
 git clone https://github.com/Ryarkhewas/domain-security-check.git
 cd domain-security-check
 python -m venv .venv
-source .venv/bin/activate      # Windows : .venv\Scripts\activate
+source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-## Utilisation
+## Usage
 
 ```bash
-# Auditer un domaine (rapport dans rapports/<domaine>.html)
-python audit.py mon-domaine.fr
+# Audit a domain (report in reports/<domain>.html)
+python domain_check.py my-domain.com
 
-# Choisir le fichier et signer le rapport
-python audit.py mon-domaine.fr -o rapports/client.html --auteur "Votre Nom"
+# Choose the output file and sign the report
+python domain_check.py my-domain.com -o reports/client.html --author "Your Name"
 
-# Sortie JSON (pour l'intégrer à un autre outil)
-python audit.py mon-domaine.fr --json
+# JSON output (to feed another tool)
+python domain_check.py my-domain.com --json
 
-# Démonstration sur un domaine fictif, sans réseau
-python audit.py --demo
+# Demo on a fictitious domain, without network access
+python domain_check.py --demo
 ```
 
-L'URL complète est acceptée (`https://www.mon-domaine.fr/contact`) : l'outil en extrait le domaine. Les contrôles email se font sur le domaine principal, même si vous saisissez `www.`.
+A full URL is accepted (`https://www.my-domain.com/contact`): the tool extracts the domain. Email checks run on the main domain, even if you enter `www.`.
 
-## Fiabilité du diagnostic
+## Reliable diagnosis
 
-Si une requête DNS échoue (coupure réseau, délai dépassé), l'audit **s'arrête sans produire de rapport** plutôt que de conclure à tort « pas de SPF » ou « pas de DMARC ». Un enregistrement absent et une vérification impossible sont deux choses différentes.
+If a DNS query fails (network outage, timeout), the audit **stops without producing a report** rather than wrongly concluding "no SPF" or "no DMARC". A missing record and a check that could not be performed are two different things.
 
-Pour DKIM, il est impossible de lister toutes les clés d'un domaine : l'outil teste les sélecteurs les plus courants. Ne rien trouver est signalé comme une information, pas comme un défaut.
+For DKIM, there is no way to list all of a domain's keys: the tool tests the most common selectors. Finding nothing is reported as information, not as a flaw.
 
-## Notation
+## Scoring
 
-Le score part de 100 : −20 par point critique, −5 par point à améliorer.
+The score starts at 100: −20 per critical item, −5 per item to improve.
 
-| Note | Score | Lecture |
+| Grade | Score | Meaning |
 |---|---|---|
-| A | 90–100 | Très bonne configuration |
-| B | 75–89 | Bonne base, quelques points à renforcer |
-| C | 60–74 | Protection partielle |
-| D | 40–59 | Exposition notable |
-| F | 0–39 | Exposition élevée |
+| A | 90–100 | Very good configuration |
+| B | 75–89 | Solid foundation, a few points to strengthen |
+| C | 60–74 | Partial protection |
+| D | 40–59 | Significant exposure |
+| F | 0–39 | High exposure |
 
-## Architecture
+## Project structure
 
 ```
-audit.py                    Ligne de commande
-auditdomaine/
-  collecte.py               Accès réseau (DNS, TLS, HTTP) — rien d'autre
-  email_checks.py           Analyse MX / SPF / DMARC / DKIM
-  web_checks.py             Analyse certificat / redirection / en-têtes
-  audit.py                  Orchestration et notation
-  rapport.py                Rapport HTML, résumé console, JSON
-  demo.py                   Données fictives pour la démonstration
-tests/                      63 tests, sans accès réseau
+domain_check.py             Command line
+domaincheck/
+  collector.py              Network access (DNS, TLS, HTTP), nothing else
+  email_checks.py           MX / SPF / DMARC / DKIM analysis
+  web_checks.py             Certificate / redirect / headers analysis
+  audit.py                  Orchestration and scoring
+  report.py                 HTML report, console summary, JSON
+  demo.py                   Fictitious data for the demo
+tests/                      63 tests, no network access needed
 ```
 
-La collecte est séparée de l'analyse : toutes les règles se testent sur des données fixes, sans dépendre d'Internet.
+Collection is kept separate from analysis: every rule can be tested on fixed data, without depending on the Internet.
 
 ## Tests
 
@@ -90,10 +90,10 @@ La collecte est séparée de l'analyse : toutes les règles se testent sur des d
 python -m pytest -q
 ```
 
-## Limites
+## Limits
 
-L'audit ne couvre ni les applications du site (formulaires, CMS, extensions), ni les postes de travail, ni les comptes utilisateurs. Il donne un état des lieux de l'exposition visible depuis Internet à une date donnée, pas une garantie de sécurité.
+The audit does not cover the site's applications (forms, CMS, plugins), workstations or user accounts. It gives an overview of the exposure visible from the Internet at a given date, not a security guarantee.
 
-## Licence
+## License
 
 MIT
