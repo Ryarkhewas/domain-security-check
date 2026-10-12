@@ -1,0 +1,40 @@
+name: Live check
+
+# Runs the tool against real domains. Kept separate from the regular tests
+# because results depend on external sites, which can change at any time.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 6 * * 1"  # every Monday at 06:17 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Audit real domains
+        run: |
+          {
+            echo "## Live audit results"
+            echo
+            python scripts/live_summary.py reports \
+              github.com google.com cloudflare.com wikipedia.org \
+              badssl.com expired.badssl.com self-signed.badssl.com wrong.host.badssl.com
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Live tests
+        run: python -m pytest -m live -v -rA
+      - name: Keep the HTML reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-reports
+          path: reports/

@@ -1,5 +1,7 @@
 # domain-security-check
 
+[![Tests](https://github.com/Ryarkhewas/domain-security-check/actions/workflows/tests.yml/badge.svg)](https://github.com/Ryarkhewas/domain-security-check/actions/workflows/tests.yml) [![Live check](https://github.com/Ryarkhewas/domain-security-check/actions/workflows/live-check.yml/badge.svg)](https://github.com/Ryarkhewas/domain-security-check/actions/workflows/live-check.yml)
+
 **Passive security audit of a domain name, with a clear report for non-specialists.**
 
 In a single command, the tool checks what anyone can see from the Internet about a domain: is the website properly protected with HTTPS, does the server send the right security headers, and above all, **can someone send emails pretending to be the company?** It produces an HTML report graded from A to F, with concrete actions to take.
@@ -79,7 +81,8 @@ domaincheck/
   audit.py                  Orchestration and scoring
   report.py                 HTML report, console summary, JSON
   demo.py                   Fictitious data for the demo
-tests/                      63 tests, no network access needed
+tests/                      63 unit tests + live tests (tests/live)
+scripts/live_summary.py     Audits a list of domains for the Live check workflow
 ```
 
 Collection is kept separate from analysis: every rule can be tested on fixed data, without depending on the Internet.
@@ -87,8 +90,18 @@ Collection is kept separate from analysis: every rule can be tested on fixed dat
 ## Tests
 
 ```bash
-python -m pytest -q
+python -m pytest -q          # 63 unit tests, no network needed
+python -m pytest -m live -v  # live tests against real domains (Internet required)
 ```
+
+Two GitHub Actions workflows keep the tool honest:
+
+- **Tests** runs the unit tests on every push, on Python 3.10 to 3.13.
+- **Live check** runs every Monday (and on demand) against real domains:
+  - hosts from [badssl.com](https://badssl.com), deliberately misconfigured for testing (expired, self-signed and wrong-host certificates), must be flagged as critical;
+  - for github.com, google.com, cloudflare.com and wikipedia.org, the SPF and DMARC records read by the tool must match those returned by an independent resolver (Google DNS-over-HTTPS).
+
+  The results table is published in the workflow summary and the HTML reports are kept as artifacts.
 
 ## Limits
 
