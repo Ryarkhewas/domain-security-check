@@ -22,6 +22,8 @@ Each item is rated **Critical**, **To improve**, **Compliant** or **Info**, with
 
 The tool only does what any visitor or mail server does: public DNS lookups, an HTTPS connection and one request to the home page. **No port scanning, no intrusion testing.**
 
+Requests identify themselves as a current desktop browser, with `domain-security-check` appended to the User-Agent. Some sites answer differently to bots (no HTTPS redirect, missing headers): this way the report shows what real visitors get, while the tool stays identifiable in server logs.
+
 Even passive, an audit should only be run **on your own domains or with the owner's permission**.
 
 ## Installation
@@ -62,6 +64,8 @@ For DKIM, there is no way to list all of a domain's keys: the tool tests the mos
 
 The score starts at 100: −20 per critical item, −5 per item to improve.
 
+**Broken HTTPS caps the grade at F.** If the certificate is invalid or expired, or if the site answers over HTTP but not over HTTPS, visitors are not protected whatever the other settings, and the security headers cannot even be checked. Without this cap, a site with broken HTTPS would lose fewer points than a working site missing a few headers. A domain with no website at all (mail only) is not capped.
+
 | Grade | Score | Meaning |
 |---|---|---|
 | A | 90–100 | Very good configuration |
@@ -81,7 +85,7 @@ domaincheck/
   audit.py                  Orchestration and scoring
   report.py                 HTML report, console summary, JSON
   demo.py                   Fictitious data for the demo
-tests/                      69 unit tests + live tests (tests/live)
+tests/                      79 unit tests + live tests (tests/live)
 scripts/live_summary.py     Audits a list of domains for the Live check workflow
 ```
 
@@ -90,7 +94,7 @@ Collection is kept separate from analysis: every rule can be tested on fixed dat
 ## Tests
 
 ```bash
-python -m pytest -q          # 69 unit tests, no network needed
+python -m pytest -q          # 79 unit tests, no network needed
 python -m pytest -m live -v  # live tests against real domains (Internet required)
 ```
 

@@ -143,3 +143,64 @@ def test_subdomain_audit_inherits_parent_policy():
     r = run_audit("docs.example.com", collector=Sub())
     dmarc = next(f for f in r.findings if f.title == "DMARC (anti-spoofing policy)")
     assert dmarc.status == Status.OK and "Inherited from example.com" in dmarc.detail
+
+
+# --- Grade cap when HTTPS is broken ------------------------------------------
+from datetime import datetime, timedelta, timezone  # noqa: E402
+
+from domaincheck.audit import CAPPED_SCORE, analyze, broken_https_reason  # noqa: E402
+from domaincheck.models import CertificateInfo, CollectedData, HTTPInfo  # noqa: E402
+
+NOW = datetime(2026, 10, 13, tzinfo=timezone.utc)
+GOOD_EMAIL = dict(root_txt=["v=spf1 -all"], dmarc_txt=["v=DMARC1; p=reject; rua=mailto:d@x.com"],
+                  mx=["mx.example.com"], dkim_selectors=["google"])
+
+
+def data(cert, http):
+    return CollectedData(domain="example.com", certificate=cert, http=http, **GOOD_EMAIL)
+
+
+def test_expired_certificate_caps_grade():
+    expired = CertificateInfo(valid=True, expires_at=NOW - timedelta(days=1), tls_version="TLSv1.3")
+    r = analyze(data(expired, HTTPInfo(False, http_redirects_to_https=True)), [], NOW)
+    assert (r.score, r.grade) == (CAPPED_SCORE, "F")
+    assert "expired" in r.cap_reason
+
+
+def test_invalid_certificate_caps_grade():
+    invalid = CertificateInfo(valid=False, error="self-signed certificate")
+    r = analyze(data(invalid, HTTPInfo(False, http_redirects_to_https=True)), [], NOW)
+    assert r.grade == "F" and "self-signed" in r.cap_reason
+
+
+def test_http_only_site_caps_grade():
+    r = analyze(data(None, HTTPInfo(False, http_redirects_to_https=False)), [], NOW)
+    assert r.grade == "F" and "not over HTTPS" in r.cap_reason
+
+
+def test_no_website_at_all_is_not_capped():
+    # mail-only domain: nothing answers on 80/443, so there is no website to grade
+    r = analyze(data(None, HTTPInfo(False, http_redirects_to_https=None)), [], NOW)
+    assert r.cap_reason == ""
+    assert r.grade != "F"
+
+
+def test_certificate_expiring_soon_is_not_capped():
+    soon = CertificateInfo(valid=True, expires_at=NOW + timedelta(days=5), tls_version="TLSv1.3")
+    assert broken_https_reason(data(soon, HTTPInfo(True, http_redirects_to_https=True)), NOW) == ""
+
+
+def test_cap_never_raises_a_lower_score():
+    invalid = CertificateInfo(valid=False, error="bad")
+    awful = data(invalid, HTTPInfo(False, http_redirects_to_https=False))
+    awful.root_txt, awful.dmarc_txt = [], []
+    r = analyze(awful, [], NOW)
+    assert r.score < CAPPED_SCORE  # already below the cap: kept as is
+
+
+def test_cap_reason_shown_in_reports():
+    invalid = CertificateInfo(valid=False, error="certificate has expired")
+    r = analyze(data(invalid, HTTPInfo(False, http_redirects_to_https=True)), [], NOW)
+    assert "Grade capped at F" in render_html(r)
+    from domaincheck.report import console_summary
+    assert "Grade capped at F" in console_summary(r)

@@ -39,10 +39,31 @@ def email_domain(domain: str) -> str:
     return domain[4:] if domain.startswith("www.") else domain
 
 
+CAPPED_SCORE = 39  # highest score that still gives an F
+
+
 def compute_score(findings) -> tuple[int, str]:
     score = max(0, 100 - sum(PENALTIES[f.status] for f in findings))
     grade = next(g for threshold, g in GRADE_THRESHOLDS if score >= threshold)
     return score, grade
+
+
+def broken_https_reason(data: CollectedData, now: datetime) -> str:
+    """Return why HTTPS is broken for visitors, or "" if it works (or there is no website).
+
+    When HTTPS fails, header checks cannot run, so without a cap a broken site
+    would lose fewer points than a working one with a few missing headers.
+    """
+    cert = data.certificate
+    if cert is None:
+        if data.http.http_redirects_to_https is None:
+            return ""  # nothing answers on port 80 or 443: no website to grade
+        return "the site is reachable over HTTP but not over HTTPS"
+    if not cert.valid:
+        return f"the HTTPS certificate is not valid ({cert.error or 'unknown error'})"
+    if cert.expires_at and cert.expires_at < now:
+        return "the HTTPS certificate has expired"
+    return ""
 
 
 def analyze(data: CollectedData, tested_selectors: list[str], now: datetime | None = None) -> Result:
@@ -56,13 +77,18 @@ def analyze(data: CollectedData, tested_selectors: list[str], now: datetime | No
     findings += check_dmarc(data.dmarc_txt, data.dmarc_inherited_from)
     findings += check_dkim(data.dkim_selectors, tested_selectors)
 
+    now = now or datetime.now(timezone.utc)
     score, grade = compute_score(findings)
+    cap_reason = broken_https_reason(data, now)
+    if cap_reason and score > CAPPED_SCORE:
+        score, grade = CAPPED_SCORE, "F"
     return Result(
         domain=data.domain,
-        date=now or datetime.now(timezone.utc),
+        date=now,
         findings=findings,
         score=score,
         grade=grade,
+        cap_reason=cap_reason,
     )
 
 

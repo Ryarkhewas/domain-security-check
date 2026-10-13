@@ -22,7 +22,19 @@ DKIM_SELECTORS = [
     "s1", "s2", "smtp", "mandrill", "mxvault", "zoho", "protonmail", "sib",
 ]
 TIMEOUT = 8
-USER_AGENT = "domain-security-check/1.0 (passive audit)"
+# Some sites (Google, for instance) answer differently to bots and to browsers:
+# no HTTPS redirect, missing security headers... To report what a real visitor
+# gets, requests look like a current desktop browser. The tool's name is kept
+# at the end so it remains identifiable in server logs.
+USER_AGENT = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 domain-security-check/1.1"
+)
+BROWSER_HEADERS = {
+    "User-Agent": USER_AGENT,
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9,fr;q=0.8",
+}
 
 
 class CollectionError(RuntimeError):
@@ -116,7 +128,7 @@ class Collector:
 
     # --- HTTP --------------------------------------------------------------
     def http(self, host: str) -> HTTPInfo:
-        headers = {"User-Agent": USER_AGENT}
+        headers = dict(BROWSER_HEADERS)
         try:
             r = requests.get(f"https://{host}", headers=headers, timeout=self.timeout, allow_redirects=True)
             info = HTTPInfo(https_reachable=True, headers=dict(r.headers))

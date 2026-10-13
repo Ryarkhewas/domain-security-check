@@ -72,3 +72,4 @@ class Result:
     findings: list[Finding]
     score: int = 0
     grade: str = ""
+    cap_reason: str = ""  # why the grade was capped, if it was

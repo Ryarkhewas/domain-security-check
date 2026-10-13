@@ -34,6 +34,8 @@ def main(out_dir: str, domains: list[str]) -> int:
         critical = [f for f in r.findings if f.status == Status.CRITICAL]
         warning = [f for f in r.findings if f.status == Status.WARNING]
         main_issue = (critical or warning)[0].title if (critical or warning) else "–"
+        if r.cap_reason:
+            main_issue = f"capped: {r.cap_reason}"
         print(f"| {r.domain} | **{r.grade}** | {r.score} | {len(critical)} | {len(warning)} | {main_issue} |")
 
     # Full details, folded, so every finding can be checked against other tools

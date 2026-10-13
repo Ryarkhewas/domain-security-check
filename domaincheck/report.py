@@ -42,6 +42,7 @@ header{display:flex;gap:24px;align-items:center;flex-wrap:wrap;margin-bottom:24p
 h1{margin:0;font-size:26px;word-break:break-all}
 .sub{color:var(--muted);margin:2px 0 0}
 .summary{margin:8px 0 0;font-weight:500}
+.cap{margin:6px 0 0;color:var(--crit);font-weight:600}
 .counters{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 28px}
 .counter{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center}
 .counter b{display:block;font-size:24px}.counter span{color:var(--muted);font-size:13px}
@@ -103,13 +104,14 @@ def render_html(r: Result, author: str = "") -> str:
         sections += f"<h2>{e(cat.value)}</h2>{items}"
 
     by = f" by {e(author)}" if author else ""
+    cap = f'<p class="cap">Grade capped at F: {e(r.cap_reason)}.</p>' if r.cap_reason else ""
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Security audit — {e(r.domain)}</title><style>{CSS}</style></head>
 <body><main>
 <header><div class="grade {GRADE_COLOR[r.grade]}">{r.grade}</div>
 <div><h1>{e(r.domain)}</h1><p class="sub">Passive security audit · {r.date:%Y-%m-%d} · score {r.score}/100</p>
-<p class="summary">{GRADE_SUMMARY[r.grade]}</p></div></header>
+<p class="summary">{GRADE_SUMMARY[r.grade]}</p>{cap}</div></header>
 <section class="counters">{counters}</section>
 {priority_block}
 {sections}
@@ -125,7 +127,10 @@ It gives an overview of the exposure visible from the Internet on the date shown
 
 def console_summary(r: Result) -> str:
     symbols = {Status.CRITICAL: "✗", Status.WARNING: "!", Status.OK: "✓", Status.INFO: "i"}
-    lines = [f"\n  {r.domain} — grade {r.grade} ({r.score}/100)", f"  {GRADE_SUMMARY[r.grade]}\n"]
+    lines = [f"\n  {r.domain} — grade {r.grade} ({r.score}/100)", f"  {GRADE_SUMMARY[r.grade]}"]
+    if r.cap_reason:
+        lines.append(f"  Grade capped at F: {r.cap_reason}.")
+    lines.append("")
     for cat in Category:
         group = [f for f in r.findings if f.category == cat]
         if group:

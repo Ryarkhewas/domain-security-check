@@ -45,10 +45,12 @@ def certificate_finding(result):
     ("untrusted-root.badssl.com", ["certificate"]),
 ])
 def test_bad_certificates_are_critical(host, expected_words):
-    finding = certificate_finding(run_audit(host))
+    result = run_audit(host)
+    finding = certificate_finding(result)
     assert finding.status == Status.CRITICAL, finding
     detail = finding.detail.lower()
     assert any(word in detail for word in expected_words), detail
+    assert result.grade == "F" and result.cap_reason, result  # broken HTTPS caps the grade
 
 
 def test_valid_certificate_is_ok():
@@ -82,13 +84,14 @@ def test_well_known_domains(domain):
     assert result.grade in "ABCDF"
 
 
-def test_http_redirect_detected():
-    # github.com redirects plain HTTP to HTTPS. (google.com is not used here:
-    # http://google.com redirects to http://www.google.com, which stays on plain
-    # HTTP and relies on browsers' HSTS preload list instead, so the tool is
-    # right to flag it.)
-    by_title = {f.title: f for f in run_audit("github.com").findings}
-    assert by_title["HTTP to HTTPS redirect"].status == Status.OK
+@pytest.mark.parametrize("domain", ["github.com", "google.com"])
+def test_http_redirect_and_hsts_seen_like_a_browser(domain):
+    # google.com redirects browsers to HTTPS and sends HSTS (checked against
+    # securityheaders.com), but not clients that look like bots: requests must
+    # look like a browser to report what visitors actually get.
+    by_title = {f.title: f for f in run_audit(domain).findings}
+    assert by_title["HTTP to HTTPS redirect"].status == Status.OK, by_title["HTTP to HTTPS redirect"]
+    assert by_title["HSTS"].status == Status.OK, by_title["HSTS"]
 
 
 def test_subdomain_inherits_parent_dmarc():
