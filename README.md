@@ -12,7 +12,7 @@ In a single command, the tool checks what anyone can see from the Internet about
 
 | Area | Checks |
 |---|---|
-| **Website** | HTTP to HTTPS redirect, HSTS, Content-Security-Policy, cookies (Secure, HttpOnly, SameSite), clickjacking protection, X-Content-Type-Options, Referrer-Policy, Cross-Origin-Resource/Opener/Embedder-Policy; not scored: Permissions-Policy, software version disclosure |
+| **Website** | HTTP to HTTPS redirect, HSTS (including the browsers' preload list), Content-Security-Policy, cookies (Secure, HttpOnly, SameSite), Subresource Integrity of external scripts, clickjacking protection, X-Content-Type-Options, Referrer-Policy, Cross-Origin-Resource/Opener/Embedder-Policy; not scored: Permissions-Policy, software version disclosure |
 | **Certificate & TLS** | Valid certificate, expiry date, TLS version |
 | **Email** | MX servers, SPF (presence, `all` rule, 10 DNS lookup limit), DMARC (policy, coverage, reports, inheritance from the parent domain for subdomains), DKIM (common selectors) |
 
@@ -20,7 +20,7 @@ Each item is rated **Critical**, **To improve**, **Compliant** or **Info**, show
 
 ## A strictly passive audit
 
-The tool only does what any visitor or mail server does: public DNS lookups, an HTTPS connection and one request to the home page. **No port scanning, no intrusion testing.**
+The tool only does what any visitor or mail server does: public DNS lookups, an HTTPS connection, and requests to the home page (over HTTPS and HTTP) and to `robots.txt`, like Mozilla HTTP Observatory. **No port scanning, no intrusion testing.** The only other download is the public [HSTS preload list](https://hstspreload.org/), cached for a week.
 
 Requests identify themselves as a current desktop browser, with `domain-security-check` appended to the User-Agent. Some sites answer differently to bots (no HTTPS redirect, missing headers): this way the report shows what real visitors get, while the tool stays identifiable in server logs.
 
@@ -83,7 +83,8 @@ Every check is based on a published standard or guide, cited under each item of 
 | Check | Reference |
 |---|---|
 | Content-Security-Policy | [W3C CSP Level 3](https://www.w3.org/TR/CSP3/) |
-| HSTS | [RFC 6797](https://www.rfc-editor.org/rfc/rfc6797) |
+| HSTS | [RFC 6797](https://www.rfc-editor.org/rfc/rfc6797), [HSTS preload list](https://hstspreload.org/) (Chromium's list, used by all major browsers) |
+| Subresource Integrity | [W3C SRI](https://www.w3.org/TR/SRI/) |
 | Clickjacking (X-Frame-Options, frame-ancestors) | [RFC 7034](https://www.rfc-editor.org/rfc/rfc7034) |
 | X-Content-Type-Options | [WHATWG Fetch](https://fetch.spec.whatwg.org/#x-content-type-options-header) |
 | Referrer-Policy | [W3C Referrer Policy](https://www.w3.org/TR/referrer-policy/) |
@@ -98,7 +99,9 @@ Every check is based on a published standard or guide, cited under each item of 
 | Domains that receive no email | [RFC 7505](https://www.rfc-editor.org/rfc/rfc7505) (null MX) |
 | Website scoring | [Mozilla HTTP Observatory](https://github.com/mdn/mdn-http-observatory) (MPL 2.0) |
 
-**Differences with the Observatory.** Three Observatory tests are not reproduced, because they need more than the home page headers: Subresource Integrity (requires parsing the HTML), the HSTS preload bonus (requires the official preload list) and CORS (its only penalty requires sending a forged `Origin` header). Only the first CSP policy is analysed when a site sends several. Website grades can therefore differ slightly from the Observatory's.
+**Differences with the Observatory.** One Observatory test is not reproduced: CORS, whose only penalty requires sending a forged `Origin` header. Security headers declared in `<meta http-equiv>` tags are not read, and only the first CSP policy is analysed when a site sends several. In these rare cases the website grade can differ from the Observatory's.
+
+**Checked against the Observatory every week.** The Live check workflow asks the [Observatory API](https://github.com/mdn/mdn-http-observatory) for its result on the same domains and compares it test by test. Any test where the points differ is listed, and a grade gap raises a warning. This is how the HSTS preload, Subresource Integrity and cookie collection rules were found and fixed; on 13 October 2026, the five domains the Observatory could scan (github.com, cloudflare.com, wikipedia.org, docs.github.com, badssl.com) got exactly the same score, with the same points on every test.
 
 ## Project structure
 
@@ -114,8 +117,11 @@ domaincheck/
   audit.py                  Orchestration
   report.py                 HTML report, console summary, JSON
   demo.py                   Fictitious data for the demo
-tests/                      164 unit tests + live tests (tests/live)
+  hsts_preload.py           HSTS preload list (download, cache, lookups)
+  observatory.py            Test-by-test comparison with the Observatory API
+tests/                      201 unit tests + live tests (tests/live)
 scripts/live_summary.py     Audits a list of domains for the Live check workflow
+scripts/observatory_compare.py  Compares the website grades with the Observatory
 ```
 
 Collection is kept separate from analysis: every rule can be tested on fixed data, without depending on the Internet.
@@ -123,7 +129,7 @@ Collection is kept separate from analysis: every rule can be tested on fixed dat
 ## Tests
 
 ```bash
-python -m pytest -q          # 164 unit tests, no network needed
+python -m pytest -q          # 201 unit tests, no network needed
 python -m pytest -m live -v  # live tests against real domains (Internet required)
 ```
 
@@ -133,7 +139,8 @@ Two GitHub Actions workflows keep the tool honest:
 - **Live check** runs every Monday (and on demand) against real domains:
   - hosts from [badssl.com](https://badssl.com), deliberately misconfigured for testing (expired, self-signed and wrong-host certificates), must be flagged as critical;
   - for github.com, google.com, cloudflare.com and wikipedia.org, the SPF and DMARC records read by the tool must match those returned by an independent resolver (Google DNS-over-HTTPS);
-  - a subdomain (docs.github.com) must inherit its parent's DMARC policy.
+  - a subdomain (docs.github.com) must inherit its parent's DMARC policy;
+  - the website grade of each domain is compared with Mozilla HTTP Observatory, test by test.
 
   The results table is published in the workflow summary and the HTML reports are kept as artifacts.
 
