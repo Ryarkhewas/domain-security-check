@@ -30,6 +30,17 @@ jobs:
               github.com google.com cloudflare.com wikipedia.org \
               docs.github.com badssl.com expired.badssl.com self-signed.badssl.com wrong.host.badssl.com
           } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Compare with Mozilla HTTP Observatory
+        # Informational: a grade gap shows up as a warning, never as a failure
+        continue-on-error: true
+        run: |
+          {
+            echo
+            echo "## Website grade vs Mozilla HTTP Observatory"
+            echo
+            python scripts/observatory_compare.py reports \
+              github.com google.com cloudflare.com wikipedia.org docs.github.com badssl.com
+          } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Live tests
         run: python -m pytest -m live -v -rA
       - name: Keep the HTML reports
