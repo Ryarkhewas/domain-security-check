@@ -34,13 +34,14 @@ jobs:
         # Informational: a grade gap shows up as a warning, never as a failure
         continue-on-error: true
         run: |
+          python scripts/observatory_compare.py reports \
+            github.com google.com cloudflare.com wikipedia.org docs.github.com badssl.com
           {
             echo
             echo "## Website grade vs Mozilla HTTP Observatory"
             echo
-            python scripts/observatory_compare.py reports \
-              github.com google.com cloudflare.com wikipedia.org docs.github.com badssl.com
-          } | tee -a "$GITHUB_STEP_SUMMARY"
+            cat reports/observatory/summary.md
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Live tests
         run: python -m pytest -m live -v -rA
       - name: Keep the HTML reports
