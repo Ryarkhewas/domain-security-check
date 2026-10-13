@@ -3,7 +3,7 @@ import json
 import pytest
 
 import domain_check as cli
-from domaincheck.audit import InvalidDomain, compute_score, email_domain, find_dmarc, normalize_domain, run_audit
+from domaincheck.audit import InvalidDomain, email_domain, find_dmarc, normalize_domain, run_audit
 from domaincheck.demo import DemoCollector
 from domaincheck.models import Category, Finding, Status
 from domaincheck.report import render_html, render_json
@@ -29,17 +29,6 @@ def test_invalid_domain(text):
 def test_email_domain():
     assert email_domain("www.example.com") == "example.com"
     assert email_domain("shop.example.com") == "shop.example.com"
-
-
-def _f(status):
-    return Finding(Category.WEB, "t", status, "d")
-
-
-def test_score():
-    assert compute_score([_f(Status.OK)] * 5) == (100, "A")
-    assert compute_score([_f(Status.CRITICAL)] * 2) == (60, "C")
-    assert compute_score([_f(Status.CRITICAL)] * 6) == (0, "F")
-    assert compute_score([_f(Status.INFO)] * 10) == (100, "A")
 
 
 class Spy(DemoCollector):
@@ -68,7 +57,11 @@ def test_www_email_checks_on_root_domain():
 
 def test_full_demo():
     r = run_audit("bakery-example.com", collector=DemoCollector())
-    assert r.grade == "C"
+    # website: 100 - 20 (redirect) - 25 (CSP) - 20 (HSTS) - 20 (clickjacking) = 15
+    assert (r.grades["WEB"].score, r.grades["WEB"].grade) == (15, "F")
+    assert (r.grades["TLS"].score, r.grades["TLS"].grade) == (90, "A")  # expires in 21 days: -10
+    assert (r.grades["EMAIL"].score, r.grades["EMAIL"].grade) == (60, "C+")  # ?all -20, p=none -20
+    assert r.grade == "F"  # overall = weakest area
     assert {f.category for f in r.findings} == set(Category)
 
 
@@ -94,7 +87,7 @@ def test_cli_demo(tmp_path, capsys):
     output = tmp_path / "r.html"
     assert cli.main(["--demo", "-o", str(output), "--author", "Test"]) == 0
     assert "by Test" in output.read_text(encoding="utf-8")
-    assert "grade C" in capsys.readouterr().out
+    assert "overall grade F" in capsys.readouterr().out
 
 
 def test_cli_invalid_domain(capsys):
@@ -148,7 +141,8 @@ def test_subdomain_audit_inherits_parent_policy():
 # --- Grade cap when HTTPS is broken ------------------------------------------
 from datetime import datetime, timedelta, timezone  # noqa: E402
 
-from domaincheck.audit import CAPPED_SCORE, analyze, broken_https_reason  # noqa: E402
+from domaincheck.audit import analyze, broken_https_reason  # noqa: E402
+from domaincheck.scoring import CAPPED_WEB_SCORE  # noqa: E402
 from domaincheck.models import CertificateInfo, CollectedData, HTTPInfo  # noqa: E402
 
 NOW = datetime(2026, 10, 13, tzinfo=timezone.utc)
@@ -163,7 +157,8 @@ def data(cert, http):
 def test_expired_certificate_caps_grade():
     expired = CertificateInfo(valid=True, expires_at=NOW - timedelta(days=1), tls_version="TLSv1.3")
     r = analyze(data(expired, HTTPInfo(False, http_redirects_to_https=True)), [], NOW)
-    assert (r.score, r.grade) == (CAPPED_SCORE, "F")
+    assert (r.grades["WEB"].score, r.grades["WEB"].grade) == (CAPPED_WEB_SCORE, "F")
+    assert r.grades["TLS"].grade == "F" and r.grade == "F"
     assert "expired" in r.cap_reason
 
 
@@ -182,7 +177,9 @@ def test_no_website_at_all_is_not_capped():
     # mail-only domain: nothing answers on 80/443, so there is no website to grade
     r = analyze(data(None, HTTPInfo(False, http_redirects_to_https=None)), [], NOW)
     assert r.cap_reason == ""
-    assert r.grade != "F"
+    assert r.grades["WEB"].grade == r.grades["TLS"].grade == "N/A"
+    assert r.grade == r.grades["EMAIL"].grade == "A"
+    assert not [f for f in r.findings if f.category != Category.EMAIL]
 
 
 def test_certificate_expiring_soon_is_not_capped():
@@ -195,12 +192,24 @@ def test_cap_never_raises_a_lower_score():
     awful = data(invalid, HTTPInfo(False, http_redirects_to_https=False))
     awful.root_txt, awful.dmarc_txt = [], []
     r = analyze(awful, [], NOW)
-    assert r.score < CAPPED_SCORE  # already below the cap: kept as is
+    assert r.grades["WEB"].score <= CAPPED_WEB_SCORE
 
 
 def test_cap_reason_shown_in_reports():
     invalid = CertificateInfo(valid=False, error="certificate has expired")
     r = analyze(data(invalid, HTTPInfo(False, http_redirects_to_https=True)), [], NOW)
-    assert "Grade capped at F" in render_html(r)
+    assert "website grade capped at F" in render_html(r)
     from domaincheck.report import console_summary
-    assert "Grade capped at F" in console_summary(r)
+    assert "Capped at F" in console_summary(r)
+
+
+def test_report_shows_points_and_sources():
+    html = render_html(run_audit("example.com", collector=DemoCollector()))
+    assert "-25 pts" in html and "not scored" in html
+    assert "https://www.rfc-editor.org/rfc/rfc7489" in html  # DMARC source
+    assert "Mozilla HTTP Observatory scoring" in html
+
+
+def test_json_contains_the_three_grades():
+    data = json.loads(render_json(run_audit("example.com", collector=DemoCollector())))
+    assert set(data["grades"]) == {"WEB", "TLS", "EMAIL"} and data["grade"] == "F"

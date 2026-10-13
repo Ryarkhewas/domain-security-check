@@ -15,7 +15,7 @@ import dns.exception
 import dns.resolver
 import requests
 
-from .models import CertificateInfo, HTTPInfo
+from .models import CertificateInfo, CookieInfo, HTTPInfo
 
 DKIM_SELECTORS = [
     "default", "google", "selector1", "selector2", "k1", "k2", "mail", "dkim",
@@ -131,16 +131,36 @@ class Collector:
         headers = dict(BROWSER_HEADERS)
         try:
             r = requests.get(f"https://{host}", headers=headers, timeout=self.timeout, allow_redirects=True)
-            info = HTTPInfo(https_reachable=True, headers=dict(r.headers))
+            info = HTTPInfo(https_reachable=True, headers=dict(r.headers), cookies=_cookies(r))
         except requests.RequestException as e:
             info = HTTPInfo(https_reachable=False, error=str(e))
 
         try:
             r = requests.get(f"http://{host}", headers=headers, timeout=self.timeout, allow_redirects=True)
+            info.redirect_chain = [h.url for h in getattr(r, "history", [])] + [r.url]
             info.http_redirects_to_https = r.url.startswith("https://")
         except requests.exceptions.SSLError:
             # Redirected to HTTPS, but the certificate is a problem: the redirect does exist.
             info.http_redirects_to_https = True
+            info.redirect_cert_error = True
         except requests.RequestException:
             info.http_redirects_to_https = None
         return info
+
+
+def _cookies(response) -> list[CookieInfo]:
+    """Cookies set while loading the home page, with their security attributes."""
+    jar = getattr(response, "cookies", None)
+    if jar is None:
+        return []
+    cookies = []
+    for c in jar:
+        rest = {k.lower(): v for k, v in getattr(c, "_rest", {}).items()}
+        samesite = rest.get("samesite")
+        cookies.append(CookieInfo(
+            name=c.name,
+            secure=bool(c.secure),
+            httponly="httponly" in rest,
+            samesite=samesite.lower() if isinstance(samesite, str) else None,
+        ))
+    return cookies

@@ -1,4 +1,4 @@
-"""Data structures shared by the checks and the report."""
+"""Data structures shared by the checks, the scoring and the report."""
 
 from __future__ import annotations
 
@@ -15,8 +15,8 @@ class Status(str, Enum):
 
 
 class Category(str, Enum):
-    WEB = "Website (HTTPS)"
-    HEADERS = "Security headers"
+    WEB = "Website security"
+    TLS = "Certificate & TLS"
     EMAIL = "Email protection"
 
 
@@ -27,6 +27,8 @@ class Finding:
     status: Status
     detail: str
     recommendation: str = ""
+    points: int | None = None  # score modifier; None = shown but not scored
+    source: str = ""  # key into sources.SOURCES
 
 
 @dataclass
@@ -42,6 +44,14 @@ class CertificateInfo:
 
 
 @dataclass
+class CookieInfo:
+    name: str
+    secure: bool
+    httponly: bool
+    samesite: str | None = None  # "strict", "lax", "none", other, or None if absent
+
+
+@dataclass
 class HTTPInfo:
     """Result of the HTTP / HTTPS requests to the site."""
 
@@ -49,6 +59,9 @@ class HTTPInfo:
     headers: dict[str, str] = field(default_factory=dict)
     http_redirects_to_https: bool | None = None  # None = plain HTTP unreachable
     error: str = ""
+    redirect_chain: list[str] = field(default_factory=list)  # URLs visited from http://host
+    redirect_cert_error: bool = False  # an invalid certificate was hit while following redirects
+    cookies: list[CookieInfo] = field(default_factory=list)
 
 
 @dataclass
@@ -66,10 +79,17 @@ class CollectedData:
 
 
 @dataclass
+class CategoryGrade:
+    score: int | None  # None = not applicable (e.g. no website)
+    grade: str  # "A+" ... "F", or "N/A"
+    note: str = ""
+
+
+@dataclass
 class Result:
     domain: str
     date: datetime
     findings: list[Finding]
-    score: int = 0
-    grade: str = ""
-    cap_reason: str = ""  # why the grade was capped, if it was
+    grades: dict[str, CategoryGrade] = field(default_factory=dict)  # keyed by Category.name
+    grade: str = ""  # overall grade: the weakest category
+    cap_reason: str = ""  # why the website / TLS grades were capped, if they were

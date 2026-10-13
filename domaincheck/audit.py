@@ -5,12 +5,11 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 
-from .email_checks import check_dkim, check_dmarc, check_mx, check_spf
-from .models import CollectedData, Result, Status
-from .web_checks import check_certificate, check_headers, check_redirect
-
-PENALTIES = {Status.CRITICAL: 20, Status.WARNING: 5, Status.INFO: 0, Status.OK: 0}
-GRADE_THRESHOLDS = [(90, "A"), (75, "B"), (60, "C"), (40, "D"), (0, "F")]
+from .email_checks import check_dkim, check_dmarc, check_mx, check_spf, effective_dmarc_policy
+from .models import CollectedData, Result
+from .scoring import category_grades, overall_grade
+from .tls_checks import check_certificate
+from .web_checks import check_website
 
 _VALID_DOMAIN = re.compile(r"^(?=.{1,253}$)(?!-)([a-z0-9-]{1,63}(?<!-)\.)+[a-z]{2,63}$")
 
@@ -39,20 +38,12 @@ def email_domain(domain: str) -> str:
     return domain[4:] if domain.startswith("www.") else domain
 
 
-CAPPED_SCORE = 39  # highest score that still gives an F
-
-
-def compute_score(findings) -> tuple[int, str]:
-    score = max(0, 100 - sum(PENALTIES[f.status] for f in findings))
-    grade = next(g for threshold, g in GRADE_THRESHOLDS if score >= threshold)
-    return score, grade
-
-
 def broken_https_reason(data: CollectedData, now: datetime) -> str:
     """Return why HTTPS is broken for visitors, or "" if it works (or there is no website).
 
     When HTTPS fails, header checks cannot run, so without a cap a broken site
-    would lose fewer points than a working one with a few missing headers.
+    would score better on the website grade than a working one with a few
+    missing headers.
     """
     cert = data.certificate
     if cert is None:
@@ -66,28 +57,31 @@ def broken_https_reason(data: CollectedData, now: datetime) -> str:
     return ""
 
 
+def website_exists(data: CollectedData) -> bool:
+    return data.certificate is not None or data.http.http_redirects_to_https is not None
+
+
 def analyze(data: CollectedData, tested_selectors: list[str], now: datetime | None = None) -> Result:
+    now = now or datetime.now(timezone.utc)
+    exists = website_exists(data)
     findings = []
-    findings += check_certificate(data.certificate, now)
-    findings += check_redirect(data.http)
-    if data.http.https_reachable:
-        findings += check_headers(data.http.headers)
+    if exists:
+        findings += check_certificate(data.certificate, now)
+        findings += check_website(data.http, data.domain)
     findings += check_mx(data.mx)
-    findings += check_spf(data.root_txt)
+    enforced = effective_dmarc_policy(data.dmarc_txt, data.dmarc_inherited_from) in ("quarantine", "reject")
+    findings += check_spf(data.root_txt, dmarc_enforced=enforced)
     findings += check_dmarc(data.dmarc_txt, data.dmarc_inherited_from)
     findings += check_dkim(data.dkim_selectors, tested_selectors)
 
-    now = now or datetime.now(timezone.utc)
-    score, grade = compute_score(findings)
     cap_reason = broken_https_reason(data, now)
-    if cap_reason and score > CAPPED_SCORE:
-        score, grade = CAPPED_SCORE, "F"
+    grades = category_grades(findings, exists, cap_reason)
     return Result(
         domain=data.domain,
         date=now,
         findings=findings,
-        score=score,
-        grade=grade,
+        grades=grades,
+        grade=overall_grade(grades),
         cap_reason=cap_reason,
     )
 

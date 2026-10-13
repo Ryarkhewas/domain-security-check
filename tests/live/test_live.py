@@ -34,7 +34,7 @@ def doh_txt(name: str) -> list[str]:
 
 
 def certificate_finding(result):
-    return next(f for f in result.findings if f.category == Category.WEB and f.title == "HTTPS certificate")
+    return next(f for f in result.findings if f.category == Category.TLS and f.title == "HTTPS certificate")
 
 
 # --- Certificate problems are detected --------------------------------------
@@ -50,7 +50,8 @@ def test_bad_certificates_are_critical(host, expected_words):
     assert finding.status == Status.CRITICAL, finding
     detail = finding.detail.lower()
     assert any(word in detail for word in expected_words), detail
-    assert result.grade == "F" and result.cap_reason, result  # broken HTTPS caps the grade
+    assert result.cap_reason, result
+    assert result.grades["WEB"].grade == result.grades["TLS"].grade == result.grade == "F"
 
 
 def test_valid_certificate_is_ok():
@@ -81,7 +82,7 @@ def test_well_known_domains(domain):
     assert by_title["HTTPS certificate"].status == Status.OK
     assert by_title["SPF (authorized senders)"].status in (Status.OK, Status.WARNING)
     assert by_title["DMARC (anti-spoofing policy)"].status != Status.CRITICAL
-    assert result.grade in "ABCDF"
+    assert result.grade[0] in "ABCDF"
 
 
 @pytest.mark.parametrize("domain", ["github.com", "google.com"])

@@ -4,7 +4,7 @@
 
 **Passive security audit of a domain name, with a clear report for non-specialists.**
 
-In a single command, the tool checks what anyone can see from the Internet about a domain: is the website properly protected with HTTPS, does the server send the right security headers, and above all, **can someone send emails pretending to be the company?** It produces an HTML report graded from A to F, with concrete actions to take.
+In a single command, the tool checks what anyone can see from the Internet about a domain: is the website properly protected with HTTPS, does the server send the right security headers, and above all, **can someone send emails pretending to be the company?** It produces an HTML report with a grade per area (website, certificate, email), the points behind each grade, the standard each check relies on, and concrete actions to take.
 
 ![Report preview](examples/preview.png)
 
@@ -12,11 +12,11 @@ In a single command, the tool checks what anyone can see from the Internet about
 
 | Area | Checks |
 |---|---|
-| **Website** | Valid certificate and expiry date, TLS version, HTTP to HTTPS redirect |
-| **Security headers** | HSTS, Content-Security-Policy, clickjacking protection, X-Content-Type-Options, Referrer-Policy, Permissions-Policy, software version disclosure |
+| **Website** | HTTP to HTTPS redirect, HSTS, Content-Security-Policy, cookies (Secure, HttpOnly, SameSite), clickjacking protection, X-Content-Type-Options, Referrer-Policy, Cross-Origin-Resource/Opener/Embedder-Policy; not scored: Permissions-Policy, software version disclosure |
+| **Certificate & TLS** | Valid certificate, expiry date, TLS version |
 | **Email** | MX servers, SPF (presence, `all` rule, 10 DNS lookup limit), DMARC (policy, coverage, reports, inheritance from the parent domain for subdomains), DKIM (common selectors) |
 
-Each item is rated **Critical**, **To improve**, **Compliant** or **Info**, with a plain-language recommendation.
+Each item is rated **Critical**, **To improve**, **Compliant** or **Info**, shows the points it weighs in the grade, cites the standard it is based on, and comes with a plain-language recommendation.
 
 ## A strictly passive audit
 
@@ -60,19 +60,45 @@ If a DNS query fails (network outage, timeout), the audit **stops without produc
 
 For DKIM, there is no way to list all of a domain's keys: the tool tests the most common selectors. Finding nothing is reported as information, not as a flaw.
 
-## Scoring
+## Grades
 
-The score starts at 100: −20 per critical item, −5 per item to improve.
+The report gives **three grades**, one per area, and an **overall grade equal to the weakest of the three**: a site is only as safe as its weakest point.
 
-**Broken HTTPS caps the grade at F.** If the certificate is invalid or expired, or if the site answers over HTTP but not over HTTPS, visitors are not protected whatever the other settings, and the security headers cannot even be checked. Without this cap, a site with broken HTTPS would lose fewer points than a working site missing a few headers. A domain with no website at all (mail only) is not capped.
+| Area | How it is graded |
+|---|---|
+| **Website** | The [Mozilla HTTP Observatory](https://developer.mozilla.org/en-US/observatory/docs/tests_and_scoring) algorithm, with its official score modifiers: start at 100, apply the penalties, and add bonuses only if the score is still 90 or more. |
+| **Certificate & TLS** | This project's scale: −100 for a missing, invalid or expired certificate, −30 for TLS 1.0/1.1 or a certificate expiring within 15 days, −10 within 30 days. |
+| **Email** | This project's scale, based on what the standards define as valid: e.g. no DMARC −40, no SPF −30 (−10 if a strict DMARC policy already stops spoofing), `p=none` −20, `?all` −20. |
 
-| Grade | Score | Meaning |
-|---|---|---|
-| A | 90–100 | Very good configuration |
-| B | 75–89 | Solid foundation, a few points to strengthen |
-| C | 60–74 | Partial protection |
-| D | 40–59 | Significant exposure |
-| F | 0–39 | High exposure |
+All three use the Observatory grade chart (A+ … F, by steps of 5 points); A+ only exists for the website grade, the only one with bonuses.
+
+Each item of the report shows the points it adds or removes, so every grade can be recomputed by hand.
+
+**Broken HTTPS caps the website grade at F.** If the certificate is invalid or expired, or if the site answers over HTTP but not over HTTPS, visitors are not protected whatever the other settings, and the security headers cannot even be checked. A domain with no website at all (mail only) gets "N/A" for the website and TLS grades, and is graded on email only.
+
+## Methodology
+
+Every check is based on a published standard or guide, cited under each item of the report.
+
+| Check | Reference |
+|---|---|
+| Content-Security-Policy | [W3C CSP Level 3](https://www.w3.org/TR/CSP3/) |
+| HSTS | [RFC 6797](https://www.rfc-editor.org/rfc/rfc6797) |
+| Clickjacking (X-Frame-Options, frame-ancestors) | [RFC 7034](https://www.rfc-editor.org/rfc/rfc7034) |
+| X-Content-Type-Options | [WHATWG Fetch](https://fetch.spec.whatwg.org/#x-content-type-options-header) |
+| Referrer-Policy | [W3C Referrer Policy](https://www.w3.org/TR/referrer-policy/) |
+| Cookies | [RFC 6265](https://www.rfc-editor.org/rfc/rfc6265), [MDN cookie guide](https://developer.mozilla.org/en-US/docs/Web/Security/Practical_implementation_guides/Cookies) |
+| HTTP to HTTPS redirect | [MDN TLS guide](https://developer.mozilla.org/en-US/docs/Web/Security/Practical_implementation_guides/TLS#http_redirection) |
+| Cross-Origin-Resource / Opener / Embedder-Policy | MDN reference pages |
+| Permissions-Policy, version disclosure (not scored) | [W3C Permissions Policy](https://www.w3.org/TR/permissions-policy/), [OWASP Secure Headers Project](https://owasp.org/www-project-secure-headers/) |
+| TLS protocol version | [RFC 8996](https://www.rfc-editor.org/rfc/rfc8996) (TLS 1.0 and 1.1 deprecated) |
+| SPF | [RFC 7208](https://www.rfc-editor.org/rfc/rfc7208) |
+| DMARC, including subdomain inheritance | [RFC 7489](https://www.rfc-editor.org/rfc/rfc7489) |
+| DKIM | [RFC 6376](https://www.rfc-editor.org/rfc/rfc6376) |
+| Domains that receive no email | [RFC 7505](https://www.rfc-editor.org/rfc/rfc7505) (null MX) |
+| Website scoring | [Mozilla HTTP Observatory](https://github.com/mdn/mdn-http-observatory) (MPL 2.0) |
+
+**Differences with the Observatory.** Three Observatory tests are not reproduced, because they need more than the home page headers: Subresource Integrity (requires parsing the HTML), the HSTS preload bonus (requires the official preload list) and CORS (its only penalty requires sending a forged `Origin` header). Only the first CSP policy is analysed when a site sends several. Website grades can therefore differ slightly from the Observatory's.
 
 ## Project structure
 
@@ -81,11 +107,14 @@ domain_check.py             Command line
 domaincheck/
   collector.py              Network access (DNS, TLS, HTTP), nothing else
   email_checks.py           MX / SPF / DMARC / DKIM analysis
-  web_checks.py             Certificate / redirect / headers analysis
-  audit.py                  Orchestration and scoring
+  web_checks.py             Website checks (Mozilla HTTP Observatory tests)
+  tls_checks.py             Certificate and TLS checks
+  scoring.py                Grades: Observatory algorithm, own scales, overall grade
+  sources.py                Standards cited for each check
+  audit.py                  Orchestration
   report.py                 HTML report, console summary, JSON
   demo.py                   Fictitious data for the demo
-tests/                      79 unit tests + live tests (tests/live)
+tests/                      164 unit tests + live tests (tests/live)
 scripts/live_summary.py     Audits a list of domains for the Live check workflow
 ```
 
@@ -94,7 +123,7 @@ Collection is kept separate from analysis: every rule can be tested on fixed dat
 ## Tests
 
 ```bash
-python -m pytest -q          # 79 unit tests, no network needed
+python -m pytest -q          # 164 unit tests, no network needed
 python -m pytest -m live -v  # live tests against real domains (Internet required)
 ```
 

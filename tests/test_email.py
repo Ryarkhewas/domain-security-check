@@ -1,6 +1,6 @@
 import pytest
 
-from domaincheck.email_checks import check_dkim, check_dmarc, check_mx, check_spf
+from domaincheck.email_checks import check_dkim, check_dmarc, check_mx, check_spf, effective_dmarc_policy
 from domaincheck.models import Status
 
 
@@ -89,3 +89,26 @@ def test_dmarc_inherited_uses_subdomain_policy():
     record = ["v=DMARC1; p=reject; sp=none; rua=mailto:a@b.com"]
     assert check_dmarc(record, inherited_from="example.com")[0].status == Status.WARNING
     assert check_dmarc(record)[0].status == Status.OK  # on the domain itself, p= applies
+
+
+def test_missing_spf_is_only_a_warning_when_dmarc_is_enforced():
+    strict = check_spf([], dmarc_enforced=True)[0]
+    assert (strict.status, strict.points) == (Status.WARNING, -10)
+    loose = check_spf([], dmarc_enforced=False)[0]
+    assert (loose.status, loose.points) == (Status.CRITICAL, -30)
+
+
+@pytest.mark.parametrize("records, parent, expected", [
+    (["v=DMARC1; p=reject"], "", "reject"),
+    (["v=DMARC1; p=quarantine; sp=none"], "example.com", "none"),  # subdomain policy applies
+    (["v=DMARC1; p=quarantine; sp=none"], "", "quarantine"),
+    ([], "", ""), (["v=DMARC1; p=bogus"], "", ""), (["v=DMARC1; p=none", "v=DMARC1; p=reject"], "", ""),
+])
+def test_effective_dmarc_policy(records, parent, expected):
+    assert effective_dmarc_policy(records, parent) == expected
+
+
+def test_email_findings_cite_their_standard():
+    assert check_spf(["v=spf1 -all"])[0].source == "spf"
+    assert check_dmarc(["v=DMARC1; p=reject"])[0].source == "dmarc"
+    assert check_dkim([], ["a"])[0].points is None  # not finding a selector is not penalised

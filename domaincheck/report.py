@@ -8,6 +8,7 @@ from enum import Enum
 from html import escape
 
 from .models import Category, Result, Status
+from .sources import SOURCES
 
 LABELS = {
     Status.CRITICAL: "Critical",
@@ -16,13 +17,25 @@ LABELS = {
     Status.INFO: "Info",
 }
 ORDER = {Status.CRITICAL: 0, Status.WARNING: 1, Status.INFO: 2, Status.OK: 3}
-GRADE_COLOR = {"A": "ok", "B": "ok", "C": "warning", "D": "critical", "F": "critical"}
+GRADE_COLOR = {"A": "ok", "B": "ok", "C": "warning", "D": "critical", "F": "critical", "N": "na"}
+CATEGORY_LABELS = {"WEB": "Website", "TLS": "Certificate & TLS", "EMAIL": "Email"}
+CATEGORY_METHOD = {
+    "WEB": "Mozilla HTTP Observatory scoring",
+    "TLS": "this project's scale (RFC 8996, certificate validity)",
+    "EMAIL": "this project's scale (RFC 7208, 7489, 6376)",
+}
+def letter(grade: str) -> str:
+    """"A+" -> "A", "N/A" -> "N"."""
+    return grade[:1]
+
+
 GRADE_SUMMARY = {
     "A": "Very good configuration. A few minor adjustments at most.",
     "B": "Solid foundation, with a few points to strengthen.",
     "C": "Partial protection: several important settings are missing.",
     "D": "Significant exposure: fixes are recommended soon.",
     "F": "High exposure: priority fixes are needed.",
+    "N": "No grade could be computed.",
 }
 
 CSS = """
@@ -39,6 +52,13 @@ header{display:flex;gap:24px;align-items:center;flex-wrap:wrap;margin-bottom:24p
 .grade{width:96px;height:96px;border-radius:20px;display:grid;place-items:center;font-size:52px;font-weight:700;flex:none}
 .grade.ok{background:var(--ok-bg);color:var(--ok)}.grade.warning{background:var(--warn-bg);color:var(--warn)}
 .grade.critical{background:var(--crit-bg);color:var(--crit)}
+.grade.na{background:var(--card);color:var(--muted);border:1px solid var(--border)}
+.cats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 12px}
+.cat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;gap:12px;align-items:center}
+.cat .grade{width:52px;height:52px;border-radius:12px;font-size:24px}
+.cat b{display:block}.cat span{color:var(--muted);font-size:12px;line-height:1.35;display:block}
+.pts{font-size:12px;font-weight:600;color:var(--muted);margin-left:6px;white-space:nowrap}
+.src{margin:6px 0 0;font-size:12px;color:var(--muted)}.src a{color:var(--muted)}
 h1{margin:0;font-size:26px;word-break:break-all}
 .sub{color:var(--muted);margin:2px 0 0}
 .summary{margin:8px 0 0;font-weight:500}
@@ -61,13 +81,15 @@ h2{font-size:18px;margin:32px 0 12px;padding-bottom:6px;border-bottom:2px solid 
 .fix::before{content:"→ ";font-weight:700;color:var(--accent)}
 ol.priority{padding-left:22px}ol.priority li{margin-bottom:8px}
 footer{margin-top:40px;color:var(--muted);font-size:13px;border-top:1px solid var(--border);padding-top:16px}
+@media (max-width:700px){.cats{grid-template-columns:1fr}}
 @media (max-width:560px){.counters{grid-template-columns:repeat(2,1fr)}.grade{width:76px;height:76px;font-size:40px}}
-@media print{body{background:#fff}.item,.counter{break-inside:avoid}}
+@media print{body{background:#fff}.item,.counter,.cat{break-inside:avoid}}
 """
 
 
 def _sorted(findings):
-    return sorted(findings, key=lambda f: ORDER[f.status])
+    """Most serious first: by status, then by points lost (unscored items last within a status)."""
+    return sorted(findings, key=lambda f: (ORDER[f.status], f.points if f.points is not None else 0))
 
 
 def render_html(r: Result, author: str = "") -> str:
@@ -96,28 +118,44 @@ def render_html(r: Result, author: str = "") -> str:
         items = ""
         for f in _sorted(group):
             fix = f'<p class="fix">{e(f.recommendation)}</p>' if f.recommendation and f.status != Status.OK else ""
+            pts = f'<span class="pts">{_points(f.points)}</span>'
+            src = ""
+            if f.source in SOURCES:
+                label, url = SOURCES[f.source]
+                src = f'<p class="src">Source: <a href="{e(url)}">{e(label)}</a></p>'
             items += (
                 f'<div class="item {f.status.value}"><div class="row"><span class="title">{e(f.title)}</span>'
-                f'<span class="badge {f.status.value}">{LABELS[f.status]}</span></div>'
-                f'<p class="detail">{e(f.detail)}</p>{fix}</div>'
+                f'<span><span class="badge {f.status.value}">{LABELS[f.status]}</span>{pts}</span></div>'
+                f'<p class="detail">{e(f.detail)}</p>{fix}{src}</div>'
             )
         sections += f"<h2>{e(cat.value)}</h2>{items}"
 
+    cats = ""
+    for key, g in r.grades.items():
+        detail = g.note or (f"{g.score}/100 · {CATEGORY_METHOD[key]}" if g.score is not None else "")
+        cats += (f'<div class="cat"><div class="grade {GRADE_COLOR[letter(g.grade)]}">{e(g.grade)}</div>'
+                 f'<div><b>{CATEGORY_LABELS[key]}</b><span>{e(detail)}</span></div></div>')
+
     by = f" by {e(author)}" if author else ""
-    cap = f'<p class="cap">Grade capped at F: {e(r.cap_reason)}.</p>' if r.cap_reason else ""
+    cap = f'<p class="cap">{e(r.cap_reason[:1].upper() + r.cap_reason[1:])}: website grade capped at F.</p>' if r.cap_reason else ""
+    obs_label, obs_url = SOURCES["observatory"]
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Security audit — {e(r.domain)}</title><style>{CSS}</style></head>
 <body><main>
-<header><div class="grade {GRADE_COLOR[r.grade]}">{r.grade}</div>
-<div><h1>{e(r.domain)}</h1><p class="sub">Passive security audit · {r.date:%Y-%m-%d} · score {r.score}/100</p>
-<p class="summary">{GRADE_SUMMARY[r.grade]}</p>{cap}</div></header>
+<header><div class="grade {GRADE_COLOR[letter(r.grade)]}">{e(r.grade)}</div>
+<div><h1>{e(r.domain)}</h1><p class="sub">Passive security audit · {r.date:%Y-%m-%d} · overall grade = weakest area</p>
+<p class="summary">{GRADE_SUMMARY[letter(r.grade)]}</p>{cap}</div></header>
+<section class="cats">{cats}</section>
 <section class="counters">{counters}</section>
 {priority_block}
 {sections}
 <footer>
 <p><b>Method.</b> Passive audit carried out{by} using public information only: DNS records, the certificate
 presented by the server and the home page headers. No intrusion testing was performed.</p>
+<p><b>Grades.</b> The website grade follows the <a href="{obs_url}">{obs_label}</a> (penalties and bonuses per header).
+The certificate and email grades use this project's own scale, based on the standards cited under each item.
+The overall grade is the lowest of the three.</p>
 <p><b>Limits.</b> This audit does not cover the site's applications, workstations or user accounts.
 It gives an overview of the exposure visible from the Internet on the date shown.</p>
 </footer>
@@ -125,17 +163,27 @@ It gives an overview of the exposure visible from the Internet on the date shown
 """
 
 
+def _points(points: int | None) -> str:
+    if points is None:
+        return "not scored"
+    if points > 0:
+        return f"+{points} pts"
+    return f"{points} pts" if points < 0 else "0 pts"
+
+
 def console_summary(r: Result) -> str:
     symbols = {Status.CRITICAL: "✗", Status.WARNING: "!", Status.OK: "✓", Status.INFO: "i"}
-    lines = [f"\n  {r.domain} — grade {r.grade} ({r.score}/100)", f"  {GRADE_SUMMARY[r.grade]}"]
-    if r.cap_reason:
-        lines.append(f"  Grade capped at F: {r.cap_reason}.")
+    lines = [f"\n  {r.domain} — overall grade {r.grade}", f"  {GRADE_SUMMARY[letter(r.grade)]}"]
+    for key, g in r.grades.items():
+        score = f" ({g.score}/100)" if g.score is not None else ""
+        note = f" — {g.note}" if g.note else ""
+        lines.append(f"    {CATEGORY_LABELS[key]:<18} {g.grade}{score}{note}")
     lines.append("")
     for cat in Category:
         group = [f for f in r.findings if f.category == cat]
         if group:
             lines.append(f"  {cat.value}")
-            lines += [f"    [{symbols[f.status]}] {f.title} — {f.detail}" for f in _sorted(group)]
+            lines += [f"    [{symbols[f.status]}] {f.title} ({_points(f.points)}) — {f.detail}" for f in _sorted(group)]
             lines.append("")
     return "\n".join(lines)
 
