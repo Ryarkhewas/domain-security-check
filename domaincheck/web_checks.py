@@ -2,10 +2,10 @@
 
 Each check reproduces one Observatory test and uses its score modifier
 (see https://github.com/mdn/mdn-http-observatory, src/grader/charts.js,
-MPL 2.0). Two Observatory tests are not implemented because they need more
-than the home page headers: Subresource Integrity (HTML parsing) and the
-HSTS preload bonus (official preload list). CORS is not tested either: the
-only case it penalises requires sending a forged Origin header.
+MPL 2.0), including the HSTS preload list and Subresource Integrity on the
+home page scripts. Not implemented: the CORS test (the only case it
+penalises requires sending a forged Origin header) and security headers
+declared in <meta http-equiv> tags, which the Observatory also reads.
 
 Two extra checks (Permissions-Policy, version disclosure) are shown but not
 scored, since the Observatory does not score them.
@@ -16,7 +16,10 @@ No network access here: the functions analyse data that was already collected.
 from __future__ import annotations
 
 import re
+from html.parser import HTMLParser
 from typing import Mapping
+
+import tldextract
 
 from .models import Category, CookieInfo, Finding, HTTPInfo, Status
 
@@ -58,6 +61,9 @@ def check_redirection(http: HTTPInfo, host: str) -> Finding:
                   "Fix the certificate of every host involved in the redirects.", src)
     if http.http_redirects_to_https is None:
         return _f(title, 0, "The site does not answer on plain HTTP (port 80). No redirect needed.", source=src)
+    if http.redirects_preloaded:
+        return _f(title, 0, "Every host involved is in the browsers' HSTS preload list: browsers never use HTTP for "
+                  "them, whatever the redirects.", source=src)
     chain = http.redirect_chain
     if not http.http_redirects_to_https:
         if len(chain) <= 1:
@@ -80,14 +86,17 @@ def _host(url: str) -> str:
 
 
 # --- HSTS -----------------------------------------------------------------------
-def check_hsts(headers: Mapping[str, str]) -> Finding:
+def check_hsts(headers: Mapping[str, str], preloaded: bool | None = None) -> Finding:
     title, src = "HSTS", "hsts"
+    if preloaded:  # overrides the header, as in the Observatory
+        return _f(title, 5, "In the browsers' HSTS preload list: HTTPS is enforced even on the first visit.",
+                  source="hsts-preload")
     hsts = header(headers, "Strict-Transport-Security")
     if not hsts:
         return _f(title, -20, "Missing: the browser is not required to use HTTPS on later visits.",
                   "Add \"Strict-Transport-Security: max-age=31536000; includeSubDomains\".", src)
     m = re.search(r"max-age\s*=\s*\"?(\d+)", hsts, re.I)
-    if not m:
+    if not m or "," in hsts:  # a comma means the header was sent several times
         return _f(title, -20, f"The header cannot be understood: \"{hsts}\".",
                   "Use the form \"max-age=31536000; includeSubDomains\".", src)
     age = int(m.group(1))
@@ -326,6 +335,98 @@ def check_cookies(cookies: list[CookieInfo], hsts: bool) -> Finding:
     return _f(title, points, f"{detail} (cookies: {names})", recommendation, src)
 
 
+# --- Subresource Integrity ------------------------------------------------------
+_PSL = tldextract.TLDExtract(suffix_list_urls=(), cache_dir=None)  # bundled public suffix list, no download
+
+
+def registrable_domain(host: str) -> str:
+    """example.co.uk for www.example.co.uk (public suffix list, like the Observatory)."""
+    r = _PSL(host)
+    return getattr(r, "top_domain_under_public_suffix", None) or r.registered_domain
+
+
+class _ScriptCollector(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.scripts: list[dict[str, str | None]] = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "script":
+            self.scripts.append(dict(attrs))
+
+
+# Observatory results, in its order (later = worse for "only if worse"), with modifiers
+_SRI_ALL_SECURE, _SRI_EXTERNAL_SECURE, _SRI_BUT_NOT_SECURE, _SRI_NONE_BUT_SECURE, _SRI_NONE_NOT_SECURE = range(5)
+_SRI_RESULTS = {
+    _SRI_ALL_SECURE: (5, "Subresource Integrity is used and all scripts are loaded from the site's own domain."),
+    _SRI_EXTERNAL_SECURE: (5, "Subresource Integrity is used and all external scripts are loaded securely."),
+    _SRI_BUT_NOT_SECURE: (-20, "Subresource Integrity is used, but some external scripts are loaded over HTTP or a "
+                               "protocol-relative URL (//...)."),
+    _SRI_NONE_BUT_SECURE: (-5, "External scripts are loaded over HTTPS, but without Subresource Integrity: if the "
+                               "other site is compromised, its scripts run on this page."),
+    _SRI_NONE_NOT_SECURE: (-50, "External scripts are loaded over HTTP or a protocol-relative URL (//...), without "
+                                "Subresource Integrity: they can be modified in transit."),
+}
+
+
+def check_sri(body: str, content_type: str, host: str) -> Finding:
+    """Subresource Integrity on the home page scripts (Observatory subresource-integrity test)."""
+    title, src = "Subresource Integrity", "sri"
+    if content_type and content_type not in ("text/html", "application/xhtml+xml"):
+        return _f(title, 0, "The home page is not HTML: no scripts to check.", source=src, status=Status.INFO)
+    parser = _ScriptCollector()
+    try:
+        parser.feed(body)
+        parser.close()
+    except Exception:  # noqa: BLE001 - html.parser rarely fails, but the page is untrusted input
+        return _f(title, -20, "The home page claims to be HTML but cannot be parsed.", source=src)
+    if not parser.scripts:
+        return _f(title, 0, "No scripts on the home page.", source=src, status=Status.INFO)
+
+    site = registrable_domain(host)
+    result: int | None = None
+    foreign = []
+
+    def only_if_worse(new):
+        nonlocal result
+        if result is None or new > result:
+            result = new
+
+    for script in parser.scripts:
+        url = (script.get("src") or "").strip()
+        if not url:
+            continue  # inline script
+        integrity = script.get("integrity")
+        protocol_relative = re.match(r"^//[^/]", url) is not None
+        full_url = re.match(r"^https?://", url, re.I) is not None
+        relative = not protocol_relative and not full_url
+        same_site = protocol_relative or relative or registrable_domain(_host(url)) == site
+        secure_origin = relative or (same_site and not protocol_relative)
+        secure_scheme = url.lower().startswith("https://") or relative  # the page itself is served over HTTPS
+        if not secure_origin:
+            foreign.append(url)
+            if integrity and not secure_scheme:
+                only_if_worse(_SRI_BUT_NOT_SECURE)
+            elif not integrity and secure_scheme:
+                only_if_worse(_SRI_NONE_BUT_SECURE)
+            elif not integrity:
+                only_if_worse(_SRI_NONE_NOT_SECURE)
+        elif integrity and secure_scheme and result is None:
+            result = _SRI_ALL_SECURE
+
+    if result is None:
+        if not foreign:
+            return _f(title, 0, "All scripts are loaded from the site's own domain (Subresource Integrity not needed).",
+                      source=src)
+        result = _SRI_EXTERNAL_SECURE
+    points, detail = _SRI_RESULTS[result]
+    if foreign:
+        detail += f" External scripts: {', '.join(foreign[:3])}" + ("…" if len(foreign) > 3 else "") + "."
+    recommendation = "" if points >= 0 else ("Load external scripts over HTTPS and add an integrity attribute "
+                                             "(with crossorigin=\"anonymous\") to each of them.")
+    return _f(title, points, detail, recommendation, src)
+
+
 # --- Not scored by the Observatory ---------------------------------------------
 def check_permissions_policy(headers) -> Finding:
     if header(headers, "Permissions-Policy"):
@@ -355,9 +456,10 @@ def check_website(http: HTTPInfo, host: str) -> list[Finding]:
     if not http.https_reachable:
         return findings
     h = http.headers
-    hsts = check_hsts(h)
+    hsts = check_hsts(h, http.hsts_preloaded)
     findings += [
-        check_csp(h), check_cookies(http.cookies, hsts.points == 0), hsts, check_referrer(h),
+        check_csp(h), check_cookies(http.cookies, hsts.points >= 0), hsts, check_referrer(h),
+        check_sri(http.body, http.content_type, host),
         check_xcto(h), check_xfo(h), check_corp(h), check_coop(h), check_coep(h),
         check_permissions_policy(h),
     ]

@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import time
+
 import requests
 
 from .models import Category, Result
@@ -23,6 +25,8 @@ API_URL = "https://observatory-api.mdn.mozilla.net/api/v2/analyze"
 TEST_FOR_SOURCE = {
     "redirection": "redirection",
     "hsts": "strict-transport-security",
+    "hsts-preload": "strict-transport-security",
+    "sri": "subresource-integrity",
     "csp": "content-security-policy",
     "xfo": "x-frame-options",
     "xcto": "x-content-type-options",
@@ -33,7 +37,7 @@ TEST_FOR_SOURCE = {
     "coep": "cross-origin-embedder-policy",
 }
 # Observatory tests this project does not implement (documented in the README)
-NOT_IMPLEMENTED = {"subresource-integrity", "cross-origin-resource-sharing"}
+NOT_IMPLEMENTED = {"cross-origin-resource-sharing"}
 
 
 class ObservatoryError(Exception):
@@ -63,13 +67,21 @@ class Comparison:
         return not self.error and self.our_grade == self.their_grade
 
 
-def fetch(host: str, session: requests.Session | None = None, timeout: int = 90) -> dict:
-    """Latest Observatory result for host (a recent one is reused, otherwise a new scan runs)."""
+def fetch(host: str, session: requests.Session | None = None, timeout: int = 90,
+          retries: int = 2, wait: float = 20) -> dict:
+    """Latest Observatory result for host (a recent one is reused, otherwise a new scan runs).
+
+    The public API sometimes answers 5xx while busy: those answers are retried.
+    """
     s = session or requests.Session()
-    try:
-        r = s.post(API_URL, params={"host": host}, timeout=timeout)
-    except requests.RequestException as e:
-        raise ObservatoryError(f"API not reachable: {e}") from e
+    for attempt in range(retries + 1):
+        try:
+            r = s.post(API_URL, params={"host": host}, timeout=timeout)
+        except requests.RequestException as e:
+            raise ObservatoryError(f"API not reachable: {e}") from e
+        if r.status_code < 500 or attempt == retries:
+            break
+        time.sleep(wait)
     try:
         data = r.json()
     except ValueError:

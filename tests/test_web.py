@@ -7,7 +7,7 @@ import pytest
 from domaincheck.models import CertificateInfo, CookieInfo, HTTPInfo, Status
 from domaincheck.tls_checks import check_certificate
 from domaincheck.web_checks import (
-    check_cookies, check_coop, check_corp, check_csp, check_hsts, check_redirection, check_referrer,
+    check_cookies, check_coop, check_corp, check_csp, check_hsts, check_redirection, check_referrer, check_sri,
     check_version_disclosure, check_website, check_xcto, check_xfo, parse_csp,
 )
 
@@ -170,3 +170,60 @@ def test_website_full_set():
     assert titles[:4] == ["HTTP to HTTPS redirect", "Content-Security-Policy", "Cookies", "HSTS"]
     cookies = next(f for f in check_website(http, "x.com") if f.title == "Cookies")
     assert cookies.points == -5  # not secure, but HSTS present
+
+
+# --- HSTS preload list (Observatory: hsts-preloaded, redirection-all-redirects-preloaded)
+def test_preloaded_hsts_overrides_the_header():
+    f = check_hsts({}, preloaded=True)
+    assert (f.points, f.source) == (5, "hsts-preload")
+    assert check_hsts({}, preloaded=None).points == -20  # list unavailable: header only
+
+
+def test_hsts_sent_twice_is_invalid():
+    assert check_hsts({"Strict-Transport-Security": "max-age=31536000, max-age=31536000"}).points == -20
+
+
+def test_preloaded_redirects_are_not_penalised():
+    chain = ["http://example.com/", "https://www.example.com/"]  # off-host: -5 without preload
+    assert check_redirection(HTTPInfo(True, http_redirects_to_https=True, redirect_chain=chain), "example.com").points == -5
+    preloaded = HTTPInfo(True, http_redirects_to_https=True, redirect_chain=chain, redirects_preloaded=True)
+    assert check_redirection(preloaded, "example.com").points == 0
+    bad_cert = HTTPInfo(True, http_redirects_to_https=True, redirect_cert_error=True, redirects_preloaded=True)
+    assert check_redirection(bad_cert, "example.com").points == -20  # certificate problems come first
+
+
+def test_cookies_count_preloaded_hsts_as_protection():
+    http = HTTPInfo(True, headers={}, http_redirects_to_https=True, redirect_chain=["http://x.com/", "https://x.com/"],
+                    cookies=[c("pref", secure=False)], hsts_preloaded=True)
+    cookies = next(f for f in check_website(http, "x.com") if f.title == "Cookies")
+    assert cookies.points == -5
+
+
+# --- Subresource Integrity (Observatory: subresource-integrity) ----------------
+SRI = 'integrity="sha384-abc" crossorigin="anonymous"'
+
+
+@pytest.mark.parametrize("html, points", [
+    ("<p>no scripts</p>", 0),
+    ("<script>inline()</script>", 0),
+    ('<script src="/app.js"></script><script src="https://static.example.com/x.js"></script>', 0),
+    (f'<script src="/app.js" {SRI}></script>', 5),
+    (f'<script src="https://cdn.other.net/lib.js" {SRI}></script>', 5),
+    ('<script src="https://cdn.other.net/lib.js"></script>', -5),
+    (f'<script src="http://cdn.other.net/lib.js" {SRI}></script>', -20),
+    ('<script src="http://cdn.other.net/lib.js"></script>', -50),
+    ('<script src="//cdn.other.net/lib.js"></script>', -50),  # protocol-relative
+    ('<script src="//static.example.com/lib.js"></script>', -50),  # even on the same domain
+    (f'<script src="/a.js" {SRI}></script><script src="https://cdn.other.net/lib.js"></script>', -5),
+    # the Observatory keeps the first problem unless a later one ranks after it in its list
+    (f'<script src="http://a.net/x.js"></script><script src="http://b.net/y.js" {SRI}></script>', -50),
+    (f'<script src="http://b.net/y.js" {SRI}></script><script src="https://a.net/x.js"></script>', -5),
+])
+def test_sri(html, points):
+    assert check_sri(html, "text/html", "www.example.com").points == points
+
+
+def test_sri_not_html_and_registrable_domain():
+    assert check_sri("<script src='http://a.net/x.js'></script>", "application/json", "example.com").points == 0
+    assert check_sri('<script src="https://cdn.bbc.co.uk/x.js"></script>', "", "www.bbc.co.uk").points == 0
+    assert check_sri('<script src="https://other.co.uk/x.js"></script>', "", "www.bbc.co.uk").points == -5

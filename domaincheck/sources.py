@@ -14,6 +14,8 @@ SOURCES: dict[str, tuple[str, str]] = {
     "cookies": ("RFC 6265 (HTTP cookies) and MDN cookie guide", f"{MDN}/Cookies"),
     "redirection": ("MDN TLS guide: HTTP redirection", f"{MDN}/TLS#http_redirection"),
     "hsts": ("RFC 6797 (HTTP Strict Transport Security)", "https://www.rfc-editor.org/rfc/rfc6797"),
+    "hsts-preload": ("HSTS preload list (Chromium, used by all major browsers)", "https://hstspreload.org/"),
+    "sri": ("W3C Subresource Integrity", "https://www.w3.org/TR/SRI/"),
     "referrer": ("W3C Referrer Policy", "https://www.w3.org/TR/referrer-policy/"),
     "xcto": ("WHATWG Fetch: X-Content-Type-Options", "https://fetch.spec.whatwg.org/#x-content-type-options-header"),
     "xfo": ("RFC 7034 (X-Frame-Options)", "https://www.rfc-editor.org/rfc/rfc7034"),

@@ -1,8 +1,8 @@
 """Passive collection of a domain's public information.
 
 Only requests that any visitor or mail server makes normally: DNS lookups,
-a TLS handshake and one GET request on the home page. No port scanning, no
-intrusion attempt.
+a TLS handshake, the home page (over HTTPS and HTTP) and robots.txt, like
+Mozilla HTTP Observatory. No port scanning, no intrusion attempt.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ import dns.exception
 import dns.resolver
 import requests
 
+from .hsts_preload import PreloadList
 from .models import CertificateInfo, CookieInfo, HTTPInfo
 
 DKIM_SELECTORS = [
@@ -128,15 +129,27 @@ class Collector:
 
     # --- HTTP --------------------------------------------------------------
     def http(self, host: str) -> HTTPInfo:
-        headers = dict(BROWSER_HEADERS)
+        # Like a browser (and the Observatory), cookies are collected across the
+        # redirects and robots.txt, not only from the final page.
+        https = requests.Session()
         try:
-            r = requests.get(f"https://{host}", headers=headers, timeout=self.timeout, allow_redirects=True)
-            info = HTTPInfo(https_reachable=True, headers=dict(r.headers), cookies=_cookies(r))
+            r = https.get(f"https://{host}", headers=dict(BROWSER_HEADERS), timeout=self.timeout,
+                          allow_redirects=True)
+            content_type = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+            info = HTTPInfo(https_reachable=True, headers=dict(r.headers), content_type=content_type,
+                            body=_page_text(r, content_type))
+            try:
+                https.get(f"https://{host}/robots.txt", headers={**BROWSER_HEADERS, "Accept": "text/plain,*/*;q=0.8"},
+                          timeout=self.timeout, allow_redirects=True)
+            except requests.RequestException:
+                pass
+            info.cookies = _cookies(https.cookies)
         except requests.RequestException as e:
             info = HTTPInfo(https_reachable=False, error=str(e))
 
         try:
-            r = requests.get(f"http://{host}", headers=headers, timeout=self.timeout, allow_redirects=True)
+            r = requests.Session().get(f"http://{host}", headers=dict(BROWSER_HEADERS), timeout=self.timeout,
+                                       allow_redirects=True)
             info.redirect_chain = [h.url for h in getattr(r, "history", [])] + [r.url]
             info.http_redirects_to_https = r.url.startswith("https://")
         except requests.exceptions.SSLError:
@@ -145,12 +158,47 @@ class Collector:
             info.redirect_cert_error = True
         except requests.RequestException:
             info.http_redirects_to_https = None
+
+        preload = self.preload_list()
+        if preload is not None:
+            info.hsts_preloaded = preload.covers(host)
+            hosts = [_url_host(u) for u in info.redirect_chain] or [host]
+            info.redirects_preloaded = all(preload.covers(h) for h in hosts)
         return info
 
+    def preload_list(self) -> PreloadList | None:
+        """HSTS preload list, loaded once per run; None if it cannot be obtained."""
+        if Collector._preload is None:
+            try:
+                Collector._preload = PreloadList.load()
+            except (requests.RequestException, OSError, ValueError):
+                Collector._preload = False
+        return Collector._preload or None
 
-def _cookies(response) -> list[CookieInfo]:
+    _preload: PreloadList | None | bool = None
+
+
+MAX_PAGE_SIZE = 2_000_000
+HTML_TYPES = {"text/html", "application/xhtml+xml"}
+
+
+def _page_text(response, content_type: str) -> str:
+    """Home page HTML (to look at its scripts); empty for other content types."""
+    if content_type and content_type not in HTML_TYPES:
+        return ""
+    content = getattr(response, "content", b"") or b""
+    try:
+        return content[:MAX_PAGE_SIZE].decode(getattr(response, "encoding", None) or "utf-8", "replace")
+    except LookupError:  # unknown charset announced by the server
+        return content[:MAX_PAGE_SIZE].decode("utf-8", "replace")
+
+
+def _url_host(url: str) -> str:
+    return url.split("://", 1)[-1].split("/")[0].split(":")[0].lower()
+
+
+def _cookies(jar) -> list[CookieInfo]:
     """Cookies set while loading the home page, with their security attributes."""
-    jar = getattr(response, "cookies", None)
     if jar is None:
         return []
     cookies = []

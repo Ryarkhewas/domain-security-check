@@ -62,6 +62,10 @@ class HTTPInfo:
     redirect_chain: list[str] = field(default_factory=list)  # URLs visited from http://host
     redirect_cert_error: bool = False  # an invalid certificate was hit while following redirects
     cookies: list[CookieInfo] = field(default_factory=list)
+    content_type: str = ""  # of the HTTPS home page, without parameters
+    body: str = ""  # HTTPS home page HTML (truncated), used for the Subresource Integrity check
+    hsts_preloaded: bool | None = None  # in the browsers' HSTS preload list (None = list unavailable)
+    redirects_preloaded: bool | None = None  # every host of the HTTP redirect chain is preloaded
 
 
 @dataclass

@@ -40,8 +40,16 @@ def test_test_missing_on_our_side_counts_as_zero():
 
 
 def test_not_implemented_tests_only_show_when_they_score():
-    c = compare(result({}), api({"subresource-integrity": 0, "cross-origin-resource-sharing": -50}))
+    c = compare(result({}), api({"cross-origin-resource-sharing": 0}))
+    assert c.gaps == []
+    c = compare(result({}), api({"cross-origin-resource-sharing": -50}))
     assert [(g.test, g.ours, g.theirs) for g in c.gaps] == [("cross-origin-resource-sharing", None, -50)]
+
+
+def test_preload_and_sri_findings_map_to_observatory_tests():
+    c = compare(result({"hsts-preload": 5, "sri": -5}),
+                api({"strict-transport-security": 5, "subresource-integrity": -5}))
+    assert c.gaps == []
 
 
 def test_unscored_findings_are_not_compared():
@@ -71,12 +79,12 @@ class FakeResponse:
 
 
 class FakeSession:
-    def __init__(self, response):
-        self.response, self.calls = response, []
+    def __init__(self, *responses):
+        self.responses, self.calls = list(responses), []
 
     def post(self, url, params, timeout):
         self.calls.append((url, params))
-        return self.response
+        return self.responses.pop(0) if len(self.responses) > 1 else self.responses[0]
 
 
 def test_fetch_ok():
@@ -92,3 +100,13 @@ def test_fetch_ok():
 def test_fetch_errors(response, message):
     with pytest.raises(ObservatoryError, match=message):
         fetch("example.com", FakeSession(response))
+
+
+def test_fetch_retries_when_the_api_is_busy():
+    s = FakeSession(FakeResponse(503, {"error": "busy"}), FakeResponse(200, api({})))
+    assert fetch("example.com", s, wait=0)["scan"]["grade"] == "B"
+    assert len(s.calls) == 2
+    s = FakeSession(FakeResponse(503, {"error": "busy"}))
+    with pytest.raises(ObservatoryError, match="busy"):
+        fetch("example.com", s, retries=1, wait=0)
+    assert len(s.calls) == 2
