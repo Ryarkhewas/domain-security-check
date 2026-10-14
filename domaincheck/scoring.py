@@ -58,6 +58,11 @@ def category_grades(findings: list[Finding], website_exists: bool, cap_reason: s
 
     mail = simple_score(by_cat[Category.EMAIL])
     grades[Category.EMAIL.name] = CategoryGrade(mail, grade_for_score(mail, allow_plus=False))
+    if any(f.points is not None for f in by_cat[Category.DNS]):
+        dns = simple_score(by_cat[Category.DNS])
+        grades[Category.DNS.name] = CategoryGrade(dns, grade_for_score(dns, allow_plus=False))
+    else:
+        grades[Category.DNS.name] = CategoryGrade(None, "N/A", "DNSSEC and CAA could not be checked.")
     return grades
 
 

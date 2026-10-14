@@ -18,6 +18,7 @@ class Category(str, Enum):
     WEB = "Website security"
     TLS = "Certificate & TLS"
     EMAIL = "Email protection"
+    DNS = "Domain & DNS"
 
 
 @dataclass
@@ -69,6 +70,36 @@ class HTTPInfo:
 
 
 @dataclass
+class DNSSECInfo:
+    """DNSSEC status of the DNS zone that contains the domain."""
+
+    zone: str = ""
+    ds_count: int = 0  # DS records published in the parent zone (the "chain of trust" link)
+    dnskey_count: int = 0  # keys published by the zone itself
+    ds_matches: bool | None = None  # a DS record matches one of the keys (None = could not compare)
+    error: str = ""  # the queries failed: status unknown
+
+
+@dataclass
+class CAAInfo:
+    """CAA records: which certificate authorities may issue certificates for the domain."""
+
+    records: list[tuple[int, str, str]] = field(default_factory=list)  # (flags, tag, value)
+    owner: str = ""  # domain where the records were found (the domain itself or a parent)
+    error: str = ""
+
+
+@dataclass
+class MTASTSInfo:
+    """MTA-STS (RFC 8461) and SMTP TLS reporting (RFC 8460) for the email domain."""
+
+    txt: list[str] = field(default_factory=list)  # _mta-sts.<domain> TXT records
+    policy: str | None = None  # https://mta-sts.<domain>/.well-known/mta-sts.txt, if fetched
+    error: str = ""  # why the policy could not be fetched
+    tls_rpt: list[str] = field(default_factory=list)  # _smtp._tls.<domain> TXT records
+
+
+@dataclass
 class CollectedData:
     """Everything fetched from the network, before analysis."""
 
@@ -80,6 +111,9 @@ class CollectedData:
     certificate: CertificateInfo | None
     http: HTTPInfo
     dmarc_inherited_from: str = ""  # parent domain whose DMARC policy applies, if any
+    dnssec: DNSSECInfo | None = None
+    caa: CAAInfo | None = None
+    mta_sts: MTASTSInfo | None = None
 
 
 @dataclass

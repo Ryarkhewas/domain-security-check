@@ -1,7 +1,7 @@
-"""Email protection checks: MX, SPF, DMARC, DKIM.
+"""Email protection checks: MX, SPF, DMARC, DKIM, MTA-STS, TLS reporting.
 
 What is valid comes from the standards (RFC 7208 SPF, RFC 7489 DMARC,
-RFC 6376 DKIM, RFC 7505 null MX). The points are this project's own:
+RFC 6376 DKIM, RFC 7505 null MX, RFC 8461 MTA-STS, RFC 8460 TLS-RPT). The points are this project's own:
 there is no public scoring standard for email security.
 
 These functions make no network calls: they receive DNS records that were
@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 
-from .models import Category, Finding, Status
+from .models import Category, Finding, MTASTSInfo, Status
 
 C = Category.EMAIL
 
@@ -174,3 +174,97 @@ def check_dkim(found_selectors: list[str], tested_selectors: list[str]) -> list[
                "This is not necessarily a problem: the selector may have another name.",
                "Check in your email service (Google Workspace, Microsoft 365...) that DKIM signing is enabled.",
                None, "dkim")]
+
+
+# --- MTA-STS (RFC 8461) and SMTP TLS reporting (RFC 8460) ----------------------
+MAX_MTA_STS_AGE = 31_557_600  # one year, RFC 8461 section 3.2
+
+
+def parse_mta_sts_policy(text: str) -> dict[str, list[str]]:
+    """"key: value" lines; "mx" may appear several times."""
+    policy: dict[str, list[str]] = {}
+    for line in text.replace("\r\n", "\n").split("\n"):
+        if ":" in line:
+            key, value = line.split(":", 1)
+            policy.setdefault(key.strip().lower(), []).append(value.strip())
+    return policy
+
+
+def mx_matches(host: str, pattern: str) -> bool:
+    """RFC 8461 section 4.1: "*.example.net" matches exactly one extra label on the left."""
+    host, pattern = host.lower().rstrip("."), pattern.lower().rstrip(".")
+    if pattern.startswith("*."):
+        return host.count(".") > 0 and host.split(".", 1)[1] == pattern[2:]
+    return host == pattern
+
+
+def check_mta_sts(info: MTASTSInfo | None, mx: list[str]) -> list[Finding]:
+    title, src = "MTA-STS (encrypted email delivery)", "mta-sts"
+    receivers = [m for m in mx if m]  # a null MX ("." -> "") receives nothing
+    if not receivers or info is None:
+        return []  # the domain receives no email: nothing to protect
+
+    findings = [_check_mta_sts_policy(info, receivers, title, src)]
+    if any(t.lower().replace(" ", "").startswith("v=tlsrptv1") for t in info.tls_rpt):
+        findings.append(_f("TLS reporting (TLS-RPT)", Status.OK,
+                           "Present: sending servers report the delivery problems they meet.", points=None,
+                           source="tls-rpt"))
+    else:
+        findings.append(_f("TLS reporting (TLS-RPT)", Status.INFO,
+                           "Not set: you are not told when other servers fail to deliver your mail securely.",
+                           "Publish a _smtp._tls TXT record, e.g. \"v=TLSRPTv1; rua=mailto:tls-reports@your-domain\".",
+                           None, "tls-rpt"))
+    return findings
+
+
+def _check_mta_sts_policy(info: MTASTSInfo, receivers: list[str], title: str, src: str) -> Finding:
+    records = [t for t in info.txt if t.lower().replace(" ", "").startswith("v=stsv1")]
+    if not records:
+        return _f(title, Status.WARNING,
+                  "Not set: other mail servers may deliver your incoming email without encryption if an attacker "
+                  "tampers with the connection.",
+                  "Publish an MTA-STS policy (in \"testing\" mode first), or enable it in your email service.",
+                  -5, src)
+    if len(records) > 1 or "id=" not in records[0].replace(" ", "").lower():
+        return _f(title, Status.WARNING, f"The _mta-sts TXT record is invalid: {'; '.join(records)}.",
+                  "Publish a single record of the form \"v=STSv1; id=20260101\".", -10, src)
+    if info.policy is None:
+        return _f(title, Status.WARNING,
+                  f"Announced, but the policy file cannot be read ({info.error or 'unknown error'}): "
+                  "sending servers ignore it.",
+                  "Serve the policy at https://mta-sts.<your-domain>/.well-known/mta-sts.txt (valid HTTPS, "
+                  "no redirect).", -15, src)
+
+    policy = parse_mta_sts_policy(info.policy)
+    mode = (policy.get("mode") or [""])[0].lower()
+    max_age = (policy.get("max_age") or [""])[0]
+    patterns = policy.get("mx", [])
+    problems = []
+    if (policy.get("version") or [""])[0] != "STSv1":
+        problems.append("version is not STSv1")
+    if mode not in ("enforce", "testing", "none"):
+        problems.append(f"unknown mode \"{mode}\"")
+    if not max_age.isdigit() or int(max_age) > MAX_MTA_STS_AGE:
+        problems.append("max_age missing or invalid")
+    if not patterns and mode != "none":
+        problems.append("no mx line")
+    if problems:
+        return _f(title, Status.WARNING, f"The policy file is invalid: {', '.join(problems)}.",
+                  "Fix the policy file (fields: version, mode, mx, max_age).", -15, src)
+
+    uncovered = [m for m in receivers if not any(mx_matches(m, p) for p in patterns)]
+    if mode == "none":
+        return _f(title, Status.WARNING, "Policy in \"none\" mode: MTA-STS is switched off.",
+                  "Move to \"testing\", then \"enforce\".", -5, src)
+    if uncovered and mode == "enforce":
+        return _f(title, Status.CRITICAL,
+                  f"Policy in \"enforce\" mode, but some mail servers are not listed ({', '.join(uncovered)}): "
+                  "servers applying MTA-STS will refuse to deliver email to them.",
+                  "Add these servers to the mx lines of the policy, then change its id.", -30, src)
+    if mode == "testing":
+        extra = f" Not listed: {', '.join(uncovered)}." if uncovered else ""
+        return _f(title, Status.INFO,
+                  f"Policy in \"testing\" mode: problems are reported but delivery is not yet protected.{extra}",
+                  "Once the TLS reports are clean, switch to \"enforce\".", 0, src)
+    return _f(title, Status.OK, "Policy in \"enforce\" mode, covering all mail servers: incoming email is always "
+              "delivered encrypted.", source=src)

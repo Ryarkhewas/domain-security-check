@@ -5,7 +5,8 @@ from __future__ import annotations
 import re
 from datetime import datetime, timezone
 
-from .email_checks import check_dkim, check_dmarc, check_mx, check_spf, effective_dmarc_policy
+from .dns_checks import check_caa, check_dnssec
+from .email_checks import check_dkim, check_dmarc, check_mta_sts, check_mx, check_spf, effective_dmarc_policy
 from .models import CollectedData, Result
 from .scoring import category_grades, overall_grade
 from .tls_checks import check_certificate
@@ -73,6 +74,11 @@ def analyze(data: CollectedData, tested_selectors: list[str], now: datetime | No
     findings += check_spf(data.root_txt, dmarc_enforced=enforced)
     findings += check_dmarc(data.dmarc_txt, data.dmarc_inherited_from)
     findings += check_dkim(data.dkim_selectors, tested_selectors)
+    findings += check_mta_sts(data.mta_sts, data.mx)
+    if data.dnssec is not None:
+        findings.append(check_dnssec(data.dnssec))
+    if data.caa is not None:
+        findings.append(check_caa(data.caa, exists))
 
     cap_reason = broken_https_reason(data, now)
     grades = category_grades(findings, exists, cap_reason)
@@ -130,5 +136,8 @@ def run_audit(text: str, collector=None) -> Result:
         dkim_selectors=collector.dkim_selectors(mail_domain),
         certificate=collector.certificate(domain),
         http=collector.http(domain),
+        dnssec=collector.dnssec(domain),
+        caa=collector.caa(domain),
+        mta_sts=collector.mta_sts(mail_domain),
     )
     return analyze(data, DKIM_SELECTORS)

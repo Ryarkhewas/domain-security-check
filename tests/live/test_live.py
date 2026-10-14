@@ -24,11 +24,15 @@ pytestmark = pytest.mark.live
 REFERENCE_DOMAINS = ["github.com", "google.com", "cloudflare.com", "wikipedia.org"]
 
 
-def doh_txt(name: str) -> list[str]:
-    """TXT records from Google's public DNS-over-HTTPS API (independent source)."""
-    r = requests.get("https://dns.google/resolve", params={"name": name, "type": "TXT"}, timeout=10)
+def doh(name: str, rtype: str) -> list[dict]:
+    """Answers from Google's public DNS-over-HTTPS API (independent source)."""
+    r = requests.get("https://dns.google/resolve", params={"name": name, "type": rtype}, timeout=10)
     r.raise_for_status()
-    answers = r.json().get("Answer", [])
+    return r.json().get("Answer", [])
+
+
+def doh_txt(name: str) -> list[str]:
+    answers = doh(name, "TXT")
     # DoH returns each record quoted, possibly split in several quoted chunks
     return sorted("".join(part for part in a["data"].split('"') if part.strip()) for a in answers if a["type"] == 16)
 
@@ -103,3 +107,23 @@ def test_subdomain_inherits_parent_dmarc():
     assert dmarc.status != Status.CRITICAL, dmarc
     if not own_record:
         assert f"Inherited from {parent}" in dmarc.detail, dmarc
+
+
+# --- Domain & DNS, MTA-STS ----------------------------------------------------
+@pytest.mark.parametrize("domain", ["cloudflare.com", "github.com", "wikipedia.org"])
+def test_dnssec_matches_independent_resolver(domain):
+    signed = any(a["type"] == 43 for a in doh(domain, "DS"))  # 43 = DS
+    dnssec = next(f for f in run_audit(domain).findings if f.title == "DNSSEC")
+    assert dnssec.status == (Status.OK if signed else Status.WARNING), dnssec
+
+
+def test_caa_found_on_google():
+    caa = next(f for f in run_audit("google.com").findings if f.title.startswith("CAA"))
+    assert caa.status == Status.OK and "pki.goog" in caa.detail, caa
+
+
+def test_mta_sts_enforced_on_gmail():
+    findings = {f.title: f for f in run_audit("gmail.com").findings}
+    mta_sts = findings["MTA-STS (encrypted email delivery)"]
+    assert mta_sts.status == Status.OK and "enforce" in mta_sts.detail, mta_sts
+    assert findings["TLS reporting (TLS-RPT)"].status == Status.OK

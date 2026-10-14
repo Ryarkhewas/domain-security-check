@@ -18,11 +18,12 @@ LABELS = {
 }
 ORDER = {Status.CRITICAL: 0, Status.WARNING: 1, Status.INFO: 2, Status.OK: 3}
 GRADE_COLOR = {"A": "ok", "B": "ok", "C": "warning", "D": "critical", "F": "critical", "N": "na"}
-CATEGORY_LABELS = {"WEB": "Website", "TLS": "Certificate & TLS", "EMAIL": "Email"}
+CATEGORY_LABELS = {"WEB": "Website", "TLS": "Certificate & TLS", "EMAIL": "Email", "DNS": "Domain & DNS"}
 CATEGORY_METHOD = {
     "WEB": "Mozilla HTTP Observatory scoring",
     "TLS": "this project's scale (RFC 8996, certificate validity)",
-    "EMAIL": "this project's scale (RFC 7208, 7489, 6376)",
+    "EMAIL": "this project's scale (RFC 7208, 7489, 6376, 8461)",
+    "DNS": "this project's scale (RFC 4033, 8659)",
 }
 def letter(grade: str) -> str:
     """"A+" -> "A", "N/A" -> "N"."""
@@ -54,7 +55,7 @@ header{display:flex;gap:24px;align-items:center;flex-wrap:wrap;margin-bottom:24p
 .grade.ok{background:var(--ok-bg);color:var(--ok)}.grade.warning{background:var(--warn-bg);color:var(--warn)}
 .grade.critical{background:var(--crit-bg);color:var(--crit)}
 .grade.na{background:var(--card);color:var(--muted);border:1px solid var(--border)}
-.cats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 12px}
+.cats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 12px}
 .cat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;
 display:flex;gap:12px;align-items:center}
 .cat .grade{width:52px;height:52px;border-radius:12px;font-size:24px}
@@ -84,7 +85,8 @@ padding:14px 16px;margin-bottom:10px}
 .fix::before{content:"→ ";font-weight:700;color:var(--accent)}
 ol.priority{padding-left:22px}ol.priority li{margin-bottom:8px}
 footer{margin-top:40px;color:var(--muted);font-size:13px;border-top:1px solid var(--border);padding-top:16px}
-@media (max-width:700px){.cats{grid-template-columns:1fr}}
+@media (max-width:860px){.cats{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:520px){.cats{grid-template-columns:1fr}}
 @media (max-width:560px){.counters{grid-template-columns:repeat(2,1fr)}.grade{width:76px;height:76px;font-size:40px}}
 @media print{body{background:#fff}.item,.counter,.cat{break-inside:avoid}}
 """
@@ -160,8 +162,8 @@ def render_html(r: Result, author: str = "") -> str:
 <p><b>Method.</b> Passive audit carried out{by} using public information only: DNS records, the certificate
 presented by the server and the home page headers. No intrusion testing was performed.</p>
 <p><b>Grades.</b> The website grade follows the <a href="{obs_url}">{obs_label}</a> (penalties and bonuses per header).
-The certificate and email grades use this project's own scale, based on the standards cited under each item.
-The overall grade is the lowest of the three.</p>
+The certificate, email and DNS grades use this project's own scale, based on the standards cited under each item.
+The overall grade is the lowest of the four.</p>
 <p><b>Limits.</b> This audit does not cover the site's applications, workstations or user accounts.
 It gives an overview of the exposure visible from the Internet on the date shown.</p>
 </footer>

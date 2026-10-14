@@ -13,13 +13,15 @@ import ssl
 from datetime import datetime, timezone
 from typing import cast
 
+import dns.dnssec
 import dns.exception
+import dns.name
 import dns.resolver
 import requests
 
 from ._version import __version__
 from .hsts_preload import PreloadList
-from .models import CertificateInfo, CookieInfo, HTTPInfo
+from .models import CAAInfo, CertificateInfo, CookieInfo, DNSSECInfo, HTTPInfo, MTASTSInfo
 
 DKIM_SELECTORS = [
     "default", "google", "selector1", "selector2", "k1", "k2", "mail", "dkim",
@@ -106,6 +108,53 @@ class Collector:
                 found.append(sel)
         return found
 
+    def dnssec(self, domain: str) -> DNSSECInfo:
+        """DS (in the parent zone) and DNSKEY records of the zone containing the domain."""
+        try:
+            zone = dns.resolver.zone_for_name(domain, resolver=self.resolver)
+            ds = self._resolve(zone.to_text(), "DS")
+            keys = self._resolve(zone.to_text(), "DNSKEY")
+        except (CollectionError, dns.exception.DNSException) as e:
+            return DNSSECInfo(error=_short(e))
+        info = DNSSECInfo(zone=zone.to_text().rstrip("."), ds_count=len(ds) if ds else 0,
+                          dnskey_count=len(keys) if keys else 0)
+        if ds and keys:
+            info.ds_matches = _ds_matches(zone, ds, keys)
+        return info
+
+    def caa(self, domain: str) -> CAAInfo:
+        """CAA records of the domain, or of its closest parent that has some (RFC 8659 section 3)."""
+        labels = domain.split(".")
+        try:
+            for i in range(len(labels) - 1):  # never the top-level domain itself
+                name = ".".join(labels[i:])
+                answer = self._resolve(name, "CAA")
+                if answer:
+                    records = [(r.flags, r.tag.decode("ascii", "replace"), r.value.decode("utf-8", "replace"))
+                               for r in answer]
+                    return CAAInfo(records, name)
+        except CollectionError as e:
+            return CAAInfo(error=_short(e))
+        return CAAInfo()
+
+    def mta_sts(self, domain: str) -> MTASTSInfo:
+        """MTA-STS record and policy file, and the TLS reporting record."""
+        info = MTASTSInfo(txt=self.txt(f"_mta-sts.{domain}"), tls_rpt=self.txt(f"_smtp._tls.{domain}"))
+        if not any(t.lower().replace(" ", "").startswith("v=stsv1") for t in info.txt):
+            return info
+        try:
+            # RFC 8461: the policy must be served over valid HTTPS, without redirects
+            r = requests.get(f"https://mta-sts.{domain}/.well-known/mta-sts.txt", headers=dict(BROWSER_HEADERS),
+                             timeout=self.timeout, allow_redirects=False)
+        except requests.RequestException as e:
+            info.error = _short(e)
+            return info
+        if r.status_code != 200:
+            info.error = f"HTTP {r.status_code}"
+        else:
+            info.policy = r.text[:65_536]
+        return info
+
     # --- TLS ---------------------------------------------------------------
     def certificate(self, host: str) -> CertificateInfo | None:
         ctx = ssl.create_default_context()
@@ -184,6 +233,28 @@ class Collector:
         return Collector._preload if isinstance(Collector._preload, PreloadList) else None
 
     _preload: PreloadList | bool | None = None  # None: not loaded yet; False: unavailable
+
+
+def _ds_matches(zone: dns.name.Name, ds_set, key_set) -> bool | None:
+    """True if a DS record is the digest of one of the zone's keys; None if no comparison was possible."""
+    compared = False
+    for ds in ds_set:
+        for key in key_set:
+            if key.algorithm != ds.algorithm or dns.dnssec.key_id(key) != ds.key_tag:
+                continue
+            try:
+                if dns.dnssec.make_ds(zone, key, ds.digest_type) == ds:
+                    return True
+                compared = True
+            except (dns.dnssec.UnsupportedAlgorithm, dns.dnssec.DeniedByPolicy, ValueError):
+                continue
+    return False if compared else None
+
+
+def _short(error: Exception) -> str:
+    """First line of an error message, for the report."""
+    text = str(error).strip().split("\n")[0]
+    return text[:200] or type(error).__name__
 
 
 MAX_PAGE_SIZE = 2_000_000

@@ -34,6 +34,11 @@ SOURCES: dict[str, tuple[str, str]] = {
     "dmarc": ("RFC 7489 (DMARC)", "https://www.rfc-editor.org/rfc/rfc7489"),
     "dkim": ("RFC 6376 (DKIM)", "https://www.rfc-editor.org/rfc/rfc6376"),
     "null-mx": ("RFC 7505 (null MX for domains that receive no email)", "https://www.rfc-editor.org/rfc/rfc7505"),
+    "mta-sts": ("RFC 8461 (SMTP MTA Strict Transport Security)", "https://www.rfc-editor.org/rfc/rfc8461"),
+    "tls-rpt": ("RFC 8460 (SMTP TLS Reporting)", "https://www.rfc-editor.org/rfc/rfc8460"),
+    # Domain & DNS
+    "dnssec": ("RFC 4033 (DNS Security Introduction and Requirements)", "https://www.rfc-editor.org/rfc/rfc4033"),
+    "caa": ("RFC 8659 (DNS Certification Authority Authorization)", "https://www.rfc-editor.org/rfc/rfc8659"),
     # Scoring
     "observatory": ("Mozilla HTTP Observatory scoring",
                     "https://developer.mozilla.org/en-US/observatory/docs/tests_and_scoring"),

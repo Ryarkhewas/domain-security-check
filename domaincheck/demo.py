@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from .models import CertificateInfo, HTTPInfo
+from .models import CAAInfo, CertificateInfo, DNSSECInfo, HTTPInfo, MTASTSInfo
 
 DEMO_DOMAIN = "bakery-example.com"
 
@@ -45,3 +45,12 @@ class DemoCollector:
                 "X-Content-Type-Options": "nosniff",
             },
         )
+
+    def dnssec(self, domain: str) -> DNSSECInfo:
+        return DNSSECInfo(zone=domain)  # not enabled, as for most small businesses
+
+    def caa(self, domain: str) -> CAAInfo:
+        return CAAInfo()
+
+    def mta_sts(self, domain: str) -> MTASTSInfo:
+        return MTASTSInfo()

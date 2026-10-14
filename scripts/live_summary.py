@@ -21,13 +21,13 @@ def main(out_dir: str, domains: list[str]) -> int:
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     results = []
-    print("| Domain | Overall | Website | Cert & TLS | Email | Main issue |")
-    print("|---|---|---|---|---|---|")
+    print("| Domain | Overall | Website | Cert & TLS | Email | DNS | Main issue |")
+    print("|---|---|---|---|---|---|---|")
     for domain in domains:
         try:
             r = run_audit(domain)
         except (CollectionError, DomainNotFound) as e:
-            print(f"| {domain} | – | – | – | – | error: {e} |")
+            print(f"| {domain} | – | – | – | – | – | error: {e} |")
             continue
         results.append(r)
         (out / f"{r.domain}.html").write_text(render_html(r), encoding="utf-8")
@@ -37,7 +37,7 @@ def main(out_dir: str, domains: list[str]) -> int:
         if r.cap_reason:
             main_issue = f"capped: {r.cap_reason}"
         g = {k: (v.grade + (f" ({v.score})" if v.score is not None else "")) for k, v in r.grades.items()}
-        print(f"| {r.domain} | **{r.grade}** | {g['WEB']} | {g['TLS']} | {g['EMAIL']} | {main_issue} |")
+        print(f"| {r.domain} | **{r.grade}** | {g['WEB']} | {g['TLS']} | {g['EMAIL']} | {g['DNS']} | {main_issue} |")
 
     # Full details, folded, so every finding can be checked against other tools
     print("\n### Details\n")

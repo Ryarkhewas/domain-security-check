@@ -125,3 +125,46 @@ def test_preload_status_covers_every_redirect_host(fake_http, monkeypatch):
     monkeypatch.setattr(Collector, "_preload", PreloadList({"example.com": False}))  # subdomains not included
     info = make_collector().http("example.com")
     assert info.hsts_preloaded is True and info.redirects_preloaded is False
+
+
+# --- MTA-STS policy download --------------------------------------------------
+def test_mta_sts_policy_is_fetched_without_redirects(monkeypatch):
+    c = make_collector()
+    c.txt = lambda name: {"_mta-sts.example.com": ["v=STSv1; id=1"],
+                          "_smtp._tls.example.com": ["v=TLSRPTv1; rua=mailto:r@example.com"]}.get(name, [])
+    calls = []
+
+    class Policy:
+        status_code, text = 200, "version: STSv1\nmode: enforce\nmx: mx.example.com\nmax_age: 86400\n"
+
+    def fake_get(url, headers, timeout, allow_redirects):
+        calls.append((url, allow_redirects))
+        return Policy()
+
+    monkeypatch.setattr(collector_module.requests, "get", fake_get)
+    info = c.mta_sts("example.com")
+    assert calls == [("https://mta-sts.example.com/.well-known/mta-sts.txt", False)]
+    assert "mode: enforce" in info.policy and info.tls_rpt
+
+
+def test_mta_sts_policy_errors_are_kept(monkeypatch):
+    c = make_collector()
+    c.txt = lambda name: ["v=STSv1; id=1"] if name.startswith("_mta-sts") else []
+
+    class Moved:
+        status_code, text = 301, ""
+
+    monkeypatch.setattr(collector_module.requests, "get", lambda *a, **k: Moved())
+    info = c.mta_sts("example.com")
+    assert info.policy is None and info.error == "HTTP 301"
+
+
+def test_no_policy_download_without_mta_sts_record(monkeypatch):
+    c = make_collector()
+    c.txt = lambda name: []
+
+    def no_call(*a, **k):
+        raise AssertionError("should not download")
+
+    monkeypatch.setattr(collector_module.requests, "get", no_call)
+    assert c.mta_sts("example.com").policy is None

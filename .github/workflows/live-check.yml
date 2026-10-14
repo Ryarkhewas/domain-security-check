@@ -21,7 +21,7 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - name: Install dependencies
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev]" pytest-github-actions-annotate-failures
       - name: Audit real domains
         run: |
           {
@@ -29,7 +29,7 @@ jobs:
             echo
             python scripts/live_summary.py reports \
               github.com google.com cloudflare.com wikipedia.org \
-              docs.github.com badssl.com expired.badssl.com self-signed.badssl.com wrong.host.badssl.com
+              docs.github.com gmail.com badssl.com expired.badssl.com self-signed.badssl.com wrong.host.badssl.com
           } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Compare with Mozilla HTTP Observatory
         # Informational: a grade gap shows up as a warning, never as a failure

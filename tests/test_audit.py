@@ -60,7 +60,9 @@ def test_full_demo():
     # website: 100 - 20 (redirect) - 25 (CSP) - 20 (HSTS) - 20 (clickjacking) = 15
     assert (r.grades["WEB"].score, r.grades["WEB"].grade) == (15, "F")
     assert (r.grades["TLS"].score, r.grades["TLS"].grade) == (90, "A")  # expires in 21 days: -10
-    assert (r.grades["EMAIL"].score, r.grades["EMAIL"].grade) == (60, "C+")  # ?all -20, p=none -20
+    # ?all -20, p=none -20, no MTA-STS -5
+    assert (r.grades["EMAIL"].score, r.grades["EMAIL"].grade) == (55, "C")
+    assert (r.grades["DNS"].score, r.grades["DNS"].grade) == (80, "B+")  # no DNSSEC -15, no CAA -5
     assert r.grade == "F"  # overall = weakest area
     assert {f.category for f in r.findings} == set(Category)
 
@@ -179,7 +181,7 @@ def test_no_website_at_all_is_not_capped():
     assert r.cap_reason == ""
     assert r.grades["WEB"].grade == r.grades["TLS"].grade == "N/A"
     assert r.grade == r.grades["EMAIL"].grade == "A"
-    assert not [f for f in r.findings if f.category != Category.EMAIL]
+    assert not [f for f in r.findings if f.category not in (Category.EMAIL, Category.DNS)]
 
 
 def test_certificate_expiring_soon_is_not_capped():
@@ -210,6 +212,6 @@ def test_report_shows_points_and_sources():
     assert "Mozilla HTTP Observatory scoring" in html
 
 
-def test_json_contains_the_three_grades():
+def test_json_contains_the_four_grades():
     data = json.loads(render_json(run_audit("example.com", collector=DemoCollector())))
-    assert set(data["grades"]) == {"WEB", "TLS", "EMAIL"} and data["grade"] == "F"
+    assert set(data["grades"]) == {"WEB", "TLS", "EMAIL", "DNS"} and data["grade"] == "F"
