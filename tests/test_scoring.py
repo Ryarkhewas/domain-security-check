@@ -4,7 +4,11 @@ import pytest
 
 from domaincheck.models import Category, CategoryGrade, Finding, Status
 from domaincheck.scoring import (
-    category_grades, grade_for_score, observatory_score, overall_grade, simple_score,
+    category_grades,
+    grade_for_score,
+    observatory_score,
+    overall_grade,
+    simple_score,
 )
 
 

@@ -28,29 +28,39 @@ Even passive, an audit should only be run **on your own domains or with the owne
 
 ## Installation
 
+Requires Python 3.10 or later.
+
 ```bash
+# Latest release, straight from GitHub
+pip install "git+https://github.com/Ryarkhewas/domain-security-check@v1.0.0"
+
+# Or from a clone, to work on the code
 git clone https://github.com/Ryarkhewas/domain-security-check.git
 cd domain-security-check
 python -m venv .venv
 source .venv/bin/activate      # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -e ".[dev]"
 ```
+
+The wheel and source archive of each version are also attached to the [GitHub releases](https://github.com/Ryarkhewas/domain-security-check/releases).
 
 ## Usage
 
 ```bash
 # Audit a domain (report in reports/<domain>.html)
-python domain_check.py my-domain.com
+domain-security-check my-domain.com
 
 # Choose the output file and sign the report
-python domain_check.py my-domain.com -o reports/client.html --author "Your Name"
+domain-security-check my-domain.com -o reports/client.html --author "Your Name"
 
 # JSON output (to feed another tool)
-python domain_check.py my-domain.com --json
+domain-security-check my-domain.com --json
 
 # Demo on a fictitious domain, without network access
-python domain_check.py --demo
+domain-security-check --demo
 ```
+
+`python -m domaincheck` works the same way, and so does `python domain_check.py` from a clone, without installing.
 
 A full URL is accepted (`https://www.my-domain.com/contact`): the tool extracts the domain. Email checks run on the main domain, even if you enter `www.`.
 
@@ -106,8 +116,10 @@ Every check is based on a published standard or guide, cited under each item of 
 ## Project structure
 
 ```
-domain_check.py             Command line
+domain_check.py             Runs the tool from a clone, without installing
+pyproject.toml              Package definition, dependencies, tool settings
 domaincheck/
+  cli.py                    Command line (domain-security-check)
   collector.py              Network access (DNS, TLS, HTTP), nothing else
   email_checks.py           MX / SPF / DMARC / DKIM analysis
   web_checks.py             Website checks (Mozilla HTTP Observatory tests)
@@ -130,12 +142,15 @@ Collection is kept separate from analysis: every rule can be tested on fixed dat
 
 ```bash
 python -m pytest -q          # 201 unit tests, no network needed
+ruff check .                 # lint
+mypy                         # type check
 python -m pytest -m live -v  # live tests against real domains (Internet required)
 ```
 
-Two GitHub Actions workflows keep the tool honest:
+Three GitHub Actions workflows keep the tool honest:
 
-- **Tests** runs the unit tests on every push, on Python 3.10 to 3.13.
+- **Tests** runs on every push: the unit tests on Python 3.10 to 3.13, the lint and type checks, and a build of the package installed in a clean environment.
+- **Release** publishes a GitHub release, with the package attached, when a version tag is pushed.
 - **Live check** runs every Monday (and on demand) against real domains:
   - hosts from [badssl.com](https://badssl.com), deliberately misconfigured for testing (expired, self-signed and wrong-host certificates), must be flagged as critical;
   - for github.com, google.com, cloudflare.com and wikipedia.org, the SPF and DMARC records read by the tool must match those returned by an independent resolver (Google DNS-over-HTTPS);
@@ -147,6 +162,10 @@ Two GitHub Actions workflows keep the tool honest:
 ## Limits
 
 The audit does not cover the site's applications (forms, CMS, plugins), workstations or user accounts. It gives an overview of the exposure visible from the Internet at a given date, not a security guarantee.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

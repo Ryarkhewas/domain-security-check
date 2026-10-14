@@ -11,9 +11,8 @@ API source: https://github.com/mdn/mdn-http-observatory (src/api/v2/analyze).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-
 import time
+from dataclasses import dataclass, field
 
 import requests
 

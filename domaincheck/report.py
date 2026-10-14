@@ -46,7 +46,8 @@ CSS = """
 --border:#2c323c;--ok:#6fd19b;--ok-bg:#16301f;--warn:#f2b552;--warn-bg:#33270f;--crit:#ff8a80;--crit-bg:#3a1a18;
 --info:#8ab4f8;--info-bg:#18243a;--accent:#8ab4f8}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{margin:0;background:var(--bg);color:var(--text);
+font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 main{max-width:860px;margin:0 auto;padding:32px 16px 48px}
 header{display:flex;gap:24px;align-items:center;flex-wrap:wrap;margin-bottom:24px}
 .grade{width:96px;height:96px;border-radius:20px;display:grid;place-items:center;font-size:52px;font-weight:700;flex:none}
@@ -54,7 +55,8 @@ header{display:flex;gap:24px;align-items:center;flex-wrap:wrap;margin-bottom:24p
 .grade.critical{background:var(--crit-bg);color:var(--crit)}
 .grade.na{background:var(--card);color:var(--muted);border:1px solid var(--border)}
 .cats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 12px}
-.cat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;gap:12px;align-items:center}
+.cat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;
+display:flex;gap:12px;align-items:center}
 .cat .grade{width:52px;height:52px;border-radius:12px;font-size:24px}
 .cat b{display:block}.cat span{color:var(--muted);font-size:12px;line-height:1.35;display:block}
 .pts{font-size:12px;font-weight:600;color:var(--muted);margin-left:6px;white-space:nowrap}
@@ -68,7 +70,8 @@ h1{margin:0;font-size:26px;word-break:break-all}
 .counter b{display:block;font-size:24px}.counter span{color:var(--muted);font-size:13px}
 .c-critical b{color:var(--crit)}.c-warning b{color:var(--warn)}.c-ok b{color:var(--ok)}.c-info b{color:var(--info)}
 h2{font-size:18px;margin:32px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--border)}
-.item{background:var(--card);border:1px solid var(--border);border-left-width:4px;border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.item{background:var(--card);border:1px solid var(--border);border-left-width:4px;border-radius:10px;
+padding:14px 16px;margin-bottom:10px}
 .item.critical{border-left-color:var(--crit)}.item.warning{border-left-color:var(--warn)}
 .item.ok{border-left-color:var(--ok)}.item.info{border-left-color:var(--info)}
 .row{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}
@@ -105,7 +108,8 @@ def render_html(r: Result, author: str = "") -> str:
     priority_block = ""
     if priorities:
         items = "".join(
-            f'<li><b>{e(f.title)}</b> <span class="badge {f.status.value}">{LABELS[f.status]}</span><br>{e(f.recommendation)}</li>'
+            f'<li><b>{e(f.title)}</b> <span class="badge {f.status.value}">{LABELS[f.status]}</span>'
+            f'<br>{e(f.recommendation)}</li>'
             for f in priorities
         )
         priority_block = f'<h2>Priority actions</h2><ol class="priority">{items}</ol>'
@@ -137,7 +141,9 @@ def render_html(r: Result, author: str = "") -> str:
                  f'<div><b>{CATEGORY_LABELS[key]}</b><span>{e(detail)}</span></div></div>')
 
     by = f" by {e(author)}" if author else ""
-    cap = f'<p class="cap">{e(r.cap_reason[:1].upper() + r.cap_reason[1:])}: website grade capped at F.</p>' if r.cap_reason else ""
+    cap = ""
+    if r.cap_reason:
+        cap = f'<p class="cap">{e(r.cap_reason[:1].upper() + r.cap_reason[1:])}: website grade capped at F.</p>'
     obs_label, obs_url = SOURCES["observatory"]
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">

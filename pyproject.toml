@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "domain-security-check"
+dynamic = ["version"]
+description = "Passive security audit of a domain name (HTTPS, security headers, SPF/DKIM/DMARC), with a clear HTML report."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Loïc Tellier" }]
+requires-python = ">=3.10"
+dependencies = [
+    "dnspython>=2.4",
+    "requests>=2.31",
+    "tldextract>=5.1",
+]
+keywords = ["security", "audit", "dmarc", "spf", "dkim", "hsts", "csp", "http-headers"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: System Administrators",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.6", "mypy>=1.10", "types-requests", "build"]
+
+[project.scripts]
+domain-security-check = "domaincheck.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/Ryarkhewas/domain-security-check"
+Changelog = "https://github.com/Ryarkhewas/domain-security-check/blob/main/CHANGELOG.md"
+
+[tool.setuptools]
+packages = ["domaincheck"]
+
+[tool.setuptools.package-data]
+domaincheck = ["py.typed"]
+
+[tool.setuptools.dynamic]
+version = { attr = "domaincheck._version.__version__" }
+
+[tool.pytest.ini_options]
+markers = ["live: tests that query real domains over the Internet (run with -m live)"]
+addopts = '-m "not live"'
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+# pycodestyle, pyflakes, import order, bugbear, pyupgrade, simplify
+select = ["E", "W", "F", "I", "B", "UP", "SIM"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["domaincheck"]
+warn_unused_ignores = true
+warn_redundant_casts = true
+check_untyped_defs = true

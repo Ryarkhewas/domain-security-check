@@ -55,7 +55,8 @@ def make_collector():
 def redirect_to_https(url):
     if url.startswith("http://"):
         return FakeResponse(url.replace("http://", "https://"), history=[FakeResponse(url)])
-    return FakeResponse(url, {"Strict-Transport-Security": "max-age=31536000", "Content-Type": "text/html; charset=utf-8"},
+    headers = {"Strict-Transport-Security": "max-age=31536000", "Content-Type": "text/html; charset=utf-8"}
+    return FakeResponse(url, headers,
                         b"<script src='https://cdn.example.net/a.js'></script>")
 
 

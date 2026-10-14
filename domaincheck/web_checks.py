@@ -16,8 +16,8 @@ No network access here: the functions analyse data that was already collected.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from html.parser import HTMLParser
-from typing import Mapping
 
 import tldextract
 
@@ -76,7 +76,8 @@ def check_redirection(http: HTTPInfo, host: str) -> Finding:
         return _f(title, -10, "The site ends on HTTPS, but the first redirect goes to another HTTP address.",
                   f"Redirect http://{host} directly to https://{host} first, so that HSTS can apply.", src)
     if first and _host(first) != host:
-        return _f(title, -5, f"The first redirect goes to a different host ({_host(first)}), which prevents HSTS on {host}.",
+        return _f(title, -5,
+                  f"The first redirect goes to a different host ({_host(first)}), which prevents HSTS on {host}.",
                   f"Redirect http://{host} to https://{host} first, then to the other host.", src)
     return _f(title, 0, "Visitors arriving over HTTP are redirected to HTTPS.", source=src)
 
@@ -135,7 +136,8 @@ def check_csp(headers: Mapping[str, str]) -> Finding:
                       "Only a test policy exists (Content-Security-Policy-Report-Only): violations are reported, "
                       "but nothing is blocked.",
                       "Once the reports are clean, enforce the policy with the Content-Security-Policy header.", src)
-        return _f(title, -25, "Missing: no limit on which scripts the page can load (protection against XSS injection).",
+        return _f(title, -25,
+                  "Missing: no limit on which scripts the page can load (protection against XSS injection).",
                   "Define a CSP suited to the site, starting in \"Report-Only\" mode.", src)
     try:
         csp = parse_csp(raw.split(",")[0])  # the first policy carries the main rules
@@ -160,7 +162,8 @@ def check_csp(headers: Mapping[str, str]) -> Finding:
             return _f(title, -25, "'strict-dynamic' is used without a nonce or hash, which makes the policy invalid.",
                       "Add a nonce or hash to script-src, or remove 'strict-dynamic'.", src)
 
-    active = [s for d, v in csp.items() if d not in ("img-src", "media-src", "script-src") for s in v] + list(script_src)
+    handled_apart = ("img-src", "media-src", "script-src")
+    active = [s for d, v in csp.items() if d not in handled_apart for s in v] + list(script_src)
     passive = [s for d in ("img-src", "media-src") for s in (csp.get(d) or default or set())]
 
     if script_src & (DANGEROUSLY_BROAD | UNSAFE_INLINE) or object_src & DANGEROUSLY_BROAD:
@@ -196,7 +199,9 @@ def _frame_ancestors_protects(headers: Mapping[str, str]) -> bool:
     except ValueError:
         return False
     fa = csp.get("frame-ancestors")
-    return bool(fa) and not (fa & DANGEROUSLY_BROAD)
+    if not fa:
+        return False
+    return not (fa & DANGEROUSLY_BROAD)
 
 
 # --- Simple headers -------------------------------------------------------------
@@ -237,7 +242,8 @@ def check_referrer(headers: Mapping[str, str]) -> Finding:
     title, src = "Referrer-Policy", "referrer"
     raw = header(headers, "Referrer-Policy")
     if not raw:
-        return _f(title, 0, "Missing: browsers apply their default policy (strict-origin-when-cross-origin in recent versions).",
+        return _f(title, 0,
+                  "Missing: browsers apply their default policy (strict-origin-when-cross-origin in recent versions).",
                   "Add \"Referrer-Policy: strict-origin-when-cross-origin\" (worth bonus points).", src,
                   status=Status.INFO)
     # Browsers use the last value they recognise
@@ -273,7 +279,8 @@ def check_corp(headers):
 def check_coop(headers):
     return _isolation(headers, "Cross-Origin-Opener-Policy", "Cross-Origin-Opener-Policy", "coop",
                       {"same-origin": "Set to same-origin: the page is isolated from the windows that open it.",
-                       "same-origin-allow-popups": "Set to same-origin-allow-popups: the page is isolated from its opener.",
+                       "same-origin-allow-popups":
+                           "Set to same-origin-allow-popups: the page is isolated from its opener.",
                        "noopener-allow-popups": "Set to noopener-allow-popups: the page is isolated from its opener."},
                       {"unsafe-none"})
 
@@ -331,7 +338,8 @@ def check_cookies(cookies: list[CookieInfo], hsts: bool) -> Finding:
         worst = 1 if missing_samesite else 0
     points, detail = _COOKIE_RESULTS[worst]
     names = ", ".join(c.name for c in cookies[:5]) + ("…" if len(cookies) > 5 else "")
-    recommendation = "" if points > 0 else "Set Secure on every cookie, HttpOnly on session cookies, and SameSite=Lax or Strict."
+    recommendation = "" if points > 0 else ("Set Secure on every cookie, HttpOnly on session cookies, "
+                                            "and SameSite=Lax or Strict.")
     return _f(title, points, f"{detail} (cookies: {names})", recommendation, src)
 
 
@@ -458,7 +466,7 @@ def check_website(http: HTTPInfo, host: str) -> list[Finding]:
     h = http.headers
     hsts = check_hsts(h, http.hsts_preloaded)
     findings += [
-        check_csp(h), check_cookies(http.cookies, hsts.points >= 0), hsts, check_referrer(h),
+        check_csp(h), check_cookies(http.cookies, (hsts.points or 0) >= 0), hsts, check_referrer(h),
         check_sri(http.body, http.content_type, host),
         check_xcto(h), check_xfo(h), check_corp(h), check_coop(h), check_coep(h),
         check_permissions_policy(h),

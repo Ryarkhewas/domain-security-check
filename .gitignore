@@ -3,3 +3,10 @@ reports/
 __pycache__/
 .pytest_cache/
 *.pyc
+
+# Packaging
+build/
+dist/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/

@@ -2,10 +2,10 @@ import json
 
 import pytest
 
-import domain_check as cli
+from domaincheck import cli
 from domaincheck.audit import InvalidDomain, email_domain, find_dmarc, normalize_domain, run_audit
 from domaincheck.demo import DemoCollector
-from domaincheck.models import Category, Finding, Status
+from domaincheck.models import Category, Status
 from domaincheck.report import render_html, render_json
 
 
@@ -142,8 +142,8 @@ def test_subdomain_audit_inherits_parent_policy():
 from datetime import datetime, timedelta, timezone  # noqa: E402
 
 from domaincheck.audit import analyze, broken_https_reason  # noqa: E402
-from domaincheck.scoring import CAPPED_WEB_SCORE  # noqa: E402
 from domaincheck.models import CertificateInfo, CollectedData, HTTPInfo  # noqa: E402
+from domaincheck.scoring import CAPPED_WEB_SCORE  # noqa: E402
 
 NOW = datetime(2026, 10, 13, tzinfo=timezone.utc)
 GOOD_EMAIL = dict(root_txt=["v=spf1 -all"], dmarc_txt=["v=DMARC1; p=reject; rua=mailto:d@x.com"],

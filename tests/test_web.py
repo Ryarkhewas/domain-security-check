@@ -7,8 +7,19 @@ import pytest
 from domaincheck.models import CertificateInfo, CookieInfo, HTTPInfo, Status
 from domaincheck.tls_checks import check_certificate
 from domaincheck.web_checks import (
-    check_cookies, check_coop, check_corp, check_csp, check_hsts, check_redirection, check_referrer, check_sri,
-    check_version_disclosure, check_website, check_xcto, check_xfo, parse_csp,
+    check_cookies,
+    check_coop,
+    check_corp,
+    check_csp,
+    check_hsts,
+    check_redirection,
+    check_referrer,
+    check_sri,
+    check_version_disclosure,
+    check_website,
+    check_xcto,
+    check_xfo,
+    parse_csp,
 )
 
 NOW = datetime(2026, 10, 8, tzinfo=timezone.utc)
@@ -185,7 +196,8 @@ def test_hsts_sent_twice_is_invalid():
 
 def test_preloaded_redirects_are_not_penalised():
     chain = ["http://example.com/", "https://www.example.com/"]  # off-host: -5 without preload
-    assert check_redirection(HTTPInfo(True, http_redirects_to_https=True, redirect_chain=chain), "example.com").points == -5
+    plain = HTTPInfo(True, http_redirects_to_https=True, redirect_chain=chain)
+    assert check_redirection(plain, "example.com").points == -5
     preloaded = HTTPInfo(True, http_redirects_to_https=True, redirect_chain=chain, redirects_preloaded=True)
     assert check_redirection(preloaded, "example.com").points == 0
     bad_cert = HTTPInfo(True, http_redirects_to_https=True, redirect_cert_error=True, redirects_preloaded=True)

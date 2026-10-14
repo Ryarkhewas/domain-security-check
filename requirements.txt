@@ -1,4 +1,0 @@
-dnspython>=2.4
-requests>=2.31
-tldextract>=5.1
-pytest>=8.0

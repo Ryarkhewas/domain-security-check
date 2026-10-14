@@ -7,14 +7,17 @@ Mozilla HTTP Observatory. No port scanning, no intrusion attempt.
 
 from __future__ import annotations
 
+import contextlib
 import socket
 import ssl
 from datetime import datetime, timezone
+from typing import cast
 
 import dns.exception
 import dns.resolver
 import requests
 
+from ._version import __version__
 from .hsts_preload import PreloadList
 from .models import CertificateInfo, CookieInfo, HTTPInfo
 
@@ -29,7 +32,7 @@ TIMEOUT = 8
 # at the end so it remains identifiable in server logs.
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 domain-security-check/1.1"
+    f"(KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36 domain-security-check/{__version__}"
 )
 BROWSER_HEADERS = {
     "User-Agent": USER_AGENT,
@@ -107,18 +110,25 @@ class Collector:
     def certificate(self, host: str) -> CertificateInfo | None:
         ctx = ssl.create_default_context()
         try:
-            with socket.create_connection((host, 443), timeout=self.timeout) as sock:
-                with ctx.wrap_socket(sock, server_hostname=host) as tls:
-                    cert = tls.getpeercert()
-                    version = tls.version() or ""
+            with socket.create_connection((host, 443), timeout=self.timeout) as sock, \
+                    ctx.wrap_socket(sock, server_hostname=host) as tls:
+                cert = tls.getpeercert()
+                version = tls.version() or ""
         except ssl.SSLCertVerificationError as e:
             return CertificateInfo(valid=False, error=e.verify_message or str(e))
         except (OSError, ssl.SSLError):
             return None
+        if not cert:
+            return None
 
-        expires = datetime.fromtimestamp(ssl.cert_time_to_seconds(cert["notAfter"]), tz=timezone.utc)
-        issuer = dict(x[0] for x in cert.get("issuer", ()))
-        names = [v for k, v in cert.get("subjectAltName", ()) if k == "DNS"]
+        not_after = cert.get("notAfter")
+        expires = (datetime.fromtimestamp(ssl.cert_time_to_seconds(not_after), tz=timezone.utc)
+                   if isinstance(not_after, str) else None)
+        # getpeercert() fields, as documented in the ssl module
+        rdns = cast("tuple[tuple[tuple[str, str], ...], ...]", cert.get("issuer", ()))
+        issuer = {key: value for rdn in rdns for key, value in rdn}
+        alt_names = cast("tuple[tuple[str, str], ...]", cert.get("subjectAltName", ()))
+        names = [value for key, value in alt_names if key == "DNS"]
         return CertificateInfo(
             valid=True,
             expires_at=expires,
@@ -138,11 +148,9 @@ class Collector:
             content_type = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
             info = HTTPInfo(https_reachable=True, headers=dict(r.headers), content_type=content_type,
                             body=_page_text(r, content_type))
-            try:
+            with contextlib.suppress(requests.RequestException):  # robots.txt is optional
                 https.get(f"https://{host}/robots.txt", headers={**BROWSER_HEADERS, "Accept": "text/plain,*/*;q=0.8"},
                           timeout=self.timeout, allow_redirects=True)
-            except requests.RequestException:
-                pass
             info.cookies = _cookies(https.cookies)
         except requests.RequestException as e:
             info = HTTPInfo(https_reachable=False, error=str(e))
@@ -173,9 +181,9 @@ class Collector:
                 Collector._preload = PreloadList.load()
             except (requests.RequestException, OSError, ValueError):
                 Collector._preload = False
-        return Collector._preload or None
+        return Collector._preload if isinstance(Collector._preload, PreloadList) else None
 
-    _preload: PreloadList | None | bool = None
+    _preload: PreloadList | bool | None = None  # None: not loaded yet; False: unavailable
 
 
 MAX_PAGE_SIZE = 2_000_000

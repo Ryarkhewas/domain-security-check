@@ -34,7 +34,8 @@ def check_certificate(cert: CertificateInfo | None, now: datetime | None = None)
             findings.append(Finding(T, title, Status.CRITICAL, f"Certificate expired on {date_txt}.",
                                     "Renew the certificate immediately.", -100, "tls-guide"))
         elif days < 15:
-            findings.append(Finding(T, title, Status.CRITICAL, f"The certificate expires in {days} day(s) ({date_txt}).",
+            findings.append(Finding(T, title, Status.CRITICAL,
+                                    f"The certificate expires in {days} day(s) ({date_txt}).",
                                     "Renew it now and set up automatic renewal.", -30, "tls-guide"))
         elif days < 30:
             findings.append(Finding(T, title, Status.WARNING, f"The certificate expires in {days} days ({date_txt}).",

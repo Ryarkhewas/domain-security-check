@@ -48,11 +48,13 @@ def check_spf(root_txt: list[str], dmarc_enforced: bool = False) -> list[Finding
             return [_f(title, Status.WARNING,
                        "No SPF record. Spoofed emails are still stopped by the domain's strict DMARC policy, "
                        "but legitimate mail is more likely to be treated as spam.",
-                       "Publish an SPF record listing your sending services, or \"v=spf1 -all\" if this domain sends no email.",
+                       "Publish an SPF record listing your sending services, "
+                       "or \"v=spf1 -all\" if this domain sends no email.",
                        -10, "spf")]
         return [_f(title, Status.CRITICAL,
                    "No SPF record: anyone can send email pretending to be this domain.",
-                   "Publish an SPF TXT record listing your sending services (e.g. \"v=spf1 include:_spf.google.com -all\").",
+                   "Publish an SPF TXT record listing your sending services "
+                   "(e.g. \"v=spf1 include:_spf.google.com -all\").",
                    -30, "spf")]
     if len(spf) > 1:
         return [_f(title, Status.CRITICAL,
@@ -76,7 +78,8 @@ def check_spf(root_txt: list[str], dmarc_enforced: bool = False) -> list[Finding
                            "The SPF record ends with \"?all\" (neutral): it provides almost no protection.",
                            "Move to \"~all\", then \"-all\" once your senders are listed.", -20, "spf"))
     elif all_term == "~all":
-        findings.append(_f(title, Status.OK, "SPF present with \"~all\" (soft fail). Fine, especially combined with DMARC.",
+        findings.append(_f(title, Status.OK,
+                           "SPF present with \"~all\" (soft fail). Fine, especially combined with DMARC.",
                            "Once you are sure of your list of senders, switch to \"-all\".", 0, "spf"))
     else:
         findings.append(_f(title, Status.OK, "SPF present and strict (\"-all\").", source="spf"))
@@ -138,13 +141,15 @@ def check_dmarc(dmarc_txt: list[str], inherited_from: str = "") -> list[Finding]
     findings: list[Finding] = []
 
     if policy == "reject":
-        findings.append(_f(title, Status.OK, f"{origin}\"reject\" policy: spoofed emails are rejected.", source="dmarc"))
+        findings.append(_f(title, Status.OK, f"{origin}\"reject\" policy: spoofed emails are rejected.",
+                           source="dmarc"))
     elif policy == "quarantine":
         findings.append(_f(title, Status.OK, f"{origin}\"quarantine\" policy: spoofed emails go to spam.",
                            "Move to \"reject\" once the reports confirm your legitimate email passes.", 0, "dmarc"))
     elif policy == "none":
         findings.append(_f(title, Status.WARNING, f"{origin}\"none\" policy: DMARC monitors but blocks nothing.",
-                           "After a few weeks of report analysis, move to \"quarantine\", then \"reject\".", -20, "dmarc"))
+                           "After a few weeks of report analysis, move to \"quarantine\", then \"reject\".",
+                           -20, "dmarc"))
     else:
         findings.append(_f(title, Status.CRITICAL, f"{origin}Missing or invalid DMARC policy ({tag}={policy or '?'}).",
                            f"Fix the record: the {tag}= tag must be none, quarantine or reject.", -40, "dmarc"))
