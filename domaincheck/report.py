@@ -8,6 +8,7 @@ from enum import Enum
 from html import escape
 
 from .models import Category, Result, Status
+from .scoring import GRADE_ORDER
 from .sources import SOURCES
 
 LABELS = {
@@ -85,6 +86,13 @@ padding:14px 16px;margin-bottom:10px}
 .fix::before{content:"→ ";font-weight:700;color:var(--accent)}
 ol.priority{padding-left:22px}ol.priority li{margin-bottom:8px}
 footer{margin-top:40px;color:var(--muted);font-size:13px;border-top:1px solid var(--border);padding-top:16px}
+table.list{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--border);border-radius:12px;
+overflow:hidden;font-size:14px}
+table.list th,table.list td{padding:10px 12px;border-bottom:1px solid var(--border);text-align:left}
+table.list th{color:var(--muted);font-weight:600;font-size:13px}
+table.list td.g{font-weight:700;text-align:center}
+.g.ok{color:var(--ok)}.g.warning{color:var(--warn)}.g.critical{color:var(--crit)}.g.na{color:var(--muted)}
+.scroll{overflow-x:auto}table.list a{color:var(--accent);font-weight:600}
 @media (max-width:860px){.cats{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:520px){.cats{grid-template-columns:1fr}}
 @media (max-width:560px){.counters{grid-template-columns:repeat(2,1fr)}.grade{width:76px;height:76px;font-size:40px}}
@@ -167,6 +175,43 @@ The overall grade is the lowest of the four.</p>
 <p><b>Limits.</b> This audit does not cover the site's applications, workstations or user accounts.
 It gives an overview of the exposure visible from the Internet on the date shown.</p>
 </footer>
+</main></body></html>
+"""
+
+
+def render_index(results: list[Result], errors: dict[str, str], author: str = "") -> str:
+    """Summary page for an audit of several domains, linking to each report (<domain>.html)."""
+    e = escape
+    keys = list(CATEGORY_LABELS)
+    head = "".join(f"<th>{CATEGORY_LABELS[k]}</th>" for k in keys)
+    rows = ""
+    for r in sorted(results, key=lambda r: (GRADE_ORDER.index(r.grade) if r.grade in GRADE_ORDER else -1),
+                    reverse=True):
+        grades = "".join(
+            f'<td class="g {GRADE_COLOR[letter(r.grades[k].grade)]}">{e(r.grades[k].grade)}</td>' if k in r.grades
+            else "<td></td>" for k in keys)
+        critical = sum(1 for f in r.findings if f.status == Status.CRITICAL)
+        warning = sum(1 for f in r.findings if f.status == Status.WARNING)
+        rows += (f'<tr><td><a href="{e(r.domain)}.html">{e(r.domain)}</a></td>'
+                 f'<td class="g {GRADE_COLOR[letter(r.grade)]}">{e(r.grade)}</td>{grades}'
+                 f'<td>{critical}</td><td>{warning}</td></tr>')
+    for domain, message in errors.items():
+        rows += (f'<tr><td>{e(domain)}</td><td class="g na">–</td>'
+                 f'<td colspan="{len(keys) + 2}">Not audited: {e(message)}</td></tr>')
+    by = f" by {e(author)}" if author else ""
+    date = results[0].date if results else None
+    when = f" · {date:%Y-%m-%d}" if date else ""
+    return f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Security audit — {len(results) + len(errors)} domains</title><style>{CSS}</style></head>
+<body><main>
+<header><div><h1>Security audit of {len(results) + len(errors)} domains</h1>
+<p class="sub">Passive security audit{when} · weakest domains first · click a domain for its full report</p>
+</div></header>
+<div class="scroll"><table class="list"><thead><tr><th>Domain</th><th>Overall</th>{head}
+<th>Critical</th><th>To improve</th></tr></thead><tbody>{rows}</tbody></table></div>
+<footer><p><b>Method.</b> Passive audit carried out{by} using public information only. Each report explains its
+grades, the points behind them and the standard each check relies on.</p></footer>
 </main></body></html>
 """
 
