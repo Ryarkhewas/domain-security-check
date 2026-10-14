@@ -28,7 +28,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          version=$(python -c "import domaincheck._version as v; print(v.__version__)")
+          # Read the file directly: importing the package would need its dependencies
+          version=$(python -c "ns = {}; exec(open('domaincheck/_version.py').read(), ns); print(ns['__version__'])")
           tag="v$version"
           if [ "$GITHUB_EVENT_NAME" = "push" ] && [ "$tag" != "$GITHUB_REF_NAME" ]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match the package version $version"
