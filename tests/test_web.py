@@ -19,6 +19,7 @@ from domaincheck.web_checks import (
     check_website,
     check_xcto,
     check_xfo,
+    meta_referrer,
     parse_csp,
 )
 
@@ -239,3 +240,18 @@ def test_sri_not_html_and_registrable_domain():
     assert check_sri("<script src='http://a.net/x.js'></script>", "application/json", "example.com").points == 0
     assert check_sri('<script src="https://cdn.bbc.co.uk/x.js"></script>', "", "www.bbc.co.uk").points == 0
     assert check_sri('<script src="https://other.co.uk/x.js"></script>', "", "www.bbc.co.uk").points == -5
+
+
+# --- <meta name="referrer"> (read by browsers and by the Observatory) ----------
+def test_meta_referrer_is_read():
+    assert meta_referrer('<meta name="referrer" content="origin"><p>x</p>') == "origin"
+    assert meta_referrer('<meta name="referrer" content="origin"><meta name="Referrer" content="no-referrer">') \
+        == "no-referrer"
+    assert meta_referrer('<meta name="description" content="x">') is None
+
+
+def test_meta_referrer_applies_after_the_header():
+    f = check_referrer({"Referrer-Policy": "strict-origin-when-cross-origin"}, "origin")
+    assert f.points == -5 and "meta" in f.detail
+    assert check_referrer({}, "no-referrer").points == 5
+    assert check_referrer({"Referrer-Policy": "unsafe-url"}, None).points == -5

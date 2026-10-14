@@ -65,13 +65,13 @@ class Collector:
         self.resolver.lifetime = timeout
 
     # --- DNS ---------------------------------------------------------------
-    def _resolve(self, name: str, rtype: str):
+    def _resolve(self, name: str, rtype: str, resolver: dns.resolver.Resolver | None = None):
         """Return the answer, or None if the record does not exist.
 
         Raise CollectionError when it cannot be known (outage, timeout).
         """
         try:
-            return self.resolver.resolve(name, rtype)
+            return (resolver or self.resolver).resolve(name, rtype)
         except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer):
             return None
         except (dns.resolver.NoNameservers, dns.exception.Timeout) as e:
@@ -109,13 +109,24 @@ class Collector:
         return found
 
     def dnssec(self, domain: str) -> DNSSECInfo:
-        """DS (in the parent zone) and DNSKEY records of the zone containing the domain."""
+        """DS (in the parent zone) and DNSKEY records of the zone containing the domain.
+
+        Some local resolvers (systemd-resolved, some routers) refuse DS and
+        DNSKEY queries. In that case the query is retried through public
+        resolvers before reporting that DNSSEC could not be checked.
+        """
         try:
-            zone = dns.resolver.zone_for_name(domain, resolver=self.resolver)
-            ds = self._resolve(zone.to_text(), "DS")
-            keys = self._resolve(zone.to_text(), "DNSKEY")
-        except (CollectionError, dns.exception.DNSException) as e:
-            return DNSSECInfo(error=_short(e))
+            return self._dnssec(domain, self.resolver)
+        except (CollectionError, dns.exception.DNSException) as first:
+            try:
+                return self._dnssec(domain, _public_resolver(self.timeout))
+            except (CollectionError, dns.exception.DNSException):
+                return DNSSECInfo(error=_short(first))
+
+    def _dnssec(self, domain: str, resolver: dns.resolver.Resolver) -> DNSSECInfo:
+        zone = dns.resolver.zone_for_name(domain, resolver=resolver)
+        ds = self._resolve(zone.to_text(), "DS", resolver)
+        keys = self._resolve(zone.to_text(), "DNSKEY", resolver)
         info = DNSSECInfo(zone=zone.to_text().rstrip("."), ds_count=len(ds) if ds else 0,
                           dnskey_count=len(keys) if keys else 0)
         if ds and keys:
@@ -233,6 +244,16 @@ class Collector:
         return Collector._preload if isinstance(Collector._preload, PreloadList) else None
 
     _preload: PreloadList | bool | None = None  # None: not loaded yet; False: unavailable
+
+
+PUBLIC_RESOLVERS = ["1.1.1.1", "9.9.9.9", "8.8.8.8"]  # Cloudflare, Quad9, Google
+
+
+def _public_resolver(timeout: float) -> dns.resolver.Resolver:
+    resolver = dns.resolver.Resolver(configure=False)
+    resolver.nameservers = list(PUBLIC_RESOLVERS)
+    resolver.lifetime = timeout
+    return resolver
 
 
 def _ds_matches(zone: dns.name.Name, ds_set, key_set) -> bool | None:

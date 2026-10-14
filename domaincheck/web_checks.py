@@ -4,8 +4,9 @@ Each check reproduces one Observatory test and uses its score modifier
 (see https://github.com/mdn/mdn-http-observatory, src/grader/charts.js,
 MPL 2.0), including the HSTS preload list and Subresource Integrity on the
 home page scripts. Not implemented: the CORS test (the only case it
-penalises requires sending a forged Origin header) and security headers
-declared in <meta http-equiv> tags, which the Observatory also reads.
+penalises requires sending a forged Origin header) and Content-Security-Policy
+declared in a <meta http-equiv> tag, which the Observatory also reads. The
+<meta name="referrer"> tag is taken into account.
 
 Two extra checks (Permissions-Policy, version disclosure) are shown but not
 scored, since the Observatory does not score them.
@@ -238,9 +239,10 @@ REFERRER_GOOD = {"no-referrer", "same-origin", "strict-origin", "strict-origin-w
 REFERRER_BAD = {"origin", "origin-when-cross-origin", "unsafe-url", "no-referrer-when-downgrade"}
 
 
-def check_referrer(headers: Mapping[str, str]) -> Finding:
+def check_referrer(headers: Mapping[str, str], meta: str | None = None) -> Finding:
+    """meta: content of a <meta name="referrer"> tag, which browsers apply after the header."""
     title, src = "Referrer-Policy", "referrer"
-    raw = header(headers, "Referrer-Policy")
+    raw = ", ".join(v for v in (header(headers, "Referrer-Policy"), meta) if v)
     if not raw:
         return _f(title, 0,
                   "Missing: browsers apply their default policy (strict-origin-when-cross-origin in recent versions).",
@@ -250,9 +252,10 @@ def check_referrer(headers: Mapping[str, str]) -> Finding:
     known = [v.strip().lower() for v in raw.split(",") if v.strip().lower() in REFERRER_GOOD | REFERRER_BAD]
     if not known:
         return _f(title, -5, f"Value not recognised: \"{raw}\".", "Use \"strict-origin-when-cross-origin\".", src)
+    where = " in a <meta> tag of the page" if meta and known[-1] == meta.strip().lower() else ""
     if known[-1] in REFERRER_GOOD:
-        return _f(title, 5, f"Present ({known[-1]}).", source=src)
-    return _f(title, -5, f"Set to \"{known[-1]}\", which can leak full page addresses to other sites.",
+        return _f(title, 5, f"Present ({known[-1]}{where}).", source=src)
+    return _f(title, -5, f"Set to \"{known[-1]}\"{where}, which can leak page addresses to other sites.",
               "Use \"strict-origin-when-cross-origin\".", src)
 
 
@@ -353,14 +356,36 @@ def registrable_domain(host: str) -> str:
     return getattr(r, "top_domain_under_public_suffix", None) or r.registered_domain
 
 
-class _ScriptCollector(HTMLParser):
+class _TagCollector(HTMLParser):
+    """Attributes of every <script> and <meta> tag of a page."""
+
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.scripts: list[dict[str, str | None]] = []
+        self.metas: list[dict[str, str | None]] = []
 
     def handle_starttag(self, tag, attrs):
         if tag == "script":
             self.scripts.append(dict(attrs))
+        elif tag == "meta":
+            self.metas.append(dict(attrs))
+
+
+def meta_referrer(body: str) -> str | None:
+    """Content of the last <meta name="referrer"> tag (read like the Observatory does)."""
+    parser = _TagCollector()
+    try:
+        parser.feed(body)
+        parser.close()
+    except Exception:  # noqa: BLE001 - untrusted HTML
+        return None
+    value = None
+    for meta in parser.metas:
+        if meta.get("http-equiv") is not None and meta.get("content") is not None:
+            continue
+        if (meta.get("name") or "").strip().lower() == "referrer" and meta.get("content"):
+            value = meta["content"]
+    return value
 
 
 # Observatory results, in its order (later = worse for "only if worse"), with modifiers
@@ -382,7 +407,7 @@ def check_sri(body: str, content_type: str, host: str) -> Finding:
     title, src = "Subresource Integrity", "sri"
     if content_type and content_type not in ("text/html", "application/xhtml+xml"):
         return _f(title, 0, "The home page is not HTML: no scripts to check.", source=src, status=Status.INFO)
-    parser = _ScriptCollector()
+    parser = _TagCollector()
     try:
         parser.feed(body)
         parser.close()
@@ -466,7 +491,8 @@ def check_website(http: HTTPInfo, host: str) -> list[Finding]:
     h = http.headers
     hsts = check_hsts(h, http.hsts_preloaded)
     findings += [
-        check_csp(h), check_cookies(http.cookies, (hsts.points or 0) >= 0), hsts, check_referrer(h),
+        check_csp(h), check_cookies(http.cookies, (hsts.points or 0) >= 0), hsts,
+        check_referrer(h, meta_referrer(http.body)),
         check_sri(http.body, http.content_type, host),
         check_xcto(h), check_xfo(h), check_corp(h), check_coop(h), check_coep(h),
         check_permissions_policy(h),

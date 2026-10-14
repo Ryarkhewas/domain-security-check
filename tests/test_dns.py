@@ -105,3 +105,30 @@ def test_caa_climbs_to_the_parent_but_not_the_tld():
 def test_caa_query_failure_is_reported_not_raised():
     c = make_collector({("example.com", "CAA"): CollectionError("SERVFAIL")})
     assert c.caa("example.com").error == "SERVFAIL"
+
+
+def test_dnssec_falls_back_to_public_resolvers(monkeypatch):
+    used = []
+
+    def fake_dnssec(self, domain, resolver):
+        used.append(resolver)
+        if resolver is self.resolver:
+            raise CollectionError("DNS resolution failed for example.com. (DS)")
+        return DNSSECInfo(zone="example.com", ds_count=1, dnskey_count=1, ds_matches=True)
+
+    monkeypatch.setattr(Collector, "_dnssec", fake_dnssec)
+    c = make_collector({})
+    c.resolver = object()
+    info = c.dnssec("example.com")
+    assert info.ds_count == 1 and len(used) == 2
+    assert used[1].nameservers == ["1.1.1.1", "9.9.9.9", "8.8.8.8"]
+
+
+def test_dnssec_reports_the_first_error_when_everything_fails(monkeypatch):
+    def failing(self, domain, resolver):
+        raise CollectionError("local failure" if resolver is self.resolver else "public failure")
+
+    monkeypatch.setattr(Collector, "_dnssec", failing)
+    c = make_collector({})
+    c.resolver = object()
+    assert c.dnssec("example.com").error == "local failure"
