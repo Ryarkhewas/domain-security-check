@@ -4,15 +4,16 @@ All notable changes to this project are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [semantic versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.1.0] - 2026-10-14
 
 ### Added
 - Fourth grade, **Domain & DNS**: DNSSEC (enabled, and DS record consistent with the domain's keys) and CAA (allowed certificate authorities, looked up on the domain and its parents).
 - Email: MTA-STS (record, policy file, mode, coverage of the mail servers) and TLS reporting (shown, not scored).
-- Several domains in one run (`domain-security-check a.com b.fr`, or `--file domains.txt`), with an `index.html` summary page; `--output-dir` chooses the folder.
+- Several domains in one run (`domain-security-check a.com b.fr`, or `--file domains.txt`), with an `index.html` summary page; `--output-dir` chooses the folder, and `--json` prints `{"results": [...], "errors": {...}}`.
 - PDF report with `--pdf` (optional dependency: `pip install "domain-security-check[pdf]"`).
 
 ### Changed
+- The overall grade is now the weakest of four grades instead of three: with the new DNS checks, a domain can get a lower overall grade than with 1.0.0.
 - The `<meta name="referrer">` tag of the home page is taken into account, as browsers and the Observatory do.
 - DNSSEC queries are retried through public resolvers when the local resolver refuses them.
 
@@ -38,4 +39,5 @@ First release.
 - 201 unit tests on Python 3.10 to 3.13, lint (ruff) and type check (mypy) in CI, and a build test of the package.
 - Weekly Live check against real domains, including a test-by-test comparison with the Mozilla HTTP Observatory API.
 
+[1.1.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.0.0
