@@ -4,7 +4,7 @@
 
 **Passive security audit of a domain name, with a clear report for non-specialists.**
 
-In a single command, the tool checks what anyone can see from the Internet about a domain: is the website properly protected with HTTPS, does the server send the right security headers, and above all, **can someone send emails pretending to be the company?** It produces an HTML report with a grade per area (website, certificate, email), the points behind each grade, the standard each check relies on, and concrete actions to take.
+In a single command, the tool checks what anyone can see from the Internet about a domain: is the website properly protected with HTTPS, does the server send the right security headers, and above all, **can someone send emails pretending to be the company?** It produces an HTML report (and, if you want, a PDF) with a grade per area (website, certificate, email, DNS), the points behind each grade, the standard each check relies on, and concrete actions to take. Several domains can be audited at once, with a summary page.
 
 ![Report preview](examples/preview.png)
 
@@ -14,13 +14,14 @@ In a single command, the tool checks what anyone can see from the Internet about
 |---|---|
 | **Website** | HTTP to HTTPS redirect, HSTS (including the browsers' preload list), Content-Security-Policy, cookies (Secure, HttpOnly, SameSite), Subresource Integrity of external scripts, clickjacking protection, X-Content-Type-Options, Referrer-Policy, Cross-Origin-Resource/Opener/Embedder-Policy; not scored: Permissions-Policy, software version disclosure |
 | **Certificate & TLS** | Valid certificate, expiry date, TLS version |
-| **Email** | MX servers, SPF (presence, `all` rule, 10 DNS lookup limit), DMARC (policy, coverage, reports, inheritance from the parent domain for subdomains), DKIM (common selectors) |
+| **Email** | MX servers, SPF (presence, `all` rule, 10 DNS lookup limit), DMARC (policy, coverage, reports, inheritance from the parent domain for subdomains), DKIM (common selectors), MTA-STS (record, policy file, mode, coverage of the mail servers); not scored: TLS reporting (TLS-RPT) |
+| **Domain & DNS** | DNSSEC (enabled, and consistent between the parent zone and the domain's keys), CAA (which certificate authorities may issue certificates) |
 
 Each item is rated **Critical**, **To improve**, **Compliant** or **Info**, shows the points it weighs in the grade, cites the standard it is based on, and comes with a plain-language recommendation.
 
 ## A strictly passive audit
 
-The tool only does what any visitor or mail server does: public DNS lookups, an HTTPS connection, and requests to the home page (over HTTPS and HTTP) and to `robots.txt`, like Mozilla HTTP Observatory. **No port scanning, no intrusion testing.** The only other download is the public [HSTS preload list](https://hstspreload.org/), cached for a week.
+The tool only does what any visitor or mail server does: public DNS lookups, an HTTPS connection, and requests to the home page (over HTTPS and HTTP) and to `robots.txt`, like Mozilla HTTP Observatory. **No port scanning, no intrusion testing.** For email, it reads the domain's MTA-STS policy file when the domain announces one, as any sending mail server does. The only other download is the public [HSTS preload list](https://hstspreload.org/), cached for a week. If the local DNS resolver refuses DNSSEC queries (some routers and Linux setups do), those queries are retried through public resolvers (Cloudflare, Quad9, Google).
 
 Requests identify themselves as a current desktop browser, with `domain-security-check` appended to the User-Agent. Some sites answer differently to bots (no HTTPS redirect, missing headers): this way the report shows what real visitors get, while the tool stays identifiable in server logs.
 
@@ -53,12 +54,21 @@ domain-security-check my-domain.com
 # Choose the output file and sign the report
 domain-security-check my-domain.com -o reports/client.html --author "Your Name"
 
+# Also produce a PDF (install the extra first: pip install "domain-security-check[pdf]")
+domain-security-check my-domain.com --pdf
+
+# Several domains: one report each, plus reports/index.html to compare them
+domain-security-check client-a.com client-b.fr client-c.org
+domain-security-check --file domains.txt --output-dir reports/clients
+
 # JSON output (to feed another tool)
 domain-security-check my-domain.com --json
 
 # Demo on a fictitious domain, without network access
 domain-security-check --demo
 ```
+
+A domain file has one domain per line; blank lines and `#` comments are ignored. With several domains, a domain that cannot be audited (DNS failure, invalid name) is listed on the summary page with the reason, the others are still audited, and the command ends with exit code 3.
 
 `python -m domaincheck` works the same way, and so does `python domain_check.py` from a clone, without installing.
 
@@ -72,19 +82,20 @@ For DKIM, there is no way to list all of a domain's keys: the tool tests the mos
 
 ## Grades
 
-The report gives **three grades**, one per area, and an **overall grade equal to the weakest of the three**: a site is only as safe as its weakest point.
+The report gives **four grades**, one per area, and an **overall grade equal to the weakest of the four**: a site is only as safe as its weakest point.
 
 | Area | How it is graded |
 |---|---|
 | **Website** | The [Mozilla HTTP Observatory](https://developer.mozilla.org/en-US/observatory/docs/tests_and_scoring) algorithm, with its official score modifiers: start at 100, apply the penalties, and add bonuses only if the score is still 90 or more. |
 | **Certificate & TLS** | This project's scale: −100 for a missing, invalid or expired certificate, −30 for TLS 1.0/1.1 or a certificate expiring within 15 days, −10 within 30 days. |
-| **Email** | This project's scale, based on what the standards define as valid: e.g. no DMARC −40, no SPF −30 (−10 if a strict DMARC policy already stops spoofing), `p=none` −20, `?all` −20. |
+| **Email** | This project's scale, based on what the standards define as valid: e.g. no DMARC −40, no SPF −30 (−10 if a strict DMARC policy already stops spoofing), `p=none` −20, `?all` −20, no MTA-STS −5, MTA-STS in enforce mode that leaves out a mail server −30. |
+| **Domain & DNS** | This project's scale, kept moderate since many large sites still do without these: DNSSEC not enabled −15, broken DNSSEC −50 (resolvers may refuse the domain), no CAA record −5. |
 
-All three use the Observatory grade chart (A+ … F, by steps of 5 points); A+ only exists for the website grade, the only one with bonuses.
+All four use the Observatory grade chart (A+ … F, by steps of 5 points); A+ only exists for the website grade, the only one with bonuses.
 
 Each item of the report shows the points it adds or removes, so every grade can be recomputed by hand.
 
-**Broken HTTPS caps the website grade at F.** If the certificate is invalid or expired, or if the site answers over HTTP but not over HTTPS, visitors are not protected whatever the other settings, and the security headers cannot even be checked. A domain with no website at all (mail only) gets "N/A" for the website and TLS grades, and is graded on email only.
+**Broken HTTPS caps the website grade at F.** If the certificate is invalid or expired, or if the site answers over HTTP but not over HTTPS, visitors are not protected whatever the other settings, and the security headers cannot even be checked. A domain with no website at all (mail only) gets "N/A" for the website and TLS grades, and is graded on email and DNS only.
 
 ## Methodology
 
@@ -107,11 +118,14 @@ Every check is based on a published standard or guide, cited under each item of 
 | DMARC, including subdomain inheritance | [RFC 7489](https://www.rfc-editor.org/rfc/rfc7489) |
 | DKIM | [RFC 6376](https://www.rfc-editor.org/rfc/rfc6376) |
 | Domains that receive no email | [RFC 7505](https://www.rfc-editor.org/rfc/rfc7505) (null MX) |
+| MTA-STS, TLS reporting | [RFC 8461](https://www.rfc-editor.org/rfc/rfc8461), [RFC 8460](https://www.rfc-editor.org/rfc/rfc8460) |
+| DNSSEC | [RFC 4033](https://www.rfc-editor.org/rfc/rfc4033) to 4035 |
+| CAA | [RFC 8659](https://www.rfc-editor.org/rfc/rfc8659) |
 | Website scoring | [Mozilla HTTP Observatory](https://github.com/mdn/mdn-http-observatory) (MPL 2.0) |
 
-**Differences with the Observatory.** One Observatory test is not reproduced: CORS, whose only penalty requires sending a forged `Origin` header. Security headers declared in `<meta http-equiv>` tags are not read, and only the first CSP policy is analysed when a site sends several. In these rare cases the website grade can differ from the Observatory's.
+**Differences with the Observatory.** One Observatory test is not reproduced: CORS, whose only penalty requires sending a forged `Origin` header. A Content-Security-Policy declared in a `<meta http-equiv>` tag is not read (the `<meta name="referrer">` tag is), and only the first CSP policy is analysed when a site sends several. In these rare cases the website grade can differ from the Observatory's.
 
-**Checked against the Observatory every week.** The Live check workflow asks the [Observatory API](https://github.com/mdn/mdn-http-observatory) for its result on the same domains and compares it test by test. Any test where the points differ is listed, and a grade gap raises a warning. This is how the HSTS preload, Subresource Integrity and cookie collection rules were found and fixed; on 13 October 2026, the five domains the Observatory could scan (github.com, cloudflare.com, wikipedia.org, docs.github.com, badssl.com) got exactly the same score, with the same points on every test.
+**Checked against the Observatory every week.** The Live check workflow asks the [Observatory API](https://github.com/mdn/mdn-http-observatory) for its result on the same domains and compares it test by test. Any test where the points differ is listed, and a grade gap raises a warning. This is how the HSTS preload, Subresource Integrity, cookie collection and `<meta name="referrer">` rules were found and fixed; on 14 October 2026, all six domains (github.com, google.com, cloudflare.com, wikipedia.org, docs.github.com, badssl.com) got exactly the same score, with the same points on every test.
 
 ## Project structure
 
@@ -121,17 +135,19 @@ pyproject.toml              Package definition, dependencies, tool settings
 domaincheck/
   cli.py                    Command line (domain-security-check)
   collector.py              Network access (DNS, TLS, HTTP), nothing else
-  email_checks.py           MX / SPF / DMARC / DKIM analysis
+  email_checks.py           MX / SPF / DMARC / DKIM / MTA-STS analysis
+  dns_checks.py             DNSSEC and CAA analysis
   web_checks.py             Website checks (Mozilla HTTP Observatory tests)
   tls_checks.py             Certificate and TLS checks
   scoring.py                Grades: Observatory algorithm, own scales, overall grade
   sources.py                Standards cited for each check
   audit.py                  Orchestration
-  report.py                 HTML report, console summary, JSON
+  report.py                 HTML report, summary page for several domains, console summary, JSON
+  pdf_report.py             PDF report (optional: needs ReportLab)
   demo.py                   Fictitious data for the demo
   hsts_preload.py           HSTS preload list (download, cache, lookups)
   observatory.py            Test-by-test comparison with the Observatory API
-tests/                      201 unit tests + live tests (tests/live)
+tests/                      255 unit tests + live tests (tests/live)
 scripts/live_summary.py     Audits a list of domains for the Live check workflow
 scripts/observatory_compare.py  Compares the website grades with the Observatory
 ```
@@ -141,7 +157,7 @@ Collection is kept separate from analysis: every rule can be tested on fixed dat
 ## Tests
 
 ```bash
-python -m pytest -q          # 201 unit tests, no network needed
+python -m pytest -q          # 255 unit tests, no network needed
 ruff check .                 # lint
 mypy                         # type check
 python -m pytest -m live -v  # live tests against real domains (Internet required)
@@ -155,6 +171,7 @@ Three GitHub Actions workflows keep the tool honest:
   - hosts from [badssl.com](https://badssl.com), deliberately misconfigured for testing (expired, self-signed and wrong-host certificates), must be flagged as critical;
   - for github.com, google.com, cloudflare.com and wikipedia.org, the SPF and DMARC records read by the tool must match those returned by an independent resolver (Google DNS-over-HTTPS);
   - a subdomain (docs.github.com) must inherit its parent's DMARC policy;
+  - DNSSEC must match an independent resolver, and CAA (google.com) and MTA-STS (gmail.com) must be found where they are published;
   - the website grade of each domain is compared with Mozilla HTTP Observatory, test by test.
 
   The results table is published in the workflow summary and the HTML reports are kept as artifacts.

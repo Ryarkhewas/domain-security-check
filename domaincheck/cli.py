@@ -6,6 +6,7 @@ Usage:
     domain-security-check example.com --json
     domain-security-check example.com example.org --output-dir reports/
     domain-security-check --file domains.txt
+    domain-security-check example.com --pdf
     domain-security-check --demo
 
 With several domains, each one gets its report in the output directory, plus
@@ -27,6 +28,7 @@ from .audit import InvalidDomain, run_audit
 from .collector import CollectionError, DomainNotFound
 from .demo import DEMO_DOMAIN, DemoCollector
 from .models import Result
+from .pdf_report import INSTALL_HINT, render_pdf
 from .report import console_summary, render_html, render_index, render_json
 
 REMINDER = (
@@ -66,6 +68,7 @@ def main(argv: list[str] | None = None) -> int:
                    "(default: reports/<domain>.html)")
     p.add_argument("-d", "--output-dir", type=Path, default=Path("reports"),
                    help="Output directory for several domains (default: reports)")
+    p.add_argument("--pdf", action="store_true", help="Also write each report as a PDF (needs the [pdf] extra)")
     p.add_argument("--author", default="", help="Name shown in the report")
     p.add_argument("--json", action="store_true", help="Print the result as JSON instead of the summary")
     p.add_argument("--demo", action="store_true", help="Demo on a fictitious domain, without network access")
@@ -79,6 +82,9 @@ def main(argv: list[str] | None = None) -> int:
         except OSError as e:
             p.error(f"cannot read {args.file}: {e.strerror or e}")
     domains = _unique(domains)
+    if args.pdf and not _pdf_available():
+        print(f"Error: {INSTALL_HINT}", file=sys.stderr)
+        return 1
 
     if args.demo:
         result = run_audit(DEMO_DOMAIN, collector=DemoCollector())
@@ -108,7 +114,19 @@ def _single(result: Result, args) -> int:
     output.write_text(render_html(result, args.author), encoding="utf-8")
     print(render_json(result) if args.json else console_summary(result))
     print(f"HTML report: {output}", file=sys.stderr)
+    if args.pdf:
+        pdf = output.with_suffix(".pdf")
+        pdf.write_bytes(render_pdf(result, args.author))
+        print(f"PDF report: {pdf}", file=sys.stderr)
     return 0
+
+
+def _pdf_available() -> bool:
+    try:
+        import reportlab  # noqa: F401
+    except ImportError:
+        return False
+    return True
 
 
 def _several(domains: list[str], args) -> int:
@@ -126,6 +144,8 @@ def _several(domains: list[str], args) -> int:
             continue
         results.append(result)
         (out / f"{result.domain}.html").write_text(render_html(result, args.author), encoding="utf-8")
+        if args.pdf:
+            (out / f"{result.domain}.pdf").write_bytes(render_pdf(result, args.author))
         print(f"    overall grade {result.grade}", file=sys.stderr)
 
     (out / "index.html").write_text(render_index(results, errors, args.author), encoding="utf-8")

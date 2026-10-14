@@ -4,6 +4,18 @@ All notable changes to this project are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [semantic versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Fourth grade, **Domain & DNS**: DNSSEC (enabled, and DS record consistent with the domain's keys) and CAA (allowed certificate authorities, looked up on the domain and its parents).
+- Email: MTA-STS (record, policy file, mode, coverage of the mail servers) and TLS reporting (shown, not scored).
+- Several domains in one run (`domain-security-check a.com b.fr`, or `--file domains.txt`), with an `index.html` summary page; `--output-dir` chooses the folder.
+- PDF report with `--pdf` (optional dependency: `pip install "domain-security-check[pdf]"`).
+
+### Changed
+- The `<meta name="referrer">` tag of the home page is taken into account, as browsers and the Observatory do.
+- DNSSEC queries are retried through public resolvers when the local resolver refuses them.
+
 ## [1.0.0] - 2026-10-14
 
 First release.
