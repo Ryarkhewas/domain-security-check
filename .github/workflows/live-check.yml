@@ -43,6 +43,10 @@ jobs:
             echo
             cat reports/observatory/summary.md
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Command line on several real domains, with PDF
+        run: |
+          domain-security-check github.com gmail.com cloudflare.com --pdf --output-dir reports/cli
+          ls reports/cli/index.html reports/cli/github.com.pdf reports/cli/gmail.com.pdf reports/cli/cloudflare.com.pdf
       - name: Live tests
         run: python -m pytest -m live -v -rA
       - name: Keep the HTML reports
