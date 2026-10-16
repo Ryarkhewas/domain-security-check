@@ -160,7 +160,7 @@ def render_html(r: Result, author: str = "", lang: str = "en") -> str:
             src = ""
             if f.source in SOURCES:
                 label, url = SOURCES[f.source]
-                src = f'<p class="src">{e(t("Source:"))} <a href="{e(url)}">{e(label)}</a></p>'
+                src = f'<p class="src">{e(t("Source:"))} <a href="{e(url)}">{e(t(label))}</a></p>'
             items += (
                 f'<div class="item {f.status.value}"><div class="row"><span class="title">{e(t(f.title))}</span>'
                 f'<span><span class="badge {f.status.value}">{e(t(LABELS[f.status]))}</span>{pts}</span></div>'
@@ -181,7 +181,7 @@ def render_html(r: Result, author: str = "", lang: str = "en") -> str:
         cap = (f'<p class="cap">{e(t("{reason}: website grade capped at F.", reason=reason[:1].upper() + reason[1:]))}'
                "</p>")
     obs_label, obs_url = SOURCES["observatory"]
-    obs_link = f'<a href="{e(obs_url)}">{e(obs_label)}</a>'
+    obs_link = f'<a href="{e(obs_url)}">{e(t(obs_label))}</a>'
     return f"""<!doctype html>
 <html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{e(t("Security audit"))} — {e(r.domain)}</title><style>{CSS}</style></head>
@@ -278,7 +278,7 @@ def render_index(results: list[Result], errors: dict[str, str], author: str = ""
     by = t(" by {author}", author=author) if author else ""
     when = f" · {date(results[0].date, lang)}" if results else ""
     count = len(results) + len(errors)
-    title = t("Security audit of {count} domains", count=count)
+    title = t("Security audit of 1 domain") if count == 1 else t("Security audit of {count} domains", count=count)
     return f"""<!doctype html>
 <html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{e(title)}</title><style>{CSS}</style></head>

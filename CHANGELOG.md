@@ -4,10 +4,10 @@ All notable changes to this project are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [semantic versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.2.0] - 2026-10-16
 
 ### Added
-- Reports in French with `--lang fr` (HTML, PDF, summary page, console). The JSON output stays in English.
+- Reports in French with `--lang fr` (HTML, PDF, summary page, console and command-line messages), including dates, the usual certificate and DNS errors, and the titles of the cited standards. The JSON output stays in English.
 - Changes since the previous audit: each result is saved as `<domain>.json` next to the report, and the next audit of the domain shows grades that changed, problems fixed, new problems, and problems that got worse or better. `--previous FILE` compares with any earlier result.
 - Several domains are audited at the same time (`--workers`, 6 by default).
 
@@ -49,5 +49,6 @@ First release.
 - 201 unit tests on Python 3.10 to 3.13, lint (ruff) and type check (mypy) in CI, and a build test of the package.
 - Weekly Live check against real domains, including a test-by-test comparison with the Mozilla HTTP Observatory API.
 
+[1.2.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.0.0

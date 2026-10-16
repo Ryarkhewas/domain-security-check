@@ -31,9 +31,9 @@ def normalize_domain(text: str) -> str:
     try:
         d = d.encode("idna").decode("ascii")  # internationalised domain names
     except UnicodeError as e:
-        raise InvalidDomain(f"Invalid domain name: {text!r}") from e
+        raise InvalidDomain(M("Invalid domain name: {name}", name=repr(text))) from e
     if not _VALID_DOMAIN.match(d):
-        raise InvalidDomain(f"Invalid domain name: {text!r}")
+        raise InvalidDomain(M("Invalid domain name: {name}", name=repr(text)))
     return d
 
 

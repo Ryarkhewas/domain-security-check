@@ -8,6 +8,7 @@ Mozilla HTTP Observatory. No port scanning, no intrusion attempt.
 from __future__ import annotations
 
 import contextlib
+import re
 import socket
 import ssl
 from datetime import datetime, timezone
@@ -21,6 +22,7 @@ import requests
 
 from ._version import __version__
 from .hsts_preload import PreloadList
+from .i18n import M, Message
 from .models import CAAInfo, CertificateInfo, CookieInfo, DNSSECInfo, HTTPInfo, MTASTSInfo
 
 DKIM_SELECTORS = [
@@ -61,7 +63,7 @@ class Collector:
         try:
             self.resolver = dns.resolver.Resolver()
         except dns.resolver.NoResolverConfiguration as e:
-            raise CollectionError("No DNS server configured on this machine.") from e
+            raise CollectionError(M("No DNS server configured on this machine.")) from e
         self.resolver.lifetime = timeout
 
     # --- DNS ---------------------------------------------------------------
@@ -75,19 +77,20 @@ class Collector:
         except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer):
             return None
         except (dns.resolver.NoNameservers, dns.exception.Timeout) as e:
-            raise CollectionError(f"DNS resolution failed for {name} ({rtype}): check your connection.") from e
+            raise CollectionError(M("DNS resolution failed for {name} ({rtype}): check your connection.",
+                                    name=str(name), rtype=rtype)) from e
 
     def check_exists(self, domain: str) -> None:
         try:
             self.resolver.resolve(domain, "SOA", search=False)
         except dns.resolver.NXDOMAIN as e:
             raise DomainNotFound(
-                f"The domain {domain} does not exist (or your network filters DNS queries)."
+                M("The domain {domain} does not exist (or your network filters DNS queries).", domain=domain)
             ) from e
         except dns.resolver.NoAnswer:
             return  # subdomain (e.g. www): it exists but has no SOA of its own
         except (dns.resolver.NoNameservers, dns.exception.Timeout) as e:
-            raise CollectionError(f"DNS resolution failed for {domain}: check your connection.") from e
+            raise CollectionError(M("DNS resolution failed for {domain}: check your connection.", domain=domain)) from e
 
     def txt(self, name: str) -> list[str]:
         answer = self._resolve(name, "TXT")
@@ -175,7 +178,7 @@ class Collector:
                 cert = tls.getpeercert()
                 version = tls.version() or ""
         except ssl.SSLCertVerificationError as e:
-            return CertificateInfo(valid=False, error=e.verify_message or str(e))
+            return CertificateInfo(valid=False, error=_ssl_error(e.verify_message or str(e)))
         except (OSError, ssl.SSLError):
             return None
         if not cert:
@@ -272,8 +275,29 @@ def _ds_matches(zone: dns.name.Name, ds_set, key_set) -> bool | None:
     return False if compared else None
 
 
+# Usual certificate errors (OpenSSL wording), so that the report can translate them
+_SSL_ERRORS = {
+    "certificate has expired": M("certificate has expired"),
+    "certificate is not yet valid": M("certificate is not yet valid"),
+    "self-signed certificate": M("self-signed certificate"),
+    "self signed certificate": M("self-signed certificate"),
+    "self-signed certificate in certificate chain": M("self-signed certificate in certificate chain"),
+    "self signed certificate in certificate chain": M("self-signed certificate in certificate chain"),
+    "unable to get local issuer certificate": M("unable to get local issuer certificate"),
+}
+
+
+def _ssl_error(text: str) -> str:
+    mismatch = re.match(r"Hostname mismatch, certificate is not valid for '(.+?)'\.?$", text)
+    if mismatch:
+        return M("hostname mismatch: the certificate is not valid for '{host}'", host=mismatch.group(1))
+    return _SSL_ERRORS.get(text.strip().lower(), text)
+
+
 def _short(error: Exception) -> str:
     """First line of an error message, for the report."""
+    if error.args and isinstance(error.args[0], Message):
+        return error.args[0]  # keeps its translation
     text = str(error).strip().split("\n")[0]
     return text[:200] or type(error).__name__
 

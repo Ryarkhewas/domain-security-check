@@ -52,7 +52,7 @@ FR: dict[str, str] = {
     "The website grade follows the {link} (penalties and bonuses per header). The certificate, email and DNS grades "
     "use this project's own scale, based on the standards cited under each item. The overall grade is the lowest of "
     "the four.":
-        "La note du site web suit le barème de {link} (pénalités et bonus par en-tête). Les notes certificat, email et "
+        "La note du site web suit le {link} (pénalités et bonus par en-tête). Les notes certificat, email et "
         "DNS suivent le barème propre au projet, fondé sur les normes citées sous chaque point. La note globale est la "
         "plus basse des quatre.",
     "This audit does not cover the site's applications, workstations or user accounts. It gives an overview of the "
@@ -494,4 +494,57 @@ FR: dict[str, str] = {
     "{count} fixed": "{count} corrigé(s)",
     "{count} new or worse": "{count} nouveau(x) ou aggravé(s)",
     "{count} better": "{count} amélioré(s)",
+    # --- Command line, errors -------------------------------------------------------
+    "Reminder: only audit domains you own or for which you have the owner's permission.":
+        "Rappel : n'auditez que vos propres domaines, ou ceux dont le propriétaire vous a donné l'autorisation.",
+    "Error: {message}": "Erreur : {message}",
+    "Audit stopped: {message}": "Audit interrompu : {message}",
+    "No report was produced, to avoid a wrong diagnosis.": "Aucun rapport n'a été produit, pour éviter un diagnostic erroné.",
+    "HTML report: {path}": "Rapport HTML : {path}",
+    "PDF report: {path}": "Rapport PDF : {path}",
+    "not audited: {reason}": "non audité : {reason}",
+    "Summary: {path} ({audited} audited, {failed} not audited)": "Synthèse : {path} ({audited} audité(s), {failed} non audité(s))",
+    "Invalid domain name: {name}": "Nom de domaine invalide : {name}",
+    "No DNS server configured on this machine.": "Aucun serveur DNS n'est configuré sur cette machine.",
+    "DNS resolution failed for {name} ({rtype}): check your connection.":
+        "La résolution DNS a échoué pour {name} ({rtype}) : vérifiez votre connexion.",
+    "DNS resolution failed for {domain}: check your connection.":
+        "La résolution DNS a échoué pour {domain} : vérifiez votre connexion.",
+    "The domain {domain} does not exist (or your network filters DNS queries).":
+        "Le domaine {domain} n'existe pas (ou votre réseau filtre les requêtes DNS).",
+    "Security audit of 1 domain": "Audit de sécurité d'un domaine",
+    # --- Certificate errors (OpenSSL wording) ---------------------------------------
+    "certificate has expired": "le certificat a expiré",
+    "certificate is not yet valid": "le certificat n'est pas encore valide",
+    "self-signed certificate": "certificat auto-signé",
+    "self-signed certificate in certificate chain": "certificat auto-signé dans la chaîne de certification",
+    "unable to get local issuer certificate": "autorité de certification inconnue (émetteur non reconnu)",
+    "hostname mismatch: the certificate is not valid for '{host}'":
+        "nom de domaine différent : le certificat n'est pas valide pour « {host} »",
+    # --- Sources (titles of the standards) -------------------------------------------
+    "W3C Content Security Policy Level 3": "W3C Content Security Policy niveau 3",
+    "RFC 6265 (HTTP cookies) and MDN cookie guide": "RFC 6265 (cookies HTTP) et guide MDN sur les cookies",
+    "MDN TLS guide: HTTP redirection": "Guide TLS de MDN : redirection HTTP",
+    "RFC 6797 (HTTP Strict Transport Security)": "RFC 6797 (HTTP Strict Transport Security)",
+    "HSTS preload list (Chromium, used by all major browsers)":
+        "Liste HSTS préchargée (Chromium, utilisée par tous les grands navigateurs)",
+    "W3C Subresource Integrity": "W3C Subresource Integrity",
+    "W3C Referrer Policy": "W3C Referrer Policy",
+    "WHATWG Fetch: X-Content-Type-Options": "WHATWG Fetch : X-Content-Type-Options",
+    "RFC 7034 (X-Frame-Options)": "RFC 7034 (X-Frame-Options)",
+    "MDN: Cross-Origin-Resource-Policy": "MDN : Cross-Origin-Resource-Policy",
+    "MDN: Cross-Origin-Opener-Policy": "MDN : Cross-Origin-Opener-Policy",
+    "MDN: Cross-Origin-Embedder-Policy": "MDN : Cross-Origin-Embedder-Policy",
+    "W3C Permissions Policy": "W3C Permissions Policy",
+    "OWASP Secure Headers Project": "OWASP Secure Headers Project",
+    "MDN TLS guide": "Guide TLS de MDN",
+    "RFC 8996 (deprecating TLS 1.0 and 1.1)": "RFC 8996 (abandon de TLS 1.0 et 1.1)",
+    "RFC 7208 (SPF)": "RFC 7208 (SPF)",
+    "RFC 7489 (DMARC)": "RFC 7489 (DMARC)",
+    "RFC 6376 (DKIM)": "RFC 6376 (DKIM)",
+    "RFC 7505 (null MX for domains that receive no email)": "RFC 7505 (MX nul pour les domaines qui ne reçoivent pas d'email)",
+    "RFC 8461 (SMTP MTA Strict Transport Security)": "RFC 8461 (SMTP MTA Strict Transport Security)",
+    "RFC 8460 (SMTP TLS Reporting)": "RFC 8460 (rapports TLS pour SMTP)",
+    "RFC 4033 (DNS Security Introduction and Requirements)": "RFC 4033 (introduction et exigences de la sécurité DNS)",
+    "RFC 8659 (DNS Certification Authority Authorization)": "RFC 8659 (autorisation des autorités de certification par DNS)",
 }

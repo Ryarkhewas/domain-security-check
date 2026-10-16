@@ -157,7 +157,7 @@ def render_pdf(r: Result, author: str = "", lang: str = "en") -> bytes:
             if f.source in SOURCES:
                 label, url = SOURCES[f.source]
                 text += (f'<br/><font size="7.5" color="{MUTED}">{t(L("Source:"))} '
-                         f'<a href="{escape(url)}">{t(label)}</a></font>')
+                         f'<a href="{escape(url)}">{t(L(label))}</a></font>')
             rows.append([badge(f.status), Paragraph(text, body), Paragraph(t(_points(f.points, lang)), small)])
             row_styles.append(("LINEBEFORE", (0, i), (0, i), 2.5, colors.HexColor(STATUS_COLORS[f.status][0])))
         table = Table(rows, colWidths=[24 * mm, 136 * mm, 20 * mm], repeatRows=0)
@@ -165,7 +165,7 @@ def render_pdf(r: Result, author: str = "", lang: str = "en") -> bytes:
         story += [Paragraph(t(L(cat.value)), h2), table]
 
     method = " ".join([L("Method."), L(METHOD_TEXT, by=by), L("Grades."),
-                       L(GRADES_TEXT, link="Mozilla HTTP Observatory"), L("Limits."), L(LIMITS_TEXT)])
+                       L(GRADES_TEXT, link=L("Mozilla HTTP Observatory scoring")), L("Limits."), L(LIMITS_TEXT)])
     story += [Spacer(1, 6 * mm), Paragraph(t(method), small)]
 
     def footer(canvas, doc):

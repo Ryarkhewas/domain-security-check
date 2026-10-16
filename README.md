@@ -8,6 +8,8 @@ In a single command, the tool checks what anyone can see from the Internet about
 
 ![Report preview](examples/preview.png)
 
+Example reports: [HTML](examples/demo_report.html) and [PDF](examples/demo_report.pdf), and the same in French: [PDF](examples/demo_report_fr.pdf).
+
 ## What is checked
 
 | Area | Checks |
@@ -33,10 +35,10 @@ Requires Python 3.10 or later.
 
 ```bash
 # Latest release, straight from GitHub
-pip install "git+https://github.com/Ryarkhewas/domain-security-check@v1.1.0"
+pip install "git+https://github.com/Ryarkhewas/domain-security-check@v1.2.0"
 
 # With PDF output
-pip install "domain-security-check[pdf] @ git+https://github.com/Ryarkhewas/domain-security-check@v1.1.0"
+pip install "domain-security-check[pdf] @ git+https://github.com/Ryarkhewas/domain-security-check@v1.2.0"
 
 # Or from a clone, to work on the code
 git clone https://github.com/Ryarkhewas/domain-security-check.git
@@ -165,7 +167,7 @@ domaincheck/
   demo.py                   Fictitious data for the demo
   hsts_preload.py           HSTS preload list (download, cache, lookups)
   observatory.py            Test-by-test comparison with the Observatory API
-tests/                      565 unit tests + live tests (tests/live)
+tests/                      616 unit tests + live tests (tests/live)
 scripts/live_summary.py     Audits a list of domains for the Live check workflow
 scripts/observatory_compare.py  Compares the website grades with the Observatory
 ```
@@ -175,7 +177,7 @@ Collection is kept separate from analysis: every rule can be tested on fixed dat
 ## Tests
 
 ```bash
-python -m pytest -q          # 565 unit tests, no network needed
+python -m pytest -q          # 616 unit tests, no network needed
 ruff check .                 # lint
 mypy                         # type check
 python -m pytest -m live -v  # live tests against real domains (Internet required)

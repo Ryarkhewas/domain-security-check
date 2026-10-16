@@ -12,9 +12,9 @@ from pathlib import Path
 
 PACKAGE = Path(__file__).resolve().parent.parent / "domaincheck"
 MODULES = ["web_checks", "tls_checks", "email_checks", "dns_checks", "audit", "scoring", "report", "pdf_report",
-           "models"]
+           "models", "collector", "cli", "sources"]
 # positions of title, detail and recommendation in each helper
-TEXT_ARGS = {"Finding": (1, 3, 4), "M": (0,), "t": (0,), "L": (0,), "tr": (0,)}
+TEXT_ARGS = {"Finding": (1, 3, 4), "M": (0,), "t": (0,), "L": (0,), "tr": (0,), "say": (0,)}
 F_ARGS = {"web_checks": (0, 2, 3), "email_checks": (0, 2, 3), "dns_checks": (0, 2, 3)}
 LABEL_DICTS = {"LABELS", "CATEGORY_LABELS", "CATEGORY_METHOD", "GRADE_SUMMARY"}
 
@@ -53,6 +53,13 @@ def translatable_texts() -> dict[str, set[str]]:
                 if getattr(targets, "id", "") in LABEL_DICTS and isinstance(node.value, ast.Dict):
                     for value in node.value.values:
                         add(value, module)
+                if getattr(targets, "id", "") in ("REMINDER", "SOURCES"):
+                    values_ = [node.value] if not isinstance(node.value, ast.Dict) else node.value.values
+                    for value in values_:
+                        add(value.elts[0] if isinstance(value, ast.Tuple) else value, module)
+            elif isinstance(node, ast.AnnAssign) and getattr(node.target, "id", "") == "SOURCES":
+                for value in getattr(node.value, "values", []):
+                    add(value.elts[0] if isinstance(value, ast.Tuple) else value, module)
             elif isinstance(node, ast.ClassDef) and node.name == "Category":
                 for item in node.body:
                     if isinstance(item, ast.Assign):

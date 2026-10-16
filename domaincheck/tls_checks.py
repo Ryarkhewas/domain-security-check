@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from .i18n import M
+from .i18n import Date, M
 from .models import Category, CertificateInfo, Finding, Status
 
 T = Category.TLS
@@ -30,7 +30,7 @@ def check_certificate(cert: CertificateInfo | None, now: datetime | None = None)
     now = now or datetime.now(timezone.utc)
     if cert.expires_at:
         days = (cert.expires_at - now).days
-        date_txt = f"{cert.expires_at:%Y-%m-%d}"
+        date_txt = Date(cert.expires_at)
         if days < 0:
             findings.append(Finding(T, title, Status.CRITICAL, M("Certificate expired on {date}.", date=date_txt),
                                     "Renew the certificate immediately.", -100, "tls-guide"))

@@ -100,3 +100,48 @@ def test_cli_french_report(tmp_path, capsys):
     html = (tmp_path / "r.html").read_text(encoding="utf-8")
     assert "Actions prioritaires" in html and "Redirection HTTP vers HTTPS" in html
     assert "note globale" in capsys.readouterr().out
+
+
+def test_dates_inside_sentences_follow_the_language():
+    from datetime import datetime, timezone
+
+    from domaincheck.models import CertificateInfo
+    from domaincheck.tls_checks import check_certificate
+
+    now = datetime(2026, 10, 16, tzinfo=timezone.utc)
+    cert = CertificateInfo(valid=True, expires_at=datetime(2026, 12, 25, tzinfo=timezone.utc), tls_version="TLSv1.3")
+    detail = check_certificate(cert, now)[0].detail
+    assert "2026-12-25" in detail
+    assert "jusqu'au 25/12/2026" in tr(detail, "fr")
+
+
+@pytest.mark.parametrize("openssl, french", [
+    ("certificate has expired", "le certificat a expiré"),
+    ("Hostname mismatch, certificate is not valid for 'example.com'.",
+     "nom de domaine différent : le certificat n'est pas valide pour « example.com »"),
+    ("some rare error", "some rare error"),
+])
+def test_certificate_errors_are_translated(openssl, french):
+    from domaincheck.collector import _ssl_error
+
+    assert tr(_ssl_error(openssl), "fr") == french
+
+
+def test_error_messages_keep_their_translation():
+    from domaincheck.collector import CollectionError
+    from domaincheck.i18n import message_of
+
+    error = CollectionError(M("DNS resolution failed for {domain}: check your connection.", domain="x.example"))
+    assert str(error) == "DNS resolution failed for x.example: check your connection."
+    assert tr(message_of(error), "fr").startswith("La résolution DNS a échoué pour x.example")
+    index = render_index([], {"x.example": message_of(error)}, lang="fr")
+    assert "La résolution DNS a échoué" in index
+
+
+def test_singular_title():
+    assert "Audit de sécurité d&#x27;un domaine" in render_index(results()[:1], {}, lang="fr")
+
+
+def test_command_line_messages_in_french(tmp_path, capsys):
+    assert cli.main(["--demo", "--lang", "fr", "-o", str(tmp_path / "r.html")]) == 0
+    assert "Rapport HTML :" in capsys.readouterr().err

@@ -29,10 +29,10 @@ from .audit import InvalidDomain, audit_many, run_audit
 from .collector import CollectionError, DomainNotFound
 from .demo import DEMO_DOMAIN, DemoCollector
 from .history import compare, load_previous
-from .i18n import LANGUAGES
+from .i18n import LANGUAGES, message_of
 from .models import Result
 from .pdf_report import INSTALL_HINT, render_pdf
-from .report import console_summary, render_html, render_index, render_json
+from .report import _translator, console_summary, render_html, render_index, render_json
 
 REMINDER = (
     "Reminder: only audit domains you own or for which you have the owner's permission."
@@ -91,8 +91,9 @@ def main(argv: list[str] | None = None) -> int:
         except OSError as e:
             p.error(f"cannot read {args.file}: {e.strerror or e}")
     domains = _unique(domains)
+    say = _translator(args.lang)
     if args.pdf and not _pdf_available():
-        print(f"Error: {INSTALL_HINT}", file=sys.stderr)
+        print(say("Error: {message}", message=INSTALL_HINT), file=sys.stderr)
         return 1
 
     if args.demo:
@@ -106,15 +107,16 @@ def main(argv: list[str] | None = None) -> int:
         p.error("--previous is for a single domain; with several domains, each report is compared with the "
                 "<domain>.json saved in the output directory")
 
-    print(REMINDER, file=sys.stderr)
+    print(say(REMINDER), file=sys.stderr)
     if len(domains) == 1:
         try:
             result = run_audit(domains[0])
         except (InvalidDomain, DomainNotFound) as e:
-            print(f"Error: {e}", file=sys.stderr)
+            print(say("Error: {message}", message=message_of(e)), file=sys.stderr)
             return 1
         except CollectionError as e:
-            print(f"Audit stopped: {e}\nNo report was produced, to avoid a wrong diagnosis.", file=sys.stderr)
+            print(say("Audit stopped: {message}", message=message_of(e)), file=sys.stderr)
+            print(say("No report was produced, to avoid a wrong diagnosis."), file=sys.stderr)
             return 2
         return _single(result, args)
     return _several(domains, args)
@@ -126,11 +128,12 @@ def _single(result: Result, args) -> int:
     _compare_and_save(result, output.with_suffix(".json"), args.previous)
     output.write_text(render_html(result, args.author, args.lang), encoding="utf-8")
     print(render_json(result) if args.json else console_summary(result, args.lang))
-    print(f"HTML report: {output}", file=sys.stderr)
+    say = _translator(args.lang)
+    print(say("HTML report: {path}", path=str(output)), file=sys.stderr)
     if args.pdf:
         pdf = output.with_suffix(".pdf")
         pdf.write_bytes(render_pdf(result, args.author, args.lang))
-        print(f"PDF report: {pdf}", file=sys.stderr)
+        print(say("PDF report: {path}", path=str(pdf)), file=sys.stderr)
     return 0
 
 
@@ -155,18 +158,22 @@ def _several(domains: list[str], args) -> int:
     out.mkdir(parents=True, exist_ok=True)
     results: list[Result] = []
     errors: dict[str, str] = {}
+    say = _translator(args.lang)
     done = 0
 
     def progress(domain: str, outcome) -> None:
         nonlocal done
         done += 1
-        status = f"not audited: {outcome}" if isinstance(outcome, Exception) else f"overall grade {outcome.grade}"
+        if isinstance(outcome, Exception):
+            status = say("not audited: {reason}", reason=message_of(outcome))
+        else:
+            status = say("overall grade {grade}", grade=outcome.grade)
         print(f"[{done}/{len(domains)}] {domain}: {status}", file=sys.stderr)
 
     # Several audits run at the same time: most of an audit is spent waiting for the network
     for domain, outcome in audit_many(domains, workers=args.workers, on_done=progress).items():
         if isinstance(outcome, (InvalidDomain, DomainNotFound, CollectionError)):
-            errors[domain] = str(outcome)
+            errors[domain] = message_of(outcome)
             continue
         if isinstance(outcome, Exception):
             raise outcome
@@ -182,14 +189,18 @@ def _several(domains: list[str], args) -> int:
                          ensure_ascii=False, indent=2))
     else:
         width = max(len(d) for d in domains)
-        print(f"\n  {'Domain':<{width}}  Overall  Website  TLS  Email  DNS")
+        columns = [say("Domain"), say("Overall"), say("Website"), "TLS", say("Email"), "DNS"]
+        sizes = [max(width, len(columns[0]))] + [max(7, len(c)) for c in columns[1:]]
+        print("\n  " + "  ".join(c.ljust(n) for c, n in zip(columns, sizes, strict=True)))
         for r in results:
             g = r.grades
-            print(f"  {r.domain:<{width}}  {r.grade:<7}  {g['WEB'].grade:<7}  {g['TLS'].grade:<3}  "
-                  f"{g['EMAIL'].grade:<5}  {g['DNS'].grade}")
+            row = [r.domain, r.grade, g["WEB"].grade, g["TLS"].grade, g["EMAIL"].grade, g["DNS"].grade]
+            print("  " + "  ".join(c.ljust(n) for c, n in zip(row, sizes, strict=True)))
         for domain, message in errors.items():
-            print(f"  {domain:<{width}}  not audited: {message}")
-    print(f"\nSummary: {out / 'index.html'} ({len(results)} audited, {len(errors)} not audited)", file=sys.stderr)
+            print(f"  {domain.ljust(sizes[0])}  {say('not audited: {reason}', reason=message)}")
+    summary = say("Summary: {path} ({audited} audited, {failed} not audited)", path=str(out / "index.html"),
+                  audited=len(results), failed=len(errors))
+    print(f"\n{summary}", file=sys.stderr)
     return 0 if not errors else 3
 
 

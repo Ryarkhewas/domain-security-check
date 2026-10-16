@@ -52,6 +52,27 @@ class Joined(str):
         return (str, (str(self),))
 
 
+class Date(str):
+    """A date inside a sentence: ISO in English (2026-11-05), 05/11/2026 in French."""
+
+    value: datetime
+
+    def __new__(cls, value: datetime) -> Date:
+        obj = super().__new__(cls, f"{value:%Y-%m-%d}")
+        obj.value = value
+        return obj
+
+    def __reduce__(self):
+        return (str, (str(self),))
+
+
+def message_of(error: BaseException) -> str:
+    """The message of an exception, keeping its translation when it was raised with M(...)."""
+    if error.args and isinstance(error.args[0], (Message, Joined)):
+        return error.args[0]
+    return str(error)
+
+
 class MissingTranslation(KeyError):
     pass
 
@@ -69,6 +90,8 @@ def tr(text: object, lang: str = "en", strict: bool = False) -> str:
     if lang == "en" or text is None:
         return "" if text is None else str(text)
     entries = catalog(lang)
+    if isinstance(text, Date):
+        return date(text.value, lang)
     if isinstance(text, Joined):
         return text.sep.join(tr(i, lang, strict) for i in text.items)
     if isinstance(text, Message) and text.params:
@@ -78,7 +101,7 @@ def tr(text: object, lang: str = "en", strict: bool = False) -> str:
                 raise MissingTranslation(text.template)
             return str(text)
         # Values that are messages themselves are translated; the others (names, numbers) are kept
-        return template.format(**{k: tr(v, lang, strict) if isinstance(v, (Message, Joined)) else v
+        return template.format(**{k: tr(v, lang, strict) if isinstance(v, (Message, Joined, Date)) else v
                                   for k, v in text.params.items()})
     value = str(text)
     if value in entries:
