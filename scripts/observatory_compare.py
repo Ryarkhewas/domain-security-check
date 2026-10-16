@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -26,33 +27,36 @@ from domaincheck.observatory import Comparison, ObservatoryError, compare, fetch
 def main(out_dir: str, domains: list[str]) -> int:
     out = Path(out_dir) / "observatory"
     out.mkdir(parents=True, exist_ok=True)
-    # Our audits and the Observatory scans both run in parallel: the Observatory
-    # takes several seconds per site, and retries a busy API after a pause.
-    audits = audit_many(domains, workers=8)
+    # The Observatory scans start first and run while our own audits are made:
+    # a scan takes from a few seconds to a few minutes, and a busy API is retried.
     with ThreadPoolExecutor(max_workers=len(domains) or 1) as pool:
-        answers = dict(zip(domains, pool.map(_observatory, domains), strict=True))
+        pending = {d: pool.submit(_observatory, d) for d in domains}
+        audits = audit_many(domains, workers=8)
+        answers = {d: f.result() for d, f in pending.items()}
     comparisons = []
     for domain, result in audits.items():
         if isinstance(result, Exception):
             print(f"::warning title=Observatory comparison::{domain}: audit failed ({result})")
             continue
-        answer = answers[domain]
+        answer, seconds = answers[domain]
         if isinstance(answer, ObservatoryError):
             c = compare(result, None, str(answer))
         else:
             (out / f"{result.domain}.json").write_text(json.dumps(answer, indent=2), encoding="utf-8")
             c = compare(result, answer)
         comparisons.append(c)
-        print(annotation(c))
+        print(f"{annotation(c)} (Observatory answer: {seconds:.0f} s)")
     (out / "summary.md").write_text(markdown(comparisons) + "\n", encoding="utf-8")
     return 0
 
 
-def _observatory(domain: str) -> dict | ObservatoryError:
+def _observatory(domain: str) -> tuple[dict | ObservatoryError, float]:
+    start = time.monotonic()
     try:
-        return fetch(domain)
+        answer: dict | ObservatoryError = fetch(domain)
     except ObservatoryError as e:
-        return e
+        answer = e
+    return answer, time.monotonic() - start
 
 
 def annotation(c: Comparison) -> str:
