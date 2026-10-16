@@ -14,8 +14,8 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -23,16 +23,27 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from domaincheck.audit import audit_many  # noqa: E402
 from domaincheck.observatory import Comparison, ObservatoryError, compare, fetch, markdown  # noqa: E402
 
+DEADLINE = 90  # seconds
+
 
 def main(out_dir: str, domains: list[str]) -> int:
     out = Path(out_dir) / "observatory"
     out.mkdir(parents=True, exist_ok=True)
-    # The Observatory scans start first and run while our own audits are made:
-    # a scan takes from a few seconds to a few minutes, and a busy API is retried.
-    with ThreadPoolExecutor(max_workers=len(domains) or 1) as pool:
-        pending = {d: pool.submit(_observatory, d) for d in domains}
-        audits = audit_many(domains, workers=8)
-        answers = {d: f.result() for d, f in pending.items()}
+    # The Observatory scans start first and run while our own audits are made.
+    # A scan takes from one second to a few minutes (google.com: up to ~3 min),
+    # so the comparison waits at most DEADLINE seconds: a slower answer is
+    # reported as missing instead of holding up the whole Live check.
+    started = time.monotonic()
+    answers: dict[str, tuple[dict | ObservatoryError, float]] = {}
+    threads = [threading.Thread(target=lambda d=d: answers.__setitem__(d, _observatory(d)), daemon=True)
+               for d in domains]
+    for thread in threads:
+        thread.start()
+    audits = audit_many(domains, workers=8)
+    for thread in threads:
+        thread.join(max(0.0, DEADLINE - (time.monotonic() - started)))
+    for domain in domains:
+        answers.setdefault(domain, (ObservatoryError(f"did not answer within {DEADLINE} s"), float(DEADLINE)))
     comparisons = []
     for domain, result in audits.items():
         if isinstance(result, Exception):
