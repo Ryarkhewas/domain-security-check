@@ -7,6 +7,7 @@ from dataclasses import asdict
 from enum import Enum
 from html import escape
 
+from .i18n import M, date, tr
 from .models import Category, Result, Status
 from .scoring import GRADE_ORDER
 from .sources import SOURCES
@@ -105,12 +106,30 @@ def _sorted(findings):
     return sorted(findings, key=lambda f: (ORDER[f.status], f.points if f.points is not None else 0))
 
 
-def render_html(r: Result, author: str = "") -> str:
+def capital(text: str) -> str:
+    """First letter in upper case (a translated sentence can start with an empty placeholder)."""
+    return text[:1].upper() + text[1:]
+
+
+def _translator(lang: str):
+    def t(text, **params) -> str:
+        return tr(M(text, **params) if params else text, lang)
+    return t
+
+
+def _linked(t, template: str, link: str, **params) -> str:
+    """Escaped translated sentence with an HTML link in place of {link}."""
+    marker = "\x00"
+    return escape(t(template, link=marker, **params)).replace(marker, link)
+
+
+def render_html(r: Result, author: str = "", lang: str = "en") -> str:
     e = escape
+    t = _translator(lang)
     counts = {s: sum(1 for f in r.findings if f.status == s) for s in Status}
 
     counters = "".join(
-        f'<div class="counter c-{s.value}"><b>{counts[s]}</b><span>{LABELS[s]}</span></div>'
+        f'<div class="counter c-{s.value}"><b>{counts[s]}</b><span>{e(t(LABELS[s]))}</span></div>'
         for s in (Status.CRITICAL, Status.WARNING, Status.OK, Status.INFO)
     )
 
@@ -118,11 +137,11 @@ def render_html(r: Result, author: str = "") -> str:
     priority_block = ""
     if priorities:
         items = "".join(
-            f'<li><b>{e(f.title)}</b> <span class="badge {f.status.value}">{LABELS[f.status]}</span>'
-            f'<br>{e(f.recommendation)}</li>'
+            f'<li><b>{e(t(f.title))}</b> <span class="badge {f.status.value}">{e(t(LABELS[f.status]))}</span>'
+            f'<br>{e(t(f.recommendation))}</li>'
             for f in priorities
         )
-        priority_block = f'<h2>Priority actions</h2><ol class="priority">{items}</ol>'
+        priority_block = f'<h2>{e(t("Priority actions"))}</h2><ol class="priority">{items}</ol>'
 
     sections = ""
     for cat in Category:
@@ -131,59 +150,70 @@ def render_html(r: Result, author: str = "") -> str:
             continue
         items = ""
         for f in _sorted(group):
-            fix = f'<p class="fix">{e(f.recommendation)}</p>' if f.recommendation and f.status != Status.OK else ""
-            pts = f'<span class="pts">{_points(f.points)}</span>'
+            fix = (f'<p class="fix">{e(t(f.recommendation))}</p>'
+                   if f.recommendation and f.status != Status.OK else "")
+            pts = f'<span class="pts">{e(_points(f.points, lang))}</span>'
             src = ""
             if f.source in SOURCES:
                 label, url = SOURCES[f.source]
-                src = f'<p class="src">Source: <a href="{e(url)}">{e(label)}</a></p>'
+                src = f'<p class="src">{e(t("Source:"))} <a href="{e(url)}">{e(label)}</a></p>'
             items += (
-                f'<div class="item {f.status.value}"><div class="row"><span class="title">{e(f.title)}</span>'
-                f'<span><span class="badge {f.status.value}">{LABELS[f.status]}</span>{pts}</span></div>'
-                f'<p class="detail">{e(f.detail)}</p>{fix}{src}</div>'
+                f'<div class="item {f.status.value}"><div class="row"><span class="title">{e(t(f.title))}</span>'
+                f'<span><span class="badge {f.status.value}">{e(t(LABELS[f.status]))}</span>{pts}</span></div>'
+                f'<p class="detail">{e(capital(t(f.detail)))}</p>{fix}{src}</div>'
             )
-        sections += f"<h2>{e(cat.value)}</h2>{items}"
+        sections += f"<h2>{e(t(cat.value))}</h2>{items}"
 
     cats = ""
     for key, g in r.grades.items():
-        detail = g.note or (f"{g.score}/100 · {CATEGORY_METHOD[key]}" if g.score is not None else "")
+        detail = t(g.note) if g.note else (f"{g.score}/100 · {t(CATEGORY_METHOD[key])}" if g.score is not None else "")
         cats += (f'<div class="cat"><div class="grade {GRADE_COLOR[letter(g.grade)]}">{e(g.grade)}</div>'
-                 f'<div><b>{CATEGORY_LABELS[key]}</b><span>{e(detail)}</span></div></div>')
+                 f'<div><b>{e(t(CATEGORY_LABELS[key]))}</b><span>{e(detail)}</span></div></div>')
 
-    by = f" by {e(author)}" if author else ""
+    by = t(" by {author}", author=author) if author else ""
     cap = ""
     if r.cap_reason:
-        cap = f'<p class="cap">{e(r.cap_reason[:1].upper() + r.cap_reason[1:])}: website grade capped at F.</p>'
+        reason = t(r.cap_reason)
+        cap = (f'<p class="cap">{e(t("{reason}: website grade capped at F.", reason=reason[:1].upper() + reason[1:]))}'
+               "</p>")
     obs_label, obs_url = SOURCES["observatory"]
+    obs_link = f'<a href="{e(obs_url)}">{e(obs_label)}</a>'
     return f"""<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Security audit — {e(r.domain)}</title><style>{CSS}</style></head>
+<html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{e(t("Security audit"))} — {e(r.domain)}</title><style>{CSS}</style></head>
 <body><main>
 <header><div class="grade {GRADE_COLOR[letter(r.grade)]}">{e(r.grade)}</div>
-<div><h1>{e(r.domain)}</h1><p class="sub">Passive security audit · {r.date:%Y-%m-%d} · overall grade = weakest area</p>
-<p class="summary">{GRADE_SUMMARY[letter(r.grade)]}</p>{cap}</div></header>
+<div><h1>{e(r.domain)}</h1><p class="sub">{e(t("Passive security audit"))} · {date(r.date, lang)} · \
+{e(t("overall grade = weakest area"))}</p>
+<p class="summary">{e(t(GRADE_SUMMARY[letter(r.grade)]))}</p>{cap}</div></header>
 <section class="cats">{cats}</section>
 <section class="counters">{counters}</section>
 {priority_block}
 {sections}
 <footer>
-<p><b>Method.</b> Passive audit carried out{by} using public information only: DNS records, the certificate
-presented by the server and the home page headers. No intrusion testing was performed.</p>
-<p><b>Grades.</b> The website grade follows the <a href="{obs_url}">{obs_label}</a> (penalties and bonuses per header).
-The certificate, email and DNS grades use this project's own scale, based on the standards cited under each item.
-The overall grade is the lowest of the four.</p>
-<p><b>Limits.</b> This audit does not cover the site's applications, workstations or user accounts.
-It gives an overview of the exposure visible from the Internet on the date shown.</p>
+<p><b>{e(t("Method."))}</b> {e(t(METHOD_TEXT, by=by))}</p>
+<p><b>{e(t("Grades."))}</b> {_linked(t, GRADES_TEXT, obs_link)}</p>
+<p><b>{e(t("Limits."))}</b> {e(t(LIMITS_TEXT))}</p>
 </footer>
 </main></body></html>
 """
 
 
-def render_index(results: list[Result], errors: dict[str, str], author: str = "") -> str:
+METHOD_TEXT = ("Passive audit carried out{by} using public information only: DNS records, the certificate presented "
+               "by the server and the home page. No intrusion testing was performed.")
+GRADES_TEXT = ("The website grade follows the {link} (penalties and bonuses per header). The certificate, email and "
+               "DNS grades use this project's own scale, based on the standards cited under each item. The overall "
+               "grade is the lowest of the four.")
+LIMITS_TEXT = ("This audit does not cover the site's applications, workstations or user accounts. It gives an "
+               "overview of the exposure visible from the Internet on the date shown.")
+
+
+def render_index(results: list[Result], errors: dict[str, str], author: str = "", lang: str = "en") -> str:
     """Summary page for an audit of several domains, linking to each report (<domain>.html)."""
     e = escape
+    t = _translator(lang)
     keys = list(CATEGORY_LABELS)
-    head = "".join(f"<th>{CATEGORY_LABELS[k]}</th>" for k in keys)
+    head = "".join(f"<th>{e(t(CATEGORY_LABELS[k]))}</th>" for k in keys)
     rows = ""
     for r in sorted(results, key=lambda r: (GRADE_ORDER.index(r.grade) if r.grade in GRADE_ORDER else -1),
                     reverse=True):
@@ -197,46 +227,52 @@ def render_index(results: list[Result], errors: dict[str, str], author: str = ""
                  f'<td>{critical}</td><td>{warning}</td></tr>')
     for domain, message in errors.items():
         rows += (f'<tr><td>{e(domain)}</td><td class="g na">–</td>'
-                 f'<td colspan="{len(keys) + 2}">Not audited: {e(message)}</td></tr>')
-    by = f" by {e(author)}" if author else ""
-    date = results[0].date if results else None
-    when = f" · {date:%Y-%m-%d}" if date else ""
+                 f'<td colspan="{len(keys) + 2}">{e(t("Not audited: {reason}", reason=message))}</td></tr>')
+    by = t(" by {author}", author=author) if author else ""
+    when = f" · {date(results[0].date, lang)}" if results else ""
+    count = len(results) + len(errors)
+    title = t("Security audit of {count} domains", count=count)
     return f"""<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Security audit — {len(results) + len(errors)} domains</title><style>{CSS}</style></head>
+<html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{e(title)}</title><style>{CSS}</style></head>
 <body><main>
-<header><div><h1>Security audit of {len(results) + len(errors)} domains</h1>
-<p class="sub">Passive security audit{when} · weakest domains first · click a domain for its full report</p>
+<header><div><h1>{e(title)}</h1>
+<p class="sub">{e(t("Passive security audit"))}{when} · \
+{e(t("weakest domains first · click a domain for its full report"))}</p>
 </div></header>
-<div class="scroll"><table class="list"><thead><tr><th>Domain</th><th>Overall</th>{head}
-<th>Critical</th><th>To improve</th></tr></thead><tbody>{rows}</tbody></table></div>
-<footer><p><b>Method.</b> Passive audit carried out{by} using public information only. Each report explains its
-grades, the points behind them and the standard each check relies on.</p></footer>
+<div class="scroll"><table class="list"><thead><tr><th>{e(t("Domain"))}</th><th>{e(t("Overall"))}</th>{head}
+<th>{e(t(LABELS[Status.CRITICAL]))}</th><th>{e(t(LABELS[Status.WARNING]))}</th></tr></thead><tbody>{rows}</tbody></table></div>
+<footer><p><b>{e(t("Method."))}</b> {e(t(INDEX_METHOD_TEXT, by=by))}</p></footer>
 </main></body></html>
 """
 
 
-def _points(points: int | None) -> str:
+INDEX_METHOD_TEXT = ("Passive audit carried out{by} using public information only. Each report explains its grades, "
+                     "the points behind them and the standard each check relies on.")
+
+
+def _points(points: int | None, lang: str = "en") -> str:
     if points is None:
-        return "not scored"
-    if points > 0:
-        return f"+{points} pts"
-    return f"{points} pts" if points < 0 else "0 pts"
+        return tr("not scored", lang)
+    sign = "+" if points > 0 else ""
+    return tr(M("{points} pts", points=f"{sign}{points}"), lang)
 
 
-def console_summary(r: Result) -> str:
+def console_summary(r: Result, lang: str = "en") -> str:
+    t = _translator(lang)
     symbols = {Status.CRITICAL: "✗", Status.WARNING: "!", Status.OK: "✓", Status.INFO: "i"}
-    lines = [f"\n  {r.domain} — overall grade {r.grade}", f"  {GRADE_SUMMARY[letter(r.grade)]}"]
+    lines = [f"\n  {r.domain} — {t('overall grade {grade}', grade=r.grade)}", f"  {t(GRADE_SUMMARY[letter(r.grade)])}"]
     for key, g in r.grades.items():
         score = f" ({g.score}/100)" if g.score is not None else ""
-        note = f" — {g.note}" if g.note else ""
-        lines.append(f"    {CATEGORY_LABELS[key]:<18} {g.grade}{score}{note}")
+        note = f" — {t(g.note)}" if g.note else ""
+        lines.append(f"    {t(CATEGORY_LABELS[key]):<20} {g.grade}{score}{note}")
     lines.append("")
     for cat in Category:
         group = [f for f in r.findings if f.category == cat]
         if group:
-            lines.append(f"  {cat.value}")
-            lines += [f"    [{symbols[f.status]}] {f.title} ({_points(f.points)}) — {f.detail}" for f in _sorted(group)]
+            lines.append(f"  {t(cat.value)}")
+            lines += [f"    [{symbols[f.status]}] {t(f.title)} ({_points(f.points, lang)}) — {capital(t(f.detail))}"
+                      for f in _sorted(group)]
             lines.append("")
     return "\n".join(lines)
 

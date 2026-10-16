@@ -22,6 +22,7 @@ from html.parser import HTMLParser
 
 import tldextract
 
+from .i18n import M
 from .models import Category, CookieInfo, Finding, HTTPInfo, Status
 
 W = Category.WEB
@@ -75,11 +76,12 @@ def check_redirection(http: HTTPInfo, host: str) -> Finding:
     first = chain[1] if len(chain) > 1 else ""
     if first and not first.startswith("https://"):
         return _f(title, -10, "The site ends on HTTPS, but the first redirect goes to another HTTP address.",
-                  f"Redirect http://{host} directly to https://{host} first, so that HSTS can apply.", src)
+                  M("Redirect http://{host} directly to https://{host} first, so that HSTS can apply.", host=host), src)
     if first and _host(first) != host:
         return _f(title, -5,
-                  f"The first redirect goes to a different host ({_host(first)}), which prevents HSTS on {host}.",
-                  f"Redirect http://{host} to https://{host} first, then to the other host.", src)
+                  M("The first redirect goes to a different host ({other}), which prevents HSTS on {host}.",
+                    other=_host(first), host=host),
+                  M("Redirect http://{host} to https://{host} first, then to the other host.", host=host), src)
     return _f(title, 0, "Visitors arriving over HTTP are redirected to HTTPS.", source=src)
 
 
@@ -99,13 +101,13 @@ def check_hsts(headers: Mapping[str, str], preloaded: bool | None = None) -> Fin
                   "Add \"Strict-Transport-Security: max-age=31536000; includeSubDomains\".", src)
     m = re.search(r"max-age\s*=\s*\"?(\d+)", hsts, re.I)
     if not m or "," in hsts:  # a comma means the header was sent several times
-        return _f(title, -20, f"The header cannot be understood: \"{hsts}\".",
+        return _f(title, -20, M("The header cannot be understood: \"{value}\".", value=hsts),
                   "Use the form \"max-age=31536000; includeSubDomains\".", src)
     age = int(m.group(1))
     if age < SIX_MONTHS:
-        return _f(title, -10, f"Present but short duration (max-age={age}).",
+        return _f(title, -10, M("Present but short duration (max-age={age}).", age=age),
                   "Use at least 6 months (max-age=15552000), ideally 1 year.", src)
-    return _f(title, 0, f"Present (max-age={age}).", source=src)
+    return _f(title, 0, M("Present (max-age={age}).", age=age), source=src)
 
 
 # --- CSP ------------------------------------------------------------------------
@@ -143,7 +145,7 @@ def check_csp(headers: Mapping[str, str]) -> Finding:
     try:
         csp = parse_csp(raw.split(",")[0])  # the first policy carries the main rules
     except ValueError as e:
-        return _f(title, -25, f"The policy cannot be parsed ({e}).",
+        return _f(title, -25, M("The policy cannot be parsed ({error}).", error=str(e)),
                   "Check the syntax, for instance with Google's CSP Evaluator.", src)
 
     default = csp.get("default-src")
@@ -216,11 +218,11 @@ def check_xfo(headers: Mapping[str, str]) -> Finding:
                   "Add \"X-Frame-Options: SAMEORIGIN\" or \"frame-ancestors 'self'\" in the CSP.", src)
     value = xfo.strip().lower()
     if value in ("deny", "sameorigin"):
-        return _f(title, 5, f"X-Frame-Options set to {value.upper()}.", source=src)
+        return _f(title, 5, M("X-Frame-Options set to {value}.", value=value.upper()), source=src)
     if value.startswith("allow-from"):
         return _f(title, 0, "X-Frame-Options uses ALLOW-FROM, which modern browsers ignore.",
                   "Use the CSP frame-ancestors directive instead.", src)
-    return _f(title, -20, f"X-Frame-Options cannot be understood: \"{xfo}\".",
+    return _f(title, -20, M("X-Frame-Options cannot be understood: \"{value}\".", value=xfo),
               "Use \"X-Frame-Options: SAMEORIGIN\" or DENY.", src)
 
 
@@ -232,7 +234,7 @@ def check_xcto(headers: Mapping[str, str]) -> Finding:
                   "Add \"X-Content-Type-Options: nosniff\".", src)
     if xcto.strip().lower() == "nosniff":
         return _f(title, 0, "Present (nosniff).", source=src)
-    return _f(title, -5, f"Invalid value: \"{xcto}\".", "The only valid value is \"nosniff\".", src)
+    return _f(title, -5, M("Invalid value: \"{value}\".", value=xcto), "The only valid value is \"nosniff\".", src)
 
 
 REFERRER_GOOD = {"no-referrer", "same-origin", "strict-origin", "strict-origin-when-cross-origin"}
@@ -251,11 +253,13 @@ def check_referrer(headers: Mapping[str, str], meta: str | None = None) -> Findi
     # Browsers use the last value they recognise
     known = [v.strip().lower() for v in raw.split(",") if v.strip().lower() in REFERRER_GOOD | REFERRER_BAD]
     if not known:
-        return _f(title, -5, f"Value not recognised: \"{raw}\".", "Use \"strict-origin-when-cross-origin\".", src)
-    where = " in a <meta> tag of the page" if meta and known[-1] == meta.strip().lower() else ""
+        return _f(title, -5, M("Value not recognised: \"{value}\".", value=raw),
+                  "Use \"strict-origin-when-cross-origin\".", src)
+    where = M(" in a <meta> tag of the page") if meta and known[-1] == meta.strip().lower() else ""
     if known[-1] in REFERRER_GOOD:
-        return _f(title, 5, f"Present ({known[-1]}{where}).", source=src)
-    return _f(title, -5, f"Set to \"{known[-1]}\"{where}, which can leak page addresses to other sites.",
+        return _f(title, 5, M("Present ({value}{where}).", value=known[-1], where=where), source=src)
+    return _f(title, -5, M("Set to \"{value}\"{where}, which can leak page addresses to other sites.",
+                               value=known[-1], where=where),
               "Use \"strict-origin-when-cross-origin\".", src)
 
 
@@ -267,46 +271,47 @@ def _isolation(headers, name, title, src, good: dict[str, str], neutral: set[str
     if value in good:
         return _f(title, 10, good[value], source=src)
     if value in neutral:
-        return _f(title, 0, f"Set to \"{value}\", which keeps the default, permissive behaviour.", source=src,
-                  status=Status.INFO)
-    return _f(title, -5, f"Value not recognised: \"{raw}\".", source=src)
+        return _f(title, 0, M("Set to \"{value}\", which keeps the default, permissive behaviour.", value=value),
+                  source=src, status=Status.INFO)
+    return _f(title, -5, M("Value not recognised: \"{value}\".", value=raw), source=src)
 
 
 def check_corp(headers):
     return _isolation(headers, "Cross-Origin-Resource-Policy", "Cross-Origin-Resource-Policy", "corp",
-                      {"same-origin": "Set to same-origin: resources cannot leak into other origins.",
-                       "same-site": "Set to same-site: resources cannot leak into other sites."},
+                      {"same-origin": M("Set to same-origin: resources cannot leak into other origins."),
+                       "same-site": M("Set to same-site: resources cannot leak into other sites.")},
                       {"cross-origin"})
 
 
 def check_coop(headers):
     return _isolation(headers, "Cross-Origin-Opener-Policy", "Cross-Origin-Opener-Policy", "coop",
-                      {"same-origin": "Set to same-origin: the page is isolated from the windows that open it.",
+                      {"same-origin": M("Set to same-origin: the page is isolated from the windows that open it."),
                        "same-origin-allow-popups":
-                           "Set to same-origin-allow-popups: the page is isolated from its opener.",
-                       "noopener-allow-popups": "Set to noopener-allow-popups: the page is isolated from its opener."},
+                           M("Set to same-origin-allow-popups: the page is isolated from its opener."),
+                       "noopener-allow-popups":
+                           M("Set to noopener-allow-popups: the page is isolated from its opener.")},
                       {"unsafe-none"})
 
 
 def check_coep(headers):
     return _isolation(headers, "Cross-Origin-Embedder-Policy", "Cross-Origin-Embedder-Policy", "coep",
-                      {"require-corp": "Set to require-corp: only explicitly allowed cross-origin resources load.",
-                       "credentialless": "Set to credentialless: cross-origin resources load without credentials."},
+                      {"require-corp": M("Set to require-corp: only explicitly allowed cross-origin resources load."),
+                       "credentialless": M("Set to credentialless: cross-origin resources load without credentials.")},
                       {"unsafe-none"})
 
 
 # --- Cookies --------------------------------------------------------------------
 # Observatory results, from best to worst, with their modifiers
 _COOKIE_RESULTS = [
-    (5, "All cookies use the Secure flag, session cookies use HttpOnly, and SameSite is set."),
-    (0, "All cookies use the Secure flag and session cookies use HttpOnly, but some cookies have no SameSite flag."),
-    (-5, "Some cookies lack the Secure flag, but HSTS prevents sending them over HTTP."),
-    (-10, "A session cookie lacks the Secure flag, but HSTS prevents sending it over HTTP."),
-    (-20, "Some cookies lack the Secure flag and can be sent over unencrypted HTTP."),
-    (-20, "A cookie uses SameSite=None without the Secure flag."),
-    (-20, "An anti-CSRF cookie is set without the SameSite flag."),
-    (-30, "A session cookie lacks the HttpOnly flag: JavaScript (and XSS attacks) can read it."),
-    (-40, "A session cookie lacks the Secure flag and can be sent over unencrypted HTTP."),
+    (5, M("All cookies use the Secure flag, session cookies use HttpOnly, and SameSite is set.")),
+    (0, M("All cookies use the Secure flag and session cookies use HttpOnly, but some cookies have no SameSite flag.")),
+    (-5, M("Some cookies lack the Secure flag, but HSTS prevents sending them over HTTP.")),
+    (-10, M("A session cookie lacks the Secure flag, but HSTS prevents sending it over HTTP.")),
+    (-20, M("Some cookies lack the Secure flag and can be sent over unencrypted HTTP.")),
+    (-20, M("A cookie uses SameSite=None without the Secure flag.")),
+    (-20, M("An anti-CSRF cookie is set without the SameSite flag.")),
+    (-30, M("A session cookie lacks the HttpOnly flag: JavaScript (and XSS attacks) can read it.")),
+    (-40, M("A session cookie lacks the Secure flag and can be sent over unencrypted HTTP.")),
 ]
 
 
@@ -341,9 +346,9 @@ def check_cookies(cookies: list[CookieInfo], hsts: bool) -> Finding:
         worst = 1 if missing_samesite else 0
     points, detail = _COOKIE_RESULTS[worst]
     names = ", ".join(c.name for c in cookies[:5]) + ("…" if len(cookies) > 5 else "")
-    recommendation = "" if points > 0 else ("Set Secure on every cookie, HttpOnly on session cookies, "
-                                            "and SameSite=Lax or Strict.")
-    return _f(title, points, f"{detail} (cookies: {names})", recommendation, src)
+    recommendation = "" if points > 0 else M("Set Secure on every cookie, HttpOnly on session cookies, "
+                                             "and SameSite=Lax or Strict.")
+    return _f(title, points, M("{detail} (cookies: {names})", detail=detail, names=names), recommendation, src)
 
 
 # --- Subresource Integrity ------------------------------------------------------
@@ -391,14 +396,14 @@ def meta_referrer(body: str) -> str | None:
 # Observatory results, in its order (later = worse for "only if worse"), with modifiers
 _SRI_ALL_SECURE, _SRI_EXTERNAL_SECURE, _SRI_BUT_NOT_SECURE, _SRI_NONE_BUT_SECURE, _SRI_NONE_NOT_SECURE = range(5)
 _SRI_RESULTS = {
-    _SRI_ALL_SECURE: (5, "Subresource Integrity is used and all scripts are loaded from the site's own domain."),
-    _SRI_EXTERNAL_SECURE: (5, "Subresource Integrity is used and all external scripts are loaded securely."),
-    _SRI_BUT_NOT_SECURE: (-20, "Subresource Integrity is used, but some external scripts are loaded over HTTP or a "
-                               "protocol-relative URL (//...)."),
-    _SRI_NONE_BUT_SECURE: (-5, "External scripts are loaded over HTTPS, but without Subresource Integrity: if the "
-                               "other site is compromised, its scripts run on this page."),
-    _SRI_NONE_NOT_SECURE: (-50, "External scripts are loaded over HTTP or a protocol-relative URL (//...), without "
-                                "Subresource Integrity: they can be modified in transit."),
+    _SRI_ALL_SECURE: (5, M("Subresource Integrity is used and all scripts are loaded from the site's own domain.")),
+    _SRI_EXTERNAL_SECURE: (5, M("Subresource Integrity is used and all external scripts are loaded securely.")),
+    _SRI_BUT_NOT_SECURE: (-20, M("Subresource Integrity is used, but some external scripts are loaded over HTTP or a "
+                               "protocol-relative URL (//...).")),
+    _SRI_NONE_BUT_SECURE: (-5, M("External scripts are loaded over HTTPS, but without Subresource Integrity: if the "
+                               "other site is compromised, its scripts run on this page.")),
+    _SRI_NONE_NOT_SECURE: (-50, M("External scripts are loaded over HTTP or a protocol-relative URL (//...), without "
+                                "Subresource Integrity: they can be modified in transit.")),
 }
 
 
@@ -454,9 +459,10 @@ def check_sri(body: str, content_type: str, host: str) -> Finding:
         result = _SRI_EXTERNAL_SECURE
     points, detail = _SRI_RESULTS[result]
     if foreign:
-        detail += f" External scripts: {', '.join(foreign[:3])}" + ("…" if len(foreign) > 3 else "") + "."
-    recommendation = "" if points >= 0 else ("Load external scripts over HTTPS and add an integrity attribute "
-                                             "(with crossorigin=\"anonymous\") to each of them.")
+        listed = ", ".join(foreign[:3]) + ("…" if len(foreign) > 3 else "")
+        detail = M("{detail} External scripts: {scripts}.", detail=detail, scripts=listed)
+    recommendation = "" if points >= 0 else M("Load external scripts over HTTPS and add an integrity attribute "
+                                              "(with crossorigin=\"anonymous\") to each of them.")
     return _f(title, points, detail, recommendation, src)
 
 
@@ -479,8 +485,9 @@ def check_version_disclosure(headers) -> Finding | None:
     if not leaks:
         return None
     return Finding(W, "Software version disclosure", Status.WARNING,
-                   "The server announces its versions (" + "; ".join(leaks) + "), which helps an attacker target known "
-                   "vulnerabilities.", "Hide version numbers in the server configuration.", source="owasp-headers")
+                   M("The server announces its versions ({versions}), which helps an attacker target known "
+                     "vulnerabilities.", versions="; ".join(leaks)),
+                   "Hide version numbers in the server configuration.", source="owasp-headers")
 
 
 # --- All website checks ---------------------------------------------------------

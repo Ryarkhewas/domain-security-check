@@ -7,6 +7,7 @@ Usage:
     domain-security-check example.com example.org --output-dir reports/
     domain-security-check --file domains.txt
     domain-security-check example.com --pdf
+    domain-security-check example.com --lang fr
     domain-security-check --demo
 
 With several domains, each one gets its report in the output directory, plus
@@ -27,6 +28,7 @@ from ._version import __version__
 from .audit import InvalidDomain, audit_many, run_audit
 from .collector import CollectionError, DomainNotFound
 from .demo import DEMO_DOMAIN, DemoCollector
+from .i18n import LANGUAGES
 from .models import Result
 from .pdf_report import INSTALL_HINT, render_pdf
 from .report import console_summary, render_html, render_index, render_json
@@ -70,6 +72,8 @@ def main(argv: list[str] | None = None) -> int:
                    help="Output directory for several domains (default: reports)")
     p.add_argument("--pdf", action="store_true", help="Also write each report as a PDF (needs the [pdf] extra)")
     p.add_argument("--workers", type=int, default=6, help="Domains audited at the same time (default: 6)")
+    p.add_argument("--lang", choices=LANGUAGES, default="en",
+                   help="Language of the reports and summary: en (default) or fr; JSON stays in English")
     p.add_argument("--author", default="", help="Name shown in the report")
     p.add_argument("--json", action="store_true", help="Print the result as JSON instead of the summary")
     p.add_argument("--demo", action="store_true", help="Demo on a fictitious domain, without network access")
@@ -112,12 +116,12 @@ def main(argv: list[str] | None = None) -> int:
 def _single(result: Result, args) -> int:
     output = args.output or args.output_dir / f"{result.domain}.html"
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(render_html(result, args.author), encoding="utf-8")
-    print(render_json(result) if args.json else console_summary(result))
+    output.write_text(render_html(result, args.author, args.lang), encoding="utf-8")
+    print(render_json(result) if args.json else console_summary(result, args.lang))
     print(f"HTML report: {output}", file=sys.stderr)
     if args.pdf:
         pdf = output.with_suffix(".pdf")
-        pdf.write_bytes(render_pdf(result, args.author))
+        pdf.write_bytes(render_pdf(result, args.author, args.lang))
         print(f"PDF report: {pdf}", file=sys.stderr)
     return 0
 
@@ -151,11 +155,11 @@ def _several(domains: list[str], args) -> int:
         if isinstance(outcome, Exception):
             raise outcome
         results.append(outcome)
-        (out / f"{outcome.domain}.html").write_text(render_html(outcome, args.author), encoding="utf-8")
+        (out / f"{outcome.domain}.html").write_text(render_html(outcome, args.author, args.lang), encoding="utf-8")
         if args.pdf:
-            (out / f"{outcome.domain}.pdf").write_bytes(render_pdf(outcome, args.author))
+            (out / f"{outcome.domain}.pdf").write_bytes(render_pdf(outcome, args.author, args.lang))
 
-    (out / "index.html").write_text(render_index(results, errors, args.author), encoding="utf-8")
+    (out / "index.html").write_text(render_index(results, errors, args.author, args.lang), encoding="utf-8")
     if args.json:
         print(json.dumps({"results": [json.loads(render_json(r)) for r in results], "errors": errors},
                          ensure_ascii=False, indent=2))

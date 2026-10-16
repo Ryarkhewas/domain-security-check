@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 
 from .dns_checks import check_caa, check_dnssec
 from .email_checks import check_dkim, check_dmarc, check_mta_sts, check_mx, check_spf, effective_dmarc_policy
+from .i18n import M
 from .models import CollectedData, Result
 from .scoring import category_grades, overall_grade
 from .tls_checks import check_certificate
@@ -52,11 +53,11 @@ def broken_https_reason(data: CollectedData, now: datetime) -> str:
     if cert is None:
         if data.http.http_redirects_to_https is None:
             return ""  # nothing answers on port 80 or 443: no website to grade
-        return "the site is reachable over HTTP but not over HTTPS"
+        return M("the site is reachable over HTTP but not over HTTPS")
     if not cert.valid:
-        return f"the HTTPS certificate is not valid ({cert.error or 'unknown error'})"
+        return M("the HTTPS certificate is not valid ({error})", error=cert.error or M("unknown error"))
     if cert.expires_at and cert.expires_at < now:
-        return "the HTTPS certificate has expired"
+        return M("the HTTPS certificate has expired")
     return ""
 
 

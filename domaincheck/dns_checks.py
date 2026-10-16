@@ -9,6 +9,7 @@ No network access here: the functions analyse data that was already collected.
 
 from __future__ import annotations
 
+from .i18n import M
 from .models import CAAInfo, Category, DNSSECInfo, Finding, Status
 
 D = Category.DNS
@@ -22,54 +23,58 @@ def _f(title, status, detail, recommendation="", points=0, source="") -> Finding
 def check_dnssec(info: DNSSECInfo) -> Finding:
     title, src = "DNSSEC", "dnssec"
     if info.error:
-        return _f(title, Status.INFO, f"Could not be checked ({info.error}).", points=None, source=src)
-    zone = info.zone or "the zone"
+        return _f(title, Status.INFO, M("Could not be checked ({error}).", error=info.error), points=None, source=src)
+    zone = info.zone or M("the zone")
     if info.ds_count == 0:
         return _f(title, Status.WARNING,
-                  f"Not enabled for {zone}: DNS answers are not signed, so a resolver cannot detect forged answers "
-                  "(redirecting visitors or emails to another server).",
+                  M("Not enabled for {zone}: DNS answers are not signed, so a resolver cannot detect forged answers "
+                    "(redirecting visitors or emails to another server).", zone=zone),
                   "Enable DNSSEC at your DNS host, then publish the DS record at your registrar "
                   "(often a single option in their interface).", -15, src)
     if info.dnskey_count == 0 or info.ds_matches is False:
-        problem = "publishes no DNSSEC key" if info.dnskey_count == 0 else "has no key matching the DS record"
+        problem = M("publishes no DNSSEC key") if info.dnskey_count == 0 else M("has no key matching the DS record")
         return _f(title, Status.CRITICAL,
-                  f"Broken: the parent zone announces DNSSEC for {zone}, but the zone {problem}. Validating "
-                  "resolvers (used by many ISPs and public DNS services) may refuse to resolve the domain.",
+                  M("Broken: the parent zone announces DNSSEC for {zone}, but the zone {problem}. Validating "
+                    "resolvers (used by many ISPs and public DNS services) may refuse to resolve the domain.",
+                    zone=zone, problem=problem),
                   "Fix it now: publish the right DS record at your registrar, or remove it if DNSSEC was turned off "
                   "at your DNS host.", -50, src)
-    unchecked = " (the DS record could not be compared with the keys)" if info.ds_matches is None else ""
-    return _f(title, Status.OK, f"Enabled for {zone}: DNS answers are signed{unchecked}.", source=src)
+    unchecked = M(" (the DS record could not be compared with the keys)") if info.ds_matches is None else ""
+    return _f(title, Status.OK, M("Enabled for {zone}: DNS answers are signed{unchecked}.", zone=zone,
+                                  unchecked=unchecked), source=src)
 
 
 def check_caa(info: CAAInfo, has_website: bool) -> Finding:
     title, src = "CAA (allowed certificate authorities)", "caa"
     if info.error:
-        return _f(title, Status.INFO, f"Could not be checked ({info.error}).", points=None, source=src)
+        return _f(title, Status.INFO, M("Could not be checked ({error}).", error=info.error), points=None, source=src)
     if not info.records:
         return _f(title, Status.WARNING,
                   "No CAA record: any certificate authority may issue a certificate for this domain.",
                   "Publish a CAA record naming the authority you use, e.g. 0 issue \"letsencrypt.org\".", -5, src)
 
-    where = "" if not info.owner else f" (published on {info.owner})"
+    where = "" if not info.owner else M(" (published on {owner})", owner=info.owner)
     unknown_critical = [tag for flags, tag, _ in info.records if flags & 128 and tag.lower() not in KNOWN_CAA_TAGS]
     if unknown_critical:
         return _f(title, Status.WARNING,
-                  f"A CAA record uses an unknown tag marked critical ({', '.join(unknown_critical)}){where}: "
-                  "certificate authorities must then refuse to issue any certificate.",
+                  M("A CAA record uses an unknown tag marked critical ({tags}){where}: "
+                    "certificate authorities must then refuse to issue any certificate.",
+                    tags=", ".join(unknown_critical), where=where),
                   "Remove the critical flag (128) or fix the tag name.", -10, src)
 
     issuers = [value.split(";")[0].strip() for _, tag, value in info.records if tag.lower() in ("issue", "issuewild")]
     if not issuers:
         return _f(title, Status.WARNING,
-                  f"CAA records exist{where} but none restricts issuance (no \"issue\" tag).",
+                  M("CAA records exist{where} but none restricts issuance (no \"issue\" tag).", where=where),
                   "Add an \"issue\" record naming the authority you use.", -5, src)
     named = sorted({i for i in issuers if i})
     if not named:
         if has_website:
             return _f(title, Status.WARNING,
-                      f"CAA forbids every certificate authority{where}: the site's certificate cannot be renewed.",
+                      M("CAA forbids every certificate authority{where}: the site's certificate cannot be renewed.",
+                        where=where),
                       "Name the authority you use in an \"issue\" record.", -10, src)
-        return _f(title, Status.OK, f"CAA forbids every certificate authority{where} (fine for a domain without "
-                  "a website).", source=src)
-    return _f(title, Status.OK, f"Only these authorities may issue certificates{where}: {', '.join(named)}.",
-              source=src)
+        return _f(title, Status.OK, M("CAA forbids every certificate authority{where} (fine for a domain without "
+                                      "a website).", where=where), source=src)
+    return _f(title, Status.OK, M("Only these authorities may issue certificates{where}: {names}.", where=where,
+                                  names=", ".join(named)), source=src)

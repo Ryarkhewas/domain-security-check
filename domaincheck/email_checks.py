@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 
+from .i18n import Joined, M
 from .models import Category, Finding, MTASTSInfo, Status
 
 C = Category.EMAIL
@@ -30,7 +31,8 @@ def check_mx(mx: list[str]) -> list[Finding]:
         return [_f(title, Status.INFO, "No MX server: this domain does not receive email.",
                    "If the domain does not send email either, publish \"v=spf1 -all\", a DMARC policy \"p=reject\" "
                    "and a null MX record, so nobody can use it to impersonate you.", 0, "null-mx")]
-    return [_f(title, Status.OK, f"{len(mx)} server(s): {', '.join(mx[:3])}", source="null-mx")]
+    servers = M("{count} server(s): {names}", count=len(mx), names=", ".join(mx[:3]))
+    return [_f(title, Status.OK, servers, source="null-mx")]
 
 
 def check_spf(root_txt: list[str], dmarc_enforced: bool = False) -> list[Finding]:
@@ -58,7 +60,8 @@ def check_spf(root_txt: list[str], dmarc_enforced: bool = False) -> list[Finding
                    -30, "spf")]
     if len(spf) > 1:
         return [_f(title, Status.CRITICAL,
-                   f"{len(spf)} SPF records found: this is invalid, receiving servers ignore all of them.",
+                   M("{count} SPF records found: this is invalid, receiving servers ignore all of them.",
+                     count=len(spf)),
                    "Merge them into a single SPF record.", -30, "spf")]
 
     record = spf[0]
@@ -67,7 +70,8 @@ def check_spf(root_txt: list[str], dmarc_enforced: bool = False) -> list[Finding
 
     all_term = next((t for t in terms if t.lower().lstrip("+-~?") == "all"), None)
     if all_term is None and not any(t.lower().startswith("redirect=") for t in terms):
-        findings.append(_f(title, Status.WARNING, f"The SPF record does not end with an \"all\" rule: \"{record}\".",
+        findings.append(_f(title, Status.WARNING,
+                           M("The SPF record does not end with an \"all\" rule: \"{record}\".", record=record),
                            "End the record with \"-all\" (or \"~all\" during a test phase).", -15, "spf"))
     elif all_term in ("all", "+all"):
         findings.append(_f(title, Status.CRITICAL,
@@ -87,7 +91,8 @@ def check_spf(root_txt: list[str], dmarc_enforced: bool = False) -> list[Finding
     lookups = sum(1 for t in terms if _DNS_MECHANISMS.match(t))
     if lookups > 10:
         findings.append(_f("SPF: number of DNS lookups", Status.WARNING,
-                           f"{lookups} mechanisms require a DNS lookup (limit: 10). The SPF record may be rejected.",
+                           M("{count} mechanisms require a DNS lookup (limit: 10). The SPF record may be rejected.",
+                             count=lookups),
                            "Reduce the number of \"include\" entries or use an SPF flattening service.", -15, "spf"))
     return findings
 
@@ -137,26 +142,33 @@ def check_dmarc(dmarc_txt: list[str], inherited_from: str = "") -> list[Finding]
     t = dmarc_tags(dmarc[0])
     tag = "sp" if inherited_from and "sp" in t else "p"
     policy = t.get(tag, "").lower()
-    origin = f"Inherited from {inherited_from}: " if inherited_from else ""
+    origin = M("Inherited from {parent}: ", parent=inherited_from) if inherited_from else ""
     findings: list[Finding] = []
 
     if policy == "reject":
-        findings.append(_f(title, Status.OK, f"{origin}\"reject\" policy: spoofed emails are rejected.",
+        findings.append(_f(title, Status.OK,
+                           M("{origin}\"reject\" policy: spoofed emails are rejected.", origin=origin),
                            source="dmarc"))
     elif policy == "quarantine":
-        findings.append(_f(title, Status.OK, f"{origin}\"quarantine\" policy: spoofed emails go to spam.",
+        findings.append(_f(title, Status.OK,
+                           M("{origin}\"quarantine\" policy: spoofed emails go to spam.", origin=origin),
                            "Move to \"reject\" once the reports confirm your legitimate email passes.", 0, "dmarc"))
     elif policy == "none":
-        findings.append(_f(title, Status.WARNING, f"{origin}\"none\" policy: DMARC monitors but blocks nothing.",
+        findings.append(_f(title, Status.WARNING,
+                           M("{origin}\"none\" policy: DMARC monitors but blocks nothing.", origin=origin),
                            "After a few weeks of report analysis, move to \"quarantine\", then \"reject\".",
                            -20, "dmarc"))
     else:
-        findings.append(_f(title, Status.CRITICAL, f"{origin}Missing or invalid DMARC policy ({tag}={policy or '?'}).",
-                           f"Fix the record: the {tag}= tag must be none, quarantine or reject.", -40, "dmarc"))
+        findings.append(_f(title, Status.CRITICAL,
+                           M("{origin}Missing or invalid DMARC policy ({tag}={policy}).", origin=origin, tag=tag,
+                             policy=policy or "?"),
+                           M("Fix the record: the {tag}= tag must be none, quarantine or reject.", tag=tag),
+                           -40, "dmarc"))
 
     pct = t.get("pct")
     if pct and pct.isdigit() and int(pct) < 100 and policy in ("quarantine", "reject"):
-        findings.append(_f("DMARC: coverage", Status.WARNING, f"The policy only applies to {pct}% of messages.",
+        findings.append(_f("DMARC: coverage", Status.WARNING,
+                           M("The policy only applies to {pct}% of messages.", pct=pct),
                            "Gradually raise it to pct=100.", -10, "dmarc"))
     if "rua" not in t:
         findings.append(_f("DMARC: reports", Status.INFO,
@@ -168,10 +180,11 @@ def check_dmarc(dmarc_txt: list[str], inherited_from: str = "") -> list[Finding]
 def check_dkim(found_selectors: list[str], tested_selectors: list[str]) -> list[Finding]:
     title = "DKIM (email signing)"
     if found_selectors:
-        return [_f(title, Status.OK, f"DKIM key(s) found: {', '.join(found_selectors)}.", source="dkim")]
+        found = M("DKIM key(s) found: {selectors}.", selectors=", ".join(found_selectors))
+        return [_f(title, Status.OK, found, source="dkim")]
     return [_f(title, Status.INFO,
-               f"No DKIM key found among the common selectors tested ({len(tested_selectors)}). "
-               "This is not necessarily a problem: the selector may have another name.",
+               M("No DKIM key found among the common selectors tested ({count}). "
+                 "This is not necessarily a problem: the selector may have another name.", count=len(tested_selectors)),
                "Check in your email service (Google Workspace, Microsoft 365...) that DKIM signing is enabled.",
                None, "dkim")]
 
@@ -226,12 +239,13 @@ def _check_mta_sts_policy(info: MTASTSInfo, receivers: list[str], title: str, sr
                   "Publish an MTA-STS policy (in \"testing\" mode first), or enable it in your email service.",
                   -5, src)
     if len(records) > 1 or "id=" not in records[0].replace(" ", "").lower():
-        return _f(title, Status.WARNING, f"The _mta-sts TXT record is invalid: {'; '.join(records)}.",
+        return _f(title, Status.WARNING,
+                  M("The _mta-sts TXT record is invalid: {records}.", records="; ".join(records)),
                   "Publish a single record of the form \"v=STSv1; id=20260101\".", -10, src)
     if info.policy is None:
         return _f(title, Status.WARNING,
-                  f"Announced, but the policy file cannot be read ({info.error or 'unknown error'}): "
-                  "sending servers ignore it.",
+                  M("Announced, but the policy file cannot be read ({error}): sending servers ignore it.",
+                    error=info.error or M("unknown error")),
                   "Serve the policy at https://mta-sts.<your-domain>/.well-known/mta-sts.txt (valid HTTPS, "
                   "no redirect).", -15, src)
 
@@ -241,15 +255,15 @@ def _check_mta_sts_policy(info: MTASTSInfo, receivers: list[str], title: str, sr
     patterns = policy.get("mx", [])
     problems = []
     if (policy.get("version") or [""])[0] != "STSv1":
-        problems.append("version is not STSv1")
+        problems.append(M("version is not STSv1"))
     if mode not in ("enforce", "testing", "none"):
-        problems.append(f"unknown mode \"{mode}\"")
+        problems.append(M("unknown mode \"{mode}\"", mode=mode))
     if not max_age.isdigit() or int(max_age) > MAX_MTA_STS_AGE:
-        problems.append("max_age missing or invalid")
+        problems.append(M("max_age missing or invalid"))
     if not patterns and mode != "none":
-        problems.append("no mx line")
+        problems.append(M("no mx line"))
     if problems:
-        return _f(title, Status.WARNING, f"The policy file is invalid: {', '.join(problems)}.",
+        return _f(title, Status.WARNING, M("The policy file is invalid: {problems}.", problems=Joined(problems)),
                   "Fix the policy file (fields: version, mode, mx, max_age).", -15, src)
 
     uncovered = [m for m in receivers if not any(mx_matches(m, p) for p in patterns)]
@@ -258,13 +272,14 @@ def _check_mta_sts_policy(info: MTASTSInfo, receivers: list[str], title: str, sr
                   "Move to \"testing\", then \"enforce\".", -5, src)
     if uncovered and mode == "enforce":
         return _f(title, Status.CRITICAL,
-                  f"Policy in \"enforce\" mode, but some mail servers are not listed ({', '.join(uncovered)}): "
-                  "servers applying MTA-STS will refuse to deliver email to them.",
+                  M("Policy in \"enforce\" mode, but some mail servers are not listed ({servers}): "
+                    "servers applying MTA-STS will refuse to deliver email to them.", servers=", ".join(uncovered)),
                   "Add these servers to the mx lines of the policy, then change its id.", -30, src)
     if mode == "testing":
-        extra = f" Not listed: {', '.join(uncovered)}." if uncovered else ""
+        extra = M(" Not listed: {servers}.", servers=", ".join(uncovered)) if uncovered else ""
         return _f(title, Status.INFO,
-                  f"Policy in \"testing\" mode: problems are reported but delivery is not yet protected.{extra}",
+                  M("Policy in \"testing\" mode: problems are reported but delivery is not yet protected.{extra}",
+                    extra=extra),
                   "Once the TLS reports are clean, switch to \"enforce\".", 0, src)
     return _f(title, Status.OK, "Policy in \"enforce\" mode, covering all mail servers: incoming email is always "
               "delivered encrypted.", source=src)

@@ -10,6 +10,7 @@ grade chart, but without A+ since these categories have no bonuses.
 
 from __future__ import annotations
 
+from .i18n import M
 from .models import Category, CategoryGrade, Finding
 
 # Mozilla HTTP Observatory grade chart (src/grader/charts.js)
@@ -44,14 +45,14 @@ def category_grades(findings: list[Finding], website_exists: bool, cap_reason: s
     grades: dict[str, CategoryGrade] = {}
 
     if not website_exists:
-        note = "No website answers on this domain."
+        note: str = M("No website answers on this domain.")
         grades[Category.WEB.name] = CategoryGrade(None, "N/A", note)
         grades[Category.TLS.name] = CategoryGrade(None, "N/A", note)
     else:
         web = observatory_score(by_cat[Category.WEB])
         note = ""
         if cap_reason and web > CAPPED_WEB_SCORE:
-            web, note = CAPPED_WEB_SCORE, f"Capped at F: {cap_reason}."
+            web, note = CAPPED_WEB_SCORE, M("Capped at F: {reason}.", reason=cap_reason)
         grades[Category.WEB.name] = CategoryGrade(web, grade_for_score(web), note)
         tls = simple_score(by_cat[Category.TLS])
         grades[Category.TLS.name] = CategoryGrade(tls, grade_for_score(tls, allow_plus=False))
@@ -62,7 +63,7 @@ def category_grades(findings: list[Finding], website_exists: bool, cap_reason: s
         dns = simple_score(by_cat[Category.DNS])
         grades[Category.DNS.name] = CategoryGrade(dns, grade_for_score(dns, allow_plus=False))
     else:
-        grades[Category.DNS.name] = CategoryGrade(None, "N/A", "DNSSEC and CAA could not be checked.")
+        grades[Category.DNS.name] = CategoryGrade(None, "N/A", M("DNSSEC and CAA could not be checked."))
     return grades
 
 
