@@ -4,6 +4,16 @@ All notable changes to this project are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [semantic versioning](https://semver.org/).
 
+## [1.3.0] - 2026-10-16
+
+### Added
+- Domain registration data from the registry (RDAP), in the Domain & DNS grade: expiry date of the domain (expired −50, within 15 days −30, within 30 days −10) and transfer lock (missing −5), with the registrar's name.
+- security.txt (RFC 9116): found or not, Contact and Expires fields, expiry. Shown but not scored, like Permissions-Policy, so that the website grade stays aligned with the Observatory.
+- Live check: warning when the Observatory reports another version of its scoring algorithm than the one this tool reproduces (version 6).
+
+### Changed
+- The Domain & DNS grade can be lower than with 1.2 for domains without a transfer lock.
+
 ## [1.2.1] - 2026-10-16
 
 ### Fixed
@@ -54,6 +64,7 @@ First release.
 - 201 unit tests on Python 3.10 to 3.13, lint (ruff) and type check (mypy) in CI, and a build test of the package.
 - Weekly Live check against real domains, including a test-by-test comparison with the Mozilla HTTP Observatory API.
 
+[1.3.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.3.0
 [1.2.1]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.2.1
 [1.2.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.1.0
