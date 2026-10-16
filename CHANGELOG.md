@@ -12,7 +12,7 @@ All notable changes to this project are listed here. The format follows
 - Several domains are audited at the same time (`--workers`, 6 by default).
 
 ### Changed
-- Faster Live check (about 2 min 20 s instead of 3 min 30 s): audits and Observatory scans run in parallel, live tests audit each domain once, and the Observatory comparison waits at most 90 s per run (a slower answer is reported as missing).
+- Faster Live check (about 2 to 3 minutes instead of 3 min 30 s, depending on how fast the Observatory answers), without skipping anything: audits and Observatory scans run in parallel, and live tests audit each domain once.
 
 ## [1.1.0] - 2026-10-14
 
