@@ -101,24 +101,24 @@ def check_registration(info: RDAPInfo, now: datetime) -> list[Finding]:
         date = Date(info.expires)
         if info.expires < now:
             findings.append(_f(expiry_title, Status.CRITICAL,
-                               M("{domain} expired on {date}: the website and the email will stop working, and "
-                                 "someone else could register the name.{registrar}", domain=info.domain, date=date,
+                               M("The domain {domain} expired on {date}: the website and the email will stop working, "
+                                 "and someone else could register the name.{registrar}", domain=info.domain, date=date,
                                  registrar=registrar),
                                M("Renew the domain immediately at your registrar."), -50, src))
         elif days < 15:
             findings.append(_f(expiry_title, Status.CRITICAL,
-                               M("{domain} expires in {days} day(s), on {date}.{registrar}", domain=info.domain,
-                                 days=days, date=date, registrar=registrar),
+                               M("The domain {domain} expires in {days} day(s), on {date}.{registrar}",
+                                 domain=info.domain, days=days, date=date, registrar=registrar),
                                M("Renew it now and turn on automatic renewal at your registrar."), -30, src))
         elif days < 30:
             findings.append(_f(expiry_title, Status.WARNING,
-                               M("{domain} expires in {days} days, on {date}.{registrar}", domain=info.domain,
-                                 days=days, date=date, registrar=registrar),
+                               M("The domain {domain} expires in {days} days, on {date}.{registrar}",
+                                 domain=info.domain, days=days, date=date, registrar=registrar),
                                M("Check that automatic renewal is on and that the payment card is valid."), -10, src))
         else:
             findings.append(_f(expiry_title, Status.OK,
-                               M("{domain} is registered until {date} ({days} days).{registrar}", domain=info.domain,
-                                 date=date, days=days, registrar=registrar), source=src))
+                               M("The domain {domain} is registered until {date} ({days} days).{registrar}",
+                                 domain=info.domain, date=date, days=days, registrar=registrar), source=src))
     if info.statuses:
         if TRANSFER_LOCKS & set(info.statuses):
             findings.append(_f(lock_title, Status.OK,

@@ -158,7 +158,7 @@ def test_mta_sts_enforced_on_gmail():
 def test_registration_data_is_read(domain):
     findings = {f.title: f for f in audit(domain).findings}
     expiry = findings["Domain expiry date"]
-    assert expiry.status == Status.OK and "registered until" in expiry.detail, expiry
+    assert expiry.status == Status.OK and "is registered until" in expiry.detail, expiry
 
 
 @pytest.mark.parametrize("domain", ["github.com", "google.com"])

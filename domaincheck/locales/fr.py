@@ -555,19 +555,19 @@ FR: dict[str, str] = {
     " Registrar: {name}.": " Registrar : {name}.",
     "The registry does not publish the expiry date of {domain}.{registrar}":
         "Le registre ne publie pas la date d'expiration de {domain}.{registrar}",
-    "{domain} expired on {date}: the website and the email will stop working, and someone else could register the "
-    "name.{registrar}":
-        "{domain} a expiré le {date} : le site et les emails vont cesser de fonctionner, et quelqu'un d'autre pourrait "
+    "The domain {domain} expired on {date}: the website and the email will stop working, and someone else could "
+    "register the name.{registrar}":
+        "Le domaine {domain} a expiré le {date} : le site et les emails vont cesser de fonctionner, et quelqu'un d'autre pourrait "
         "enregistrer ce nom.{registrar}",
     "Renew the domain immediately at your registrar.": "Renouvelez le domaine immédiatement chez votre registrar.",
-    "{domain} expires in {days} day(s), on {date}.{registrar}": "{domain} expire dans {days} jour(s), le {date}.{registrar}",
+    "The domain {domain} expires in {days} day(s), on {date}.{registrar}": "Le domaine {domain} expire dans {days} jour(s), le {date}.{registrar}",
     "Renew it now and turn on automatic renewal at your registrar.":
         "Renouvelez-le maintenant et activez le renouvellement automatique chez votre registrar.",
-    "{domain} expires in {days} days, on {date}.{registrar}": "{domain} expire dans {days} jours, le {date}.{registrar}",
+    "The domain {domain} expires in {days} days, on {date}.{registrar}": "Le domaine {domain} expire dans {days} jours, le {date}.{registrar}",
     "Check that automatic renewal is on and that the payment card is valid.":
         "Vérifiez que le renouvellement automatique est activé et que la carte de paiement est valide.",
-    "{domain} is registered until {date} ({days} days).{registrar}":
-        "{domain} est enregistré jusqu'au {date} ({days} jours).{registrar}",
+    "The domain {domain} is registered until {date} ({days} days).{registrar}":
+        "Le domaine {domain} est enregistré jusqu'au {date} ({days} jours).{registrar}",
     "The domain is locked against transfers to another registrar.":
         "Le domaine est verrouillé contre les transferts vers un autre registrar.",
     "The domain is not locked against transfers: with a stolen access to your registrar account, it is easier to "
