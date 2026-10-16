@@ -67,7 +67,7 @@ class Comparison:
 
 
 def fetch(host: str, session: requests.Session | None = None, timeout: int = 90,
-          retries: int = 2, wait: float = 20) -> dict:
+          retries: int = 2, wait: float = 10) -> dict:
     """Latest Observatory result for host (a recent one is reused, otherwise a new scan runs).
 
     The public API sometimes answers 5xx while busy: those answers are retried.
