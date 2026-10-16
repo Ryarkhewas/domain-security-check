@@ -64,6 +64,8 @@ jobs:
           cd /tmp
           /tmp/clean/bin/domain-security-check --version
           /tmp/clean/bin/domain-security-check --demo -o demo.html
+          /tmp/clean/bin/domain-security-check --demo --lang fr -o demo_fr.html
+          grep -q "Actions prioritaires" demo_fr.html
       - uses: actions/upload-artifact@v7
         with:
           name: dist

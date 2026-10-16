@@ -4,6 +4,11 @@ All notable changes to this project are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [semantic versioning](https://semver.org/).
 
+## [1.2.1] - 2026-10-16
+
+### Fixed
+- `--lang fr` failed when the tool was installed with pip (1.2.0): the French translation was missing from the package. It worked only from a clone of the repository. The package test in CI now also runs the French report.
+
 ## [1.2.0] - 2026-10-16
 
 ### Added
@@ -49,6 +54,7 @@ First release.
 - 201 unit tests on Python 3.10 to 3.13, lint (ruff) and type check (mypy) in CI, and a build test of the package.
 - Weekly Live check against real domains, including a test-by-test comparison with the Mozilla HTTP Observatory API.
 
+[1.2.1]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.2.1
 [1.2.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.0.0

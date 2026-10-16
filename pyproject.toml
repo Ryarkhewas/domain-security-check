@@ -42,7 +42,7 @@ Homepage = "https://github.com/Ryarkhewas/domain-security-check"
 Changelog = "https://github.com/Ryarkhewas/domain-security-check/blob/main/CHANGELOG.md"
 
 [tool.setuptools]
-packages = ["domaincheck"]
+packages = ["domaincheck", "domaincheck.locales"]
 
 [tool.setuptools.package-data]
 domaincheck = ["py.typed"]
