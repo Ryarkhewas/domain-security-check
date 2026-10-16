@@ -21,7 +21,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from domaincheck.audit import audit_many  # noqa: E402
-from domaincheck.observatory import Comparison, ObservatoryError, compare, fetch, markdown  # noqa: E402
+from domaincheck.observatory import Comparison, ObservatoryError, algorithm_warning, compare, fetch, markdown  # noqa: E402
 
 
 def main(out_dir: str, domains: list[str]) -> int:
@@ -46,7 +46,10 @@ def main(out_dir: str, domains: list[str]) -> int:
             (out / f"{result.domain}.json").write_text(json.dumps(answer, indent=2), encoding="utf-8")
             c = compare(result, answer)
         comparisons.append(c)
-        print(f"{annotation(c)} (Observatory answer: {seconds:.0f} s)")
+        print(f"{annotation(c)} (Observatory answer: {seconds:.0f} s, algorithm v{c.algorithm_version})")
+    warning = algorithm_warning(comparisons)
+    if warning:
+        print(f"::warning title=Observatory algorithm changed::{warning}")
     (out / "summary.md").write_text(markdown(comparisons) + "\n", encoding="utf-8")
     return 0
 

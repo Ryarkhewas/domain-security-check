@@ -110,3 +110,23 @@ def test_fetch_retries_when_the_api_is_busy():
     with pytest.raises(ObservatoryError, match="busy"):
         fetch("example.com", s, retries=1, wait=0)
     assert len(s.calls) == 2
+
+
+def test_algorithm_version_is_recorded_and_checked():
+    data = api({})
+    data["scan"]["algorithm_version"] = observatory.ALGORITHM_VERSION
+    same = compare(result({}), data)
+    assert same.algorithm_version == observatory.ALGORITHM_VERSION and not same.algorithm_changed
+    assert observatory.algorithm_warning([same]) == ""
+
+    data["scan"]["algorithm_version"] = observatory.ALGORITHM_VERSION + 1
+    changed = compare(result({}), data)
+    assert changed.algorithm_changed
+    warning = observatory.algorithm_warning([same, changed])
+    assert f"version {observatory.ALGORITHM_VERSION + 1}" in warning
+    assert warning in markdown([same, changed])
+
+
+def test_missing_algorithm_version_is_not_an_alert():
+    c = compare(result({}), api({}))
+    assert c.algorithm_version is None and not c.algorithm_changed

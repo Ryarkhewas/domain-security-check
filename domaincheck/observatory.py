@@ -19,6 +19,9 @@ import requests
 from .models import Category, Result
 
 API_URL = "https://observatory-api.mdn.mozilla.net/api/v2/analyze"
+# Version of the Observatory scoring that the website checks reproduce (src/constants.js).
+# If the API reports another version, the scoring may have changed: the Live check warns.
+ALGORITHM_VERSION = 6
 
 # Our finding "source" key -> Observatory test name
 TEST_FOR_SOURCE = {
@@ -60,6 +63,11 @@ class Comparison:
     their_score: int | None
     gaps: list[TestGap] = field(default_factory=list)
     error: str = ""
+    algorithm_version: int | None = None  # reported by the Observatory
+
+    @property
+    def algorithm_changed(self) -> bool:
+        return self.algorithm_version is not None and self.algorithm_version != ALGORITHM_VERSION
 
     @property
     def same_grade(self) -> bool:
@@ -112,7 +120,9 @@ def compare(result: Result, data: dict | None, error: str = "") -> Comparison:
         mine = ours.get(name, None if name in NOT_IMPLEMENTED else 0)
         if mine != theirs and not (mine is None and theirs == 0):
             gaps.append(TestGap(name, mine, theirs, tests[name].get("result", "")))
-    return Comparison(result.domain, web.grade, web.score, scan.get("grade"), scan.get("score"), gaps)
+    version = scan.get("algorithm_version")
+    return Comparison(result.domain, web.grade, web.score, scan.get("grade"), scan.get("score"), gaps,
+                      algorithm_version=version if isinstance(version, int) else None)
 
 
 def _pts(p: int | None) -> str:
@@ -121,9 +131,21 @@ def _pts(p: int | None) -> str:
     return f"+{p}" if p > 0 else str(p)
 
 
+def algorithm_warning(comparisons: list[Comparison]) -> str:
+    """Message when the Observatory reports a scoring version other than the one reproduced here."""
+    versions = sorted({c.algorithm_version for c in comparisons if c.algorithm_changed and c.algorithm_version})
+    if not versions:
+        return ""
+    return (f"The Observatory now reports scoring algorithm version {', '.join(map(str, versions))}; this tool "
+            f"reproduces version {ALGORITHM_VERSION}. Review the changes in mdn/mdn-http-observatory "
+            "(src/grader/charts.js, src/analyzer) and update the website checks.")
+
+
 def markdown(comparisons: list[Comparison]) -> str:
     """Summary table, then the tests that differ for each domain."""
-    lines = ["| Domain | This tool | Observatory | Match | Tests that differ |", "|---|---|---|---|---|"]
+    warning = algorithm_warning(comparisons)
+    lines = [f"> **Warning:** {warning}\n"] if warning else []
+    lines += ["| Domain | This tool | Observatory | Match | Tests that differ |", "|---|---|---|---|---|"]
     for c in comparisons:
         ours = f"{c.our_grade} ({c.our_score})" if c.our_score is not None else c.our_grade
         if c.error:
