@@ -28,6 +28,7 @@ from ._version import __version__
 from .audit import InvalidDomain, audit_many, run_audit
 from .collector import CollectionError, DomainNotFound
 from .demo import DEMO_DOMAIN, DemoCollector
+from .history import compare, load_previous
 from .i18n import LANGUAGES
 from .models import Result
 from .pdf_report import INSTALL_HINT, render_pdf
@@ -76,6 +77,9 @@ def main(argv: list[str] | None = None) -> int:
                    help="Language of the reports and summary: en (default) or fr; JSON stays in English")
     p.add_argument("--author", default="", help="Name shown in the report")
     p.add_argument("--json", action="store_true", help="Print the result as JSON instead of the summary")
+    p.add_argument("--previous", type=Path, metavar="FILE",
+                   help="JSON result of an earlier audit to compare with, for a single domain "
+                        "(default: the <domain>.json saved next to the report by the previous run)")
     p.add_argument("--demo", action="store_true", help="Demo on a fictitious domain, without network access")
     p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     args = p.parse_args(argv)
@@ -98,6 +102,9 @@ def main(argv: list[str] | None = None) -> int:
         p.error("give a domain, a --file, or --demo")
     if len(domains) > 1 and args.output:
         p.error("-o/--output is for a single domain; use --output-dir with several domains")
+    if len(domains) > 1 and args.previous:
+        p.error("--previous is for a single domain; with several domains, each report is compared with the "
+                "<domain>.json saved in the output directory")
 
     print(REMINDER, file=sys.stderr)
     if len(domains) == 1:
@@ -116,6 +123,7 @@ def main(argv: list[str] | None = None) -> int:
 def _single(result: Result, args) -> int:
     output = args.output or args.output_dir / f"{result.domain}.html"
     output.parent.mkdir(parents=True, exist_ok=True)
+    _compare_and_save(result, output.with_suffix(".json"), args.previous)
     output.write_text(render_html(result, args.author, args.lang), encoding="utf-8")
     print(render_json(result) if args.json else console_summary(result, args.lang))
     print(f"HTML report: {output}", file=sys.stderr)
@@ -124,6 +132,14 @@ def _single(result: Result, args) -> int:
         pdf.write_bytes(render_pdf(result, args.author, args.lang))
         print(f"PDF report: {pdf}", file=sys.stderr)
     return 0
+
+
+def _compare_and_save(result: Result, saved: Path, previous: Path | None = None) -> None:
+    """Compare with the previous audit of the same domain, then save this one for the next comparison."""
+    earlier = load_previous(previous or saved)
+    if earlier and earlier.get("domain") == result.domain:
+        result.changes = compare(earlier, result)
+    saved.write_text(render_json(result), encoding="utf-8")
 
 
 def _pdf_available() -> bool:
@@ -155,6 +171,7 @@ def _several(domains: list[str], args) -> int:
         if isinstance(outcome, Exception):
             raise outcome
         results.append(outcome)
+        _compare_and_save(outcome, out / f"{outcome.domain}.json")
         (out / f"{outcome.domain}.html").write_text(render_html(outcome, args.author, args.lang), encoding="utf-8")
         if args.pdf:
             (out / f"{outcome.domain}.pdf").write_bytes(render_pdf(outcome, args.author, args.lang))

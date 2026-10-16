@@ -43,10 +43,13 @@ jobs:
             echo
             cat reports/observatory/summary.md
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Command line on several real domains, with PDF
+      - name: Command line on several real domains, in French, with PDF, run twice
         run: |
-          domain-security-check github.com gmail.com cloudflare.com --pdf --output-dir reports/cli
-          ls reports/cli/index.html reports/cli/github.com.pdf reports/cli/gmail.com.pdf reports/cli/cloudflare.com.pdf
+          domain-security-check github.com gmail.com cloudflare.com --lang fr --pdf --output-dir reports/cli
+          domain-security-check github.com gmail.com cloudflare.com --lang fr --pdf --output-dir reports/cli
+          ls reports/cli/index.html reports/cli/github.com.pdf reports/cli/gmail.com.json reports/cli/cloudflare.com.pdf
+          grep -q "Depuis le dernier audit" reports/cli/index.html
+          grep -q 'class="changes"' reports/cli/github.com.html
       - name: Live tests
         run: python -m pytest -m live -v -rA
       - name: Keep the HTML reports

@@ -477,4 +477,21 @@ FR: dict[str, str] = {
         "CAA interdit toutes les autorités de certification{where} (normal pour un domaine sans site web).",
     "Only these authorities may issue certificates{where}: {names}.":
         "Seules ces autorités peuvent émettre des certificats{where} : {names}.",
+    # --- Changes since the previous audit --------------------------------------------
+    "Changes since the audit of {date}": "Évolution depuis l'audit du {date}",
+    "No change since the audit of {date}.": "Aucun changement depuis l'audit du {date}.",
+    "Grades": "Notes",
+    "{area}: {old} → {new}": "{area} : {old} → {new}",
+    "Fixed ({count})": "Corrigés ({count})",
+    "New problems ({count})": "Nouveaux problèmes ({count})",
+    "Worse ({count})": "Aggravés ({count})",
+    "Better ({count})": "Améliorés ({count})",
+    "new check": "nouveau contrôle",
+    "Since last audit": "Depuis le dernier audit",
+    "first audit": "premier audit",
+    "no change": "aucun changement",
+    "grades changed": "notes modifiées",
+    "{count} fixed": "{count} corrigé(s)",
+    "{count} new or worse": "{count} nouveau(x) ou aggravé(s)",
+    "{count} better": "{count} amélioré(s)",
 }

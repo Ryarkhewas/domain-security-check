@@ -4,6 +4,16 @@ All notable changes to this project are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [semantic versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Reports in French with `--lang fr` (HTML, PDF, summary page, console). The JSON output stays in English.
+- Changes since the previous audit: each result is saved as `<domain>.json` next to the report, and the next audit of the domain shows grades that changed, problems fixed, new problems, and problems that got worse or better. `--previous FILE` compares with any earlier result.
+- Several domains are audited at the same time (`--workers`, 6 by default).
+
+### Changed
+- The Live check runs about twice as fast: audits and Observatory scans run in parallel, and live tests audit each domain once.
+
 ## [1.1.0] - 2026-10-14
 
 ### Added

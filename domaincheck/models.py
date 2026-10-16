@@ -5,6 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .history import Changes
 
 
 class Status(str, Enum):
@@ -131,3 +135,4 @@ class Result:
     grades: dict[str, CategoryGrade] = field(default_factory=dict)  # keyed by Category.name
     grade: str = ""  # overall grade: the weakest category
     cap_reason: str = ""  # why the website / TLS grades were capped, if they were
+    changes: Changes | None = None  # compared with the previous audit of the domain, if there was one

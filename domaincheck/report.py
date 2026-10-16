@@ -93,6 +93,10 @@ table.list th,table.list td{padding:10px 12px;border-bottom:1px solid var(--bord
 table.list th{color:var(--muted);font-weight:600;font-size:13px}
 table.list td.g{font-weight:700;text-align:center}
 .g.ok{color:var(--ok)}.g.warning{color:var(--warn)}.g.critical{color:var(--crit)}.g.na{color:var(--muted)}
+.changes{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:6px 16px 10px;
+margin:0 0 8px}
+.changes h3{font-size:14px;margin:10px 0 4px}.changes ul{margin:0;padding-left:20px}
+.changes li{margin:2px 0}.up{color:var(--ok);font-weight:600}.down{color:var(--crit);font-weight:600}
 .scroll{overflow-x:auto}table.list a{color:var(--accent);font-weight:600}
 @media (max-width:860px){.cats{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:520px){.cats{grid-template-columns:1fr}}
@@ -188,6 +192,7 @@ def render_html(r: Result, author: str = "", lang: str = "en") -> str:
 <p class="summary">{e(t(GRADE_SUMMARY[letter(r.grade)]))}</p>{cap}</div></header>
 <section class="cats">{cats}</section>
 <section class="counters">{counters}</section>
+{_changes_html(r.changes, t, lang)}
 {priority_block}
 {sections}
 <footer>
@@ -197,6 +202,48 @@ def render_html(r: Result, author: str = "", lang: str = "en") -> str:
 </footer>
 </main></body></html>
 """
+
+
+def _area(t, key: str) -> str:
+    return t("Overall") if key == "OVERALL" else t(CATEGORY_LABELS[key])
+
+
+def change_lines(changes, t) -> list[tuple[str, list[str]]]:
+    """[(heading, [lines])] describing the changes, translated; shared by the HTML, console and PDF outputs."""
+    groups: list[tuple[str, list[str]]] = []
+    if changes.grades:
+        groups.append((t("Grades"), [t("{area}: {old} → {new}", area=_area(t, g.key), old=g.old, new=g.new)
+                                     for g in changes.grades]))
+    for heading, items, with_status in ((t("Fixed ({count})", count=len(changes.fixed)), changes.fixed, False),
+                                        (t("New problems ({count})", count=len(changes.new)), changes.new, True),
+                                        (t("Worse ({count})", count=len(changes.worse)), changes.worse, True),
+                                        (t("Better ({count})", count=len(changes.better)), changes.better, True)):
+        if items:
+            lines = []
+            for c in items:
+                line = t(c.title)
+                if with_status:
+                    old = t(LABELS[Status(c.old)]) if c.old else t("new check")
+                    line += f" ({old} → {t(LABELS[Status(c.new)])})"
+                lines.append(line)
+            groups.append((heading, lines))
+    return groups
+
+
+def changes_heading(changes, t, lang: str) -> str:
+    when = date(changes.previous_date, lang)
+    if changes.nothing:
+        return t("No change since the audit of {date}.", date=when)
+    return t("Changes since the audit of {date}", date=when)
+
+
+def _changes_html(changes, t, lang: str) -> str:
+    if changes is None:
+        return ""
+    body = ""
+    for heading, lines in change_lines(changes, t):
+        body += f"<h3>{escape(heading)}</h3><ul>" + "".join(f"<li>{escape(line)}</li>" for line in lines) + "</ul>"
+    return f'<section class="changes"><h3>{escape(changes_heading(changes, t, lang))}</h3>{body}</section>'
 
 
 METHOD_TEXT = ("Passive audit carried out{by} using public information only: DNS records, the certificate presented "
@@ -224,10 +271,10 @@ def render_index(results: list[Result], errors: dict[str, str], author: str = ""
         warning = sum(1 for f in r.findings if f.status == Status.WARNING)
         rows += (f'<tr><td><a href="{e(r.domain)}.html">{e(r.domain)}</a></td>'
                  f'<td class="g {GRADE_COLOR[letter(r.grade)]}">{e(r.grade)}</td>{grades}'
-                 f'<td>{critical}</td><td>{warning}</td></tr>')
+                 f'<td>{critical}</td><td>{warning}</td><td>{_since_last(r.changes, t)}</td></tr>')
     for domain, message in errors.items():
         rows += (f'<tr><td>{e(domain)}</td><td class="g na">–</td>'
-                 f'<td colspan="{len(keys) + 2}">{e(t("Not audited: {reason}", reason=message))}</td></tr>')
+                 f'<td colspan="{len(keys) + 3}">{e(t("Not audited: {reason}", reason=message))}</td></tr>')
     by = t(" by {author}", author=author) if author else ""
     when = f" · {date(results[0].date, lang)}" if results else ""
     count = len(results) + len(errors)
@@ -241,10 +288,31 @@ def render_index(results: list[Result], errors: dict[str, str], author: str = ""
 {e(t("weakest domains first · click a domain for its full report"))}</p>
 </div></header>
 <div class="scroll"><table class="list"><thead><tr><th>{e(t("Domain"))}</th><th>{e(t("Overall"))}</th>{head}
-<th>{e(t(LABELS[Status.CRITICAL]))}</th><th>{e(t(LABELS[Status.WARNING]))}</th></tr></thead><tbody>{rows}</tbody></table></div>
+<th>{e(t(LABELS[Status.CRITICAL]))}</th><th>{e(t(LABELS[Status.WARNING]))}</th><th>{e(t("Since last audit"))}</th>
+</tr></thead><tbody>{rows}</tbody></table></div>
 <footer><p><b>{e(t("Method."))}</b> {e(t(INDEX_METHOD_TEXT, by=by))}</p></footer>
 </main></body></html>
 """
+
+
+def _since_last(changes, t) -> str:
+    """Short summary for the index page."""
+    if changes is None:
+        return escape(t("first audit"))
+    if changes.nothing:
+        return escape(t("no change"))
+    parts = []
+    overall = next((g for g in changes.grades if g.key == "OVERALL"), None)
+    if overall:
+        css = "up" if overall.better else "down"
+        parts.append(f'<span class="{css}">{escape(overall.old)} → {escape(overall.new)}</span>')
+    if changes.fixed:
+        parts.append(escape(t("{count} fixed", count=len(changes.fixed))))
+    if changes.new or changes.worse:
+        parts.append(escape(t("{count} new or worse", count=len(changes.new) + len(changes.worse))))
+    if changes.better:
+        parts.append(escape(t("{count} better", count=len(changes.better))))
+    return " · ".join(parts) or escape(t("grades changed"))
 
 
 INDEX_METHOD_TEXT = ("Passive audit carried out{by} using public information only. Each report explains its grades, "
@@ -267,6 +335,12 @@ def console_summary(r: Result, lang: str = "en") -> str:
         note = f" — {t(g.note)}" if g.note else ""
         lines.append(f"    {t(CATEGORY_LABELS[key]):<20} {g.grade}{score}{note}")
     lines.append("")
+    if r.changes is not None:
+        lines.append(f"  {changes_heading(r.changes, t, lang)}")
+        for heading, items in change_lines(r.changes, t):
+            lines.append(f"    {heading}")
+            lines += [f"      - {item}" for item in items]
+        lines.append("")
     for cat in Category:
         group = [f for f in r.findings if f.category == cat]
         if group:

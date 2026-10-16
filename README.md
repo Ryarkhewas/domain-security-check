@@ -4,7 +4,7 @@
 
 **Passive security audit of a domain name, with a clear report for non-specialists.**
 
-In a single command, the tool checks what anyone can see from the Internet about a domain: is the website properly protected with HTTPS, does the server send the right security headers, and above all, **can someone send emails pretending to be the company?** It produces an HTML report (and, if you want, a PDF) with a grade per area (website, certificate, email, DNS), the points behind each grade, the standard each check relies on, and concrete actions to take. Several domains can be audited at once, with a summary page.
+In a single command, the tool checks what anyone can see from the Internet about a domain: is the website properly protected with HTTPS, does the server send the right security headers, and above all, **can someone send emails pretending to be the company?** It produces an HTML report (and, if you want, a PDF) with a grade per area (website, certificate, email, DNS), the points behind each grade, the standard each check relies on, and concrete actions to take. Several domains can be audited at once, with a summary page. Reports exist in English and French, and each new audit of a domain shows what changed since the previous one.
 
 ![Report preview](examples/preview.png)
 
@@ -60,6 +60,9 @@ domain-security-check my-domain.com -o reports/client.html --author "Your Name"
 # Also produce a PDF (install the extra first: pip install "domain-security-check[pdf]")
 domain-security-check my-domain.com --pdf
 
+# Report in French
+domain-security-check my-domain.com --lang fr
+
 # Several domains: one report each, plus reports/index.html to compare them
 domain-security-check client-a.com client-b.fr client-c.org
 domain-security-check --file domains.txt --output-dir reports/clients
@@ -71,11 +74,21 @@ domain-security-check my-domain.com --json
 domain-security-check --demo
 ```
 
-A domain file has one domain per line; blank lines and `#` comments are ignored. With several domains, a domain that cannot be audited (DNS failure, invalid name) is listed on the summary page with the reason, the others are still audited, and the command ends with exit code 3.
+A domain file has one domain per line; blank lines and `#` comments are ignored. Several domains are audited at the same time (6 by default, `--workers` to change it). With several domains, a domain that cannot be audited (DNS failure, invalid name) is listed on the summary page with the reason, the others are still audited, and the command ends with exit code 3.
 
 `python -m domaincheck` works the same way, and so does `python domain_check.py` from a clone, without installing.
 
 A full URL is accepted (`https://www.my-domain.com/contact`): the tool extracts the domain. Email checks run on the main domain, even if you enter `www.`.
+
+## Changes since the previous audit
+
+Each report is saved with its result in JSON (`<domain>.json`, next to the HTML report). When the same domain is audited again into the same folder, the new report starts with what changed since then: grades that went up or down, problems fixed, new problems, and problems that got worse or better. The summary page of several domains shows it in one column. This is meant for a regular follow-up, for instance a weekly audit of a client's domains.
+
+`--previous FILE` compares a single domain with any earlier JSON result.
+
+## Languages
+
+`--lang fr` produces the HTML report, the PDF, the summary page and the console summary in French. All texts come from one catalog (`domaincheck/locales/fr.py`), and a test checks that every text of the code has its translation. The JSON output always stays in English, as it is meant for other programs.
 
 ## Reliable diagnosis
 
@@ -147,10 +160,12 @@ domaincheck/
   audit.py                  Orchestration
   report.py                 HTML report, summary page for several domains, console summary, JSON
   pdf_report.py             PDF report (optional: needs ReportLab)
+  history.py                Changes since the previous audit of a domain
+  i18n.py, locales/fr.py    Report languages and the French translation
   demo.py                   Fictitious data for the demo
   hsts_preload.py           HSTS preload list (download, cache, lookups)
   observatory.py            Test-by-test comparison with the Observatory API
-tests/                      255 unit tests + live tests (tests/live)
+tests/                      565 unit tests + live tests (tests/live)
 scripts/live_summary.py     Audits a list of domains for the Live check workflow
 scripts/observatory_compare.py  Compares the website grades with the Observatory
 ```
@@ -160,7 +175,7 @@ Collection is kept separate from analysis: every rule can be tested on fixed dat
 ## Tests
 
 ```bash
-python -m pytest -q          # 255 unit tests, no network needed
+python -m pytest -q          # 565 unit tests, no network needed
 ruff check .                 # lint
 mypy                         # type check
 python -m pytest -m live -v  # live tests against real domains (Internet required)

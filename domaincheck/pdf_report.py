@@ -23,6 +23,8 @@ from .report import (
     _points,
     _sorted,
     _translator,
+    change_lines,
+    changes_heading,
     letter,
 )
 from .sources import SOURCES
@@ -123,6 +125,13 @@ def render_pdf(r: Result, author: str = "", lang: str = "en") -> bytes:
     summary = " · ".join(f"{counts[s]} {L(LABELS[s]).lower()}"
                          for s in (Status.CRITICAL, Status.WARNING, Status.OK, Status.INFO))
     story += [Spacer(1, 3 * mm), Paragraph(t(summary), sub)]
+
+    if r.changes is not None:
+        story.append(Paragraph(t(changes_heading(r.changes, L, lang)), h2))
+        for heading, lines in change_lines(r.changes, L):
+            story.append(Paragraph(f"<b>{t(heading)}</b>", body))
+            for line in lines:
+                story.append(Paragraph(f"• {t(line)}", style("change", 9.5, leftIndent=10)))
 
     priorities = [f for f in _sorted(r.findings) if f.status in (Status.CRITICAL, Status.WARNING) and f.recommendation]
     if priorities:
