@@ -24,7 +24,7 @@ import sys
 from pathlib import Path
 
 from ._version import __version__
-from .audit import InvalidDomain, run_audit
+from .audit import InvalidDomain, audit_many, run_audit
 from .collector import CollectionError, DomainNotFound
 from .demo import DEMO_DOMAIN, DemoCollector
 from .models import Result
@@ -69,6 +69,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("-d", "--output-dir", type=Path, default=Path("reports"),
                    help="Output directory for several domains (default: reports)")
     p.add_argument("--pdf", action="store_true", help="Also write each report as a PDF (needs the [pdf] extra)")
+    p.add_argument("--workers", type=int, default=6, help="Domains audited at the same time (default: 6)")
     p.add_argument("--author", default="", help="Name shown in the report")
     p.add_argument("--json", action="store_true", help="Print the result as JSON instead of the summary")
     p.add_argument("--demo", action="store_true", help="Demo on a fictitious domain, without network access")
@@ -134,19 +135,25 @@ def _several(domains: list[str], args) -> int:
     out.mkdir(parents=True, exist_ok=True)
     results: list[Result] = []
     errors: dict[str, str] = {}
-    for i, domain in enumerate(domains, 1):
-        print(f"[{i}/{len(domains)}] {domain}", file=sys.stderr)
-        try:
-            result = run_audit(domain)
-        except (InvalidDomain, DomainNotFound, CollectionError) as e:
-            errors[domain] = str(e)
-            print(f"    not audited: {e}", file=sys.stderr)
+    done = 0
+
+    def progress(domain: str, outcome) -> None:
+        nonlocal done
+        done += 1
+        status = f"not audited: {outcome}" if isinstance(outcome, Exception) else f"overall grade {outcome.grade}"
+        print(f"[{done}/{len(domains)}] {domain}: {status}", file=sys.stderr)
+
+    # Several audits run at the same time: most of an audit is spent waiting for the network
+    for domain, outcome in audit_many(domains, workers=args.workers, on_done=progress).items():
+        if isinstance(outcome, (InvalidDomain, DomainNotFound, CollectionError)):
+            errors[domain] = str(outcome)
             continue
-        results.append(result)
-        (out / f"{result.domain}.html").write_text(render_html(result, args.author), encoding="utf-8")
+        if isinstance(outcome, Exception):
+            raise outcome
+        results.append(outcome)
+        (out / f"{outcome.domain}.html").write_text(render_html(outcome, args.author), encoding="utf-8")
         if args.pdf:
-            (out / f"{result.domain}.pdf").write_bytes(render_pdf(result, args.author))
-        print(f"    overall grade {result.grade}", file=sys.stderr)
+            (out / f"{outcome.domain}.pdf").write_bytes(render_pdf(outcome, args.author))
 
     (out / "index.html").write_text(render_index(results, errors, args.author), encoding="utf-8")
     if args.json:

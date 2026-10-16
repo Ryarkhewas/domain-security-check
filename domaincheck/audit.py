@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
 from .dns_checks import check_caa, check_dnssec
@@ -141,3 +143,28 @@ def run_audit(text: str, collector=None) -> Result:
         mta_sts=collector.mta_sts(mail_domain),
     )
     return analyze(data, DKIM_SELECTORS)
+
+
+def audit_many(domains: list[str], workers: int = 6,
+               on_done: Callable[[str, Result | Exception], None] | None = None) -> dict[str, Result | Exception]:
+    """Audit several domains at the same time (most of an audit is spent waiting for the network).
+
+    Returns {domain: Result, or the exception that stopped its audit}, in the order given.
+    on_done is called as each audit finishes, for progress messages.
+    """
+    from .collector import Collector
+
+    Collector().preload_list()  # downloaded once, before the threads share it
+    outcomes: dict[str, Result | Exception] = {}
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        futures = {pool.submit(run_audit, d): d for d in domains}
+        for future in as_completed(futures):
+            domain = futures[future]
+            try:
+                outcome: Result | Exception = future.result()
+            except Exception as e:  # noqa: BLE001 - reported per domain, the others go on
+                outcome = e
+            outcomes[domain] = outcome
+            if on_done:
+                on_done(domain, outcome)
+    return {d: outcomes[d] for d in domains}

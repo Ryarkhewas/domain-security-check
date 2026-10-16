@@ -14,35 +14,45 @@ from __future__ import annotations
 
 import json
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from domaincheck.audit import run_audit  # noqa: E402
-from domaincheck.collector import CollectionError, DomainNotFound  # noqa: E402
+from domaincheck.audit import audit_many  # noqa: E402
 from domaincheck.observatory import Comparison, ObservatoryError, compare, fetch, markdown  # noqa: E402
 
 
 def main(out_dir: str, domains: list[str]) -> int:
     out = Path(out_dir) / "observatory"
     out.mkdir(parents=True, exist_ok=True)
+    # Our audits and the Observatory scans both run in parallel: the Observatory
+    # takes several seconds per site, and retries a busy API after a pause.
+    audits = audit_many(domains, workers=8)
+    with ThreadPoolExecutor(max_workers=len(domains) or 1) as pool:
+        answers = dict(zip(domains, pool.map(_observatory, domains), strict=True))
     comparisons = []
-    for domain in domains:
-        try:
-            result = run_audit(domain)
-        except (CollectionError, DomainNotFound) as e:
-            print(f"::warning title=Observatory comparison::{domain}: audit failed ({e})")
+    for domain, result in audits.items():
+        if isinstance(result, Exception):
+            print(f"::warning title=Observatory comparison::{domain}: audit failed ({result})")
             continue
-        try:
-            data = fetch(result.domain)
-            (out / f"{result.domain}.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
-            c = compare(result, data)
-        except ObservatoryError as e:
-            c = compare(result, None, str(e))
+        answer = answers[domain]
+        if isinstance(answer, ObservatoryError):
+            c = compare(result, None, str(answer))
+        else:
+            (out / f"{result.domain}.json").write_text(json.dumps(answer, indent=2), encoding="utf-8")
+            c = compare(result, answer)
         comparisons.append(c)
         print(annotation(c))
     (out / "summary.md").write_text(markdown(comparisons) + "\n", encoding="utf-8")
     return 0
+
+
+def _observatory(domain: str) -> dict | ObservatoryError:
+    try:
+        return fetch(domain)
+    except ObservatoryError as e:
+        return e
 
 
 def annotation(c: Comparison) -> str:

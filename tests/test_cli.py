@@ -4,9 +4,10 @@ import json
 
 import pytest
 
+from domaincheck import audit as audit_module
 from domaincheck import cli
 from domaincheck.audit import InvalidDomain, run_audit
-from domaincheck.collector import CollectionError
+from domaincheck.collector import CollectionError, Collector
 from domaincheck.demo import DemoCollector
 
 
@@ -21,6 +22,8 @@ def fake_audit(monkeypatch):
         return run_audit(domain, collector=DemoCollector())
 
     monkeypatch.setattr(cli, "run_audit", audit)
+    monkeypatch.setattr(audit_module, "run_audit", audit)  # used by audit_many for several domains
+    monkeypatch.setattr(Collector, "_preload", False)
 
 
 def test_read_domain_file(tmp_path):

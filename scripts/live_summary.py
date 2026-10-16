@@ -11,8 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from domaincheck.audit import run_audit  # noqa: E402
-from domaincheck.collector import CollectionError, DomainNotFound  # noqa: E402
+from domaincheck.audit import audit_many  # noqa: E402
 from domaincheck.models import Status  # noqa: E402
 from domaincheck.report import render_html  # noqa: E402
 
@@ -23,11 +22,9 @@ def main(out_dir: str, domains: list[str]) -> int:
     results = []
     print("| Domain | Overall | Website | Cert & TLS | Email | DNS | Main issue |")
     print("|---|---|---|---|---|---|---|")
-    for domain in domains:
-        try:
-            r = run_audit(domain)
-        except (CollectionError, DomainNotFound) as e:
-            print(f"| {domain} | – | – | – | – | – | error: {e} |")
+    for domain, r in audit_many(domains, workers=8).items():
+        if isinstance(r, Exception):
+            print(f"| {domain} | – | – | – | – | – | error: {r} |")
             continue
         results.append(r)
         (out / f"{r.domain}.html").write_text(render_html(r), encoding="utf-8")

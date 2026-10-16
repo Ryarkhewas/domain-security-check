@@ -15,13 +15,37 @@ from __future__ import annotations
 import pytest
 import requests
 
-from domaincheck.audit import run_audit
+from domaincheck.audit import audit_many, run_audit
 from domaincheck.collector import Collector
 from domaincheck.models import Category, Status
 
 pytestmark = pytest.mark.live
 
 REFERENCE_DOMAINS = ["github.com", "google.com", "cloudflare.com", "wikipedia.org"]
+BAD_CERT_HOSTS = ["expired.badssl.com", "self-signed.badssl.com", "wrong.host.badssl.com", "untrusted-root.badssl.com"]
+AUDITED = [*REFERENCE_DOMAINS, *BAD_CERT_HOSTS, "badssl.com", "docs.github.com", "gmail.com"]
+
+
+_AUDITS: dict = {}
+
+
+def audit(domain: str):
+    """Each domain is audited once, whatever the number of tests that look at it."""
+    if domain not in _AUDITS:
+        try:
+            _AUDITS[domain] = run_audit(domain)
+        except Exception as e:  # noqa: BLE001 - kept, then raised again for the test that asked
+            _AUDITS[domain] = e
+    outcome = _AUDITS[domain]
+    if isinstance(outcome, Exception):
+        raise outcome
+    return outcome
+
+
+@pytest.fixture(scope="module", autouse=True)
+def audit_in_parallel():
+    """Audit every domain at the same time before the tests run (the network waits dominate)."""
+    _AUDITS.update(audit_many(AUDITED, workers=8))
 
 
 def doh(name: str, rtype: str) -> list[dict]:
@@ -49,7 +73,7 @@ def certificate_finding(result):
     ("untrusted-root.badssl.com", ["certificate"]),
 ])
 def test_bad_certificates_are_critical(host, expected_words):
-    result = run_audit(host)
+    result = audit(host)
     finding = certificate_finding(result)
     assert finding.status == Status.CRITICAL, finding
     detail = finding.detail.lower()
@@ -59,7 +83,7 @@ def test_bad_certificates_are_critical(host, expected_words):
 
 
 def test_valid_certificate_is_ok():
-    finding = certificate_finding(run_audit("badssl.com"))
+    finding = certificate_finding(audit("badssl.com"))
     assert finding.status in (Status.OK, Status.WARNING), finding  # warning only if expiring soon
 
 
@@ -81,7 +105,7 @@ def test_dmarc_matches_independent_resolver(domain):
 # --- End-to-end sanity on large, well-run domains ----------------------------
 @pytest.mark.parametrize("domain", ["github.com", "google.com"])
 def test_well_known_domains(domain):
-    result = run_audit(domain)
+    result = audit(domain)
     by_title = {f.title: f for f in result.findings}
     assert by_title["HTTPS certificate"].status == Status.OK
     assert by_title["SPF (authorized senders)"].status in (Status.OK, Status.WARNING)
@@ -94,7 +118,7 @@ def test_http_redirect_and_hsts_seen_like_a_browser(domain):
     # Seen like a browser, both sites end on HTTPS and send HSTS. google.com
     # first redirects to http://www.google.com, which the Observatory scoring
     # penalises (-10): the redirect must end on HTTPS, with at most that penalty.
-    by_title = {f.title: f for f in run_audit(domain).findings}
+    by_title = {f.title: f for f in audit(domain).findings}
     assert by_title["HTTP to HTTPS redirect"].points >= -10, by_title["HTTP to HTTPS redirect"]
     assert by_title["HSTS"].status == Status.OK, by_title["HSTS"]
 
@@ -103,7 +127,7 @@ def test_subdomain_inherits_parent_dmarc():
     # A subdomain without its own DMARC record is covered by its parent's policy.
     sub, parent = "docs.github.com", "github.com"
     own_record = any(t.lower().startswith("v=dmarc1") for t in doh_txt(f"_dmarc.{sub}"))
-    dmarc = next(f for f in run_audit(sub).findings if f.title == "DMARC (anti-spoofing policy)")
+    dmarc = next(f for f in audit(sub).findings if f.title == "DMARC (anti-spoofing policy)")
     assert dmarc.status != Status.CRITICAL, dmarc
     if not own_record:
         assert f"Inherited from {parent}" in dmarc.detail, dmarc
@@ -113,17 +137,17 @@ def test_subdomain_inherits_parent_dmarc():
 @pytest.mark.parametrize("domain", ["cloudflare.com", "github.com", "wikipedia.org"])
 def test_dnssec_matches_independent_resolver(domain):
     signed = any(a["type"] == 43 for a in doh(domain, "DS"))  # 43 = DS
-    dnssec = next(f for f in run_audit(domain).findings if f.title == "DNSSEC")
+    dnssec = next(f for f in audit(domain).findings if f.title == "DNSSEC")
     assert dnssec.status == (Status.OK if signed else Status.WARNING), dnssec
 
 
 def test_caa_found_on_google():
-    caa = next(f for f in run_audit("google.com").findings if f.title.startswith("CAA"))
+    caa = next(f for f in audit("google.com").findings if f.title.startswith("CAA"))
     assert caa.status == Status.OK and "pki.goog" in caa.detail, caa
 
 
 def test_mta_sts_enforced_on_gmail():
-    findings = {f.title: f for f in run_audit("gmail.com").findings}
+    findings = {f.title: f for f in audit("gmail.com").findings}
     mta_sts = findings["MTA-STS (encrypted email delivery)"]
     assert mta_sts.status == Status.OK and "enforce" in mta_sts.detail, mta_sts
     assert findings["TLS reporting (TLS-RPT)"].status == Status.OK

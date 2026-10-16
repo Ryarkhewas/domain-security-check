@@ -215,3 +215,24 @@ def test_report_shows_points_and_sources():
 def test_json_contains_the_four_grades():
     data = json.loads(render_json(run_audit("example.com", collector=DemoCollector())))
     assert set(data["grades"]) == {"WEB", "TLS", "EMAIL", "DNS"} and data["grade"] == "F"
+
+
+def test_audit_many_keeps_the_order_and_reports_failures(monkeypatch):
+    from domaincheck import audit as audit_module
+    from domaincheck.collector import CollectionError, Collector
+
+    monkeypatch.setattr(Collector, "_preload", False)
+
+    def fake(domain, collector=None):
+        if domain == "down.example":
+            raise CollectionError("DNS failure")
+        return run_audit(domain, collector=DemoCollector())
+
+    monkeypatch.setattr(audit_module, "run_audit", fake)
+    done = []
+    outcomes = audit_module.audit_many(["b.example", "down.example", "a.example"],
+                                       on_done=lambda d, o: done.append(d))
+    assert list(outcomes) == ["b.example", "down.example", "a.example"]
+    assert isinstance(outcomes["down.example"], CollectionError)
+    assert outcomes["a.example"].domain == "a.example"
+    assert sorted(done) == ["a.example", "b.example", "down.example"]
