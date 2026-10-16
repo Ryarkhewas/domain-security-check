@@ -23,7 +23,18 @@ import requests
 from ._version import __version__
 from .hsts_preload import PreloadList
 from .i18n import M, Message
-from .models import CAAInfo, CertificateInfo, CookieInfo, DNSSECInfo, HTTPInfo, MTASTSInfo
+from .models import (
+    CAAInfo,
+    CertificateInfo,
+    CookieInfo,
+    DNSSECInfo,
+    HTTPInfo,
+    MTASTSInfo,
+    RDAPInfo,
+    SecurityTxtInfo,
+)
+from .rdap import load_bootstrap, read_answer, server_for
+from .web_checks import registrable_domain
 
 DKIM_SELECTORS = [
     "default", "google", "selector1", "selector2", "k1", "k2", "mail", "dkim",
@@ -167,6 +178,52 @@ class Collector:
             info.error = f"HTTP {r.status_code}"
         else:
             info.policy = r.text[:65_536]
+        return info
+
+    def security_txt(self, host: str) -> SecurityTxtInfo:
+        """security.txt at its standard place (/.well-known/), or at the old one (/security.txt)."""
+        last_error = ""
+        for path in ("/.well-known/security.txt", "/security.txt"):
+            url = f"https://{host}{path}"
+            try:
+                r = requests.get(url, headers={**BROWSER_HEADERS, "Accept": "text/plain"}, timeout=self.timeout,
+                                 allow_redirects=True)
+            except requests.RequestException as e:
+                last_error = _short(e)
+                continue
+            content_type = (r.headers.get("Content-Type") or "").lower()
+            # Many sites answer 200 with an HTML page for any address: only a text file counts
+            if r.status_code == 200 and content_type.startswith("text/plain"):
+                return SecurityTxtInfo(url=url, content=r.text[:32_768])
+        return SecurityTxtInfo(error=last_error)
+
+    def rdap(self, domain: str) -> RDAPInfo:
+        """Expiry date, status and registrar of the registrable domain, from its registry (RDAP)."""
+        registered = registrable_domain(domain) or domain
+        info = RDAPInfo(domain=registered)
+        try:
+            servers = load_bootstrap(self.timeout * 2)
+        except (requests.RequestException, OSError, ValueError) as e:
+            info.error = _short(e)
+            return info
+        base = server_for(registered, servers)
+        if not base:
+            info.error = M("no RDAP server for this extension")
+            return info
+        try:
+            r = requests.get(f"{base.rstrip('/')}/domain/{registered}", timeout=self.timeout * 2,
+                             headers={"Accept": "application/rdap+json, application/json",
+                                      "User-Agent": BROWSER_HEADERS["User-Agent"]})
+        except requests.RequestException as e:
+            info.error = _short(e)
+            return info
+        if r.status_code != 200:
+            info.error = f"HTTP {r.status_code}"
+            return info
+        try:
+            info.expires, info.statuses, info.registrar = read_answer(r.json())
+        except ValueError:
+            info.error = M("unreadable answer")
         return info
 
     # --- TLS ---------------------------------------------------------------

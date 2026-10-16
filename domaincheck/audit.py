@@ -7,13 +7,13 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
-from .dns_checks import check_caa, check_dnssec
+from .dns_checks import check_caa, check_dnssec, check_registration
 from .email_checks import check_dkim, check_dmarc, check_mta_sts, check_mx, check_spf, effective_dmarc_policy
 from .i18n import M
 from .models import CollectedData, Result
 from .scoring import category_grades, overall_grade
 from .tls_checks import check_certificate
-from .web_checks import check_website
+from .web_checks import check_security_txt, check_website
 
 _VALID_DOMAIN = re.compile(r"^(?=.{1,253}$)(?!-)([a-z0-9-]{1,63}(?<!-)\.)+[a-z]{2,63}$")
 
@@ -82,6 +82,10 @@ def analyze(data: CollectedData, tested_selectors: list[str], now: datetime | No
         findings.append(check_dnssec(data.dnssec))
     if data.caa is not None:
         findings.append(check_caa(data.caa, exists))
+    if data.rdap is not None:
+        findings += check_registration(data.rdap, now)
+    if exists and data.security_txt is not None:
+        findings.append(check_security_txt(data.security_txt, now))
 
     cap_reason = broken_https_reason(data, now)
     grades = category_grades(findings, exists, cap_reason)
@@ -142,6 +146,8 @@ def run_audit(text: str, collector=None) -> Result:
         dnssec=collector.dnssec(domain),
         caa=collector.caa(domain),
         mta_sts=collector.mta_sts(mail_domain),
+        security_txt=collector.security_txt(domain),
+        rdap=collector.rdap(domain),
     )
     return analyze(data, DKIM_SELECTORS)
 

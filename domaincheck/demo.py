@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from .models import CAAInfo, CertificateInfo, DNSSECInfo, HTTPInfo, MTASTSInfo
+from .models import CAAInfo, CertificateInfo, DNSSECInfo, HTTPInfo, MTASTSInfo, RDAPInfo, SecurityTxtInfo
 
 DEMO_DOMAIN = "bakery-example.com"
 
@@ -54,3 +54,10 @@ class DemoCollector:
 
     def mta_sts(self, domain: str) -> MTASTSInfo:
         return MTASTSInfo()
+
+    def security_txt(self, host: str) -> SecurityTxtInfo:
+        return SecurityTxtInfo()  # not published
+
+    def rdap(self, domain: str) -> RDAPInfo:
+        return RDAPInfo(domain=domain, expires=datetime.now(timezone.utc) + timedelta(days=200),
+                        statuses=["active"], registrar="Example Registrar")  # no transfer lock

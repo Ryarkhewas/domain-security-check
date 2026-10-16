@@ -48,7 +48,8 @@ def translatable_texts() -> dict[str, set[str]]:
                 names = [targets] if isinstance(targets, ast.Name) else getattr(targets, "elts", [])
                 values = [node.value] if isinstance(targets, ast.Name) else getattr(node.value, "elts", [])
                 for target, value in zip(names, values, strict=False):
-                    if getattr(target, "id", "") == "title" or getattr(target, "id", "").endswith("_TEXT"):
+                    name = getattr(target, "id", "")
+                    if name == "title" or name.endswith(("_title", "_TEXT")):
                         add(value, module)
                 if getattr(targets, "id", "") in LABEL_DICTS and isinstance(node.value, ast.Dict):
                     for value in node.value.values:

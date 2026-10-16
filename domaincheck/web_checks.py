@@ -22,7 +22,7 @@ from html.parser import HTMLParser
 
 import tldextract
 
-from .i18n import M
+from .i18n import Date, M
 from .models import Category, CookieInfo, Finding, HTTPInfo, Status
 
 W = Category.WEB
@@ -358,7 +358,9 @@ _PSL = tldextract.TLDExtract(suffix_list_urls=(), cache_dir=None)  # bundled pub
 def registrable_domain(host: str) -> str:
     """example.co.uk for www.example.co.uk (public suffix list, like the Observatory)."""
     r = _PSL(host)
-    return getattr(r, "top_domain_under_public_suffix", None) or r.registered_domain
+    if hasattr(r, "top_domain_under_public_suffix"):  # tldextract 5.3+
+        return r.top_domain_under_public_suffix
+    return r.registered_domain
 
 
 class _TagCollector(HTMLParser):
@@ -508,3 +510,54 @@ def check_website(http: HTTPInfo, host: str) -> list[Finding]:
     if leak:
         findings.append(leak)
     return findings
+
+
+# --- security.txt (RFC 9116), shown but not scored -----------------------------
+def parse_security_txt(content: str) -> dict[str, list[str]]:
+    """{field name in lower case: [values]}; comments and a PGP signature are ignored."""
+    fields: dict[str, list[str]] = {}
+    in_signature = False
+    for line in content.splitlines():
+        line = line.strip()
+        if line.startswith("-----BEGIN PGP SIGNATURE"):
+            in_signature = True
+        if in_signature or not line or line.startswith(("#", "-----", "Hash:")):
+            continue
+        if ":" in line:
+            name, value = line.split(":", 1)
+            fields.setdefault(name.strip().lower(), []).append(value.strip())
+    return fields
+
+
+def check_security_txt(info, now) -> Finding:
+    """security.txt tells security researchers how to report a vulnerability (RFC 9116)."""
+    from .rdap import parse_date
+
+    title, src = "security.txt (vulnerability reporting)", "security-txt"
+    if info.content is None:
+        return Finding(W, title, Status.INFO,
+                       M("No security.txt file: someone who finds a vulnerability on the site does not know whom to "
+                         "warn."),
+                       M("Publish /.well-known/security.txt with at least a Contact and an Expires field "
+                         "(for example generated on securitytxt.org)."), None, src)
+    fields = parse_security_txt(info.content)
+    where = M(" (at the old address /security.txt; the standard one is /.well-known/security.txt)") \
+        if not info.url.endswith("/.well-known/security.txt") else ""
+    if not fields.get("contact"):
+        return Finding(W, title, Status.WARNING, M("The file has no Contact field{where}.", where=where),
+                       M("Add a Contact line, for example Contact: mailto:security@your-domain."), None, src)
+    expires_values = fields.get("expires", [])
+    expires = parse_date(expires_values[0]) if len(expires_values) == 1 else None
+    if expires is None:
+        return Finding(W, title, Status.WARNING,
+                       M("The file has no valid Expires field (exactly one date is required){where}.", where=where),
+                       M("Add an Expires line, for example Expires: 2027-01-01T00:00:00Z, and renew it every year."),
+                       None, src)
+    if expires < now:
+        return Finding(W, title, Status.WARNING,
+                       M("The file expired on {date}: it should no longer be trusted{where}.", date=Date(expires),
+                         where=where),
+                       M("Update the file and its Expires date (at most one year ahead)."), None, src)
+    return Finding(W, title, Status.OK,
+                   M("Present: contact {contact}, valid until {date}{where}.", contact=fields["contact"][0],
+                     date=Date(expires), where=where), source=src)

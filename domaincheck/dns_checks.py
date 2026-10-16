@@ -9,8 +9,11 @@ No network access here: the functions analyse data that was already collected.
 
 from __future__ import annotations
 
-from .i18n import M
-from .models import CAAInfo, Category, DNSSECInfo, Finding, Status
+from datetime import datetime
+
+from .i18n import Date, M
+from .models import CAAInfo, Category, DNSSECInfo, Finding, RDAPInfo, Status
+from .rdap import TRANSFER_LOCKS
 
 D = Category.DNS
 KNOWN_CAA_TAGS = {"issue", "issuewild", "iodef", "issuemail", "issuevmc", "contactemail", "contactphone"}
@@ -78,3 +81,52 @@ def check_caa(info: CAAInfo, has_website: bool) -> Finding:
                                       "a website).", where=where), source=src)
     return _f(title, Status.OK, M("Only these authorities may issue certificates{where}: {names}.", where=where,
                                   names=", ".join(named)), source=src)
+
+
+# --- Registration (RDAP) -----------------------------------------------------------
+def check_registration(info: RDAPInfo, now: datetime) -> list[Finding]:
+    """Expiry date of the domain and its transfer lock, as published by the registry."""
+    expiry_title, lock_title, src = "Domain expiry date", "Transfer lock", "rdap"
+    if info.error:
+        return [_f(expiry_title, Status.INFO, M("Could not be checked ({error}).", error=info.error), points=None,
+                   source=src)]
+    findings = []
+    registrar = M(" Registrar: {name}.", name=info.registrar) if info.registrar else ""
+    if info.expires is None:
+        findings.append(_f(expiry_title, Status.INFO,
+                           M("The registry does not publish the expiry date of {domain}.{registrar}",
+                             domain=info.domain, registrar=registrar), points=None, source=src))
+    else:
+        days = (info.expires - now).days
+        date = Date(info.expires)
+        if info.expires < now:
+            findings.append(_f(expiry_title, Status.CRITICAL,
+                               M("{domain} expired on {date}: the website and the email will stop working, and "
+                                 "someone else could register the name.{registrar}", domain=info.domain, date=date,
+                                 registrar=registrar),
+                               M("Renew the domain immediately at your registrar."), -50, src))
+        elif days < 15:
+            findings.append(_f(expiry_title, Status.CRITICAL,
+                               M("{domain} expires in {days} day(s), on {date}.{registrar}", domain=info.domain,
+                                 days=days, date=date, registrar=registrar),
+                               M("Renew it now and turn on automatic renewal at your registrar."), -30, src))
+        elif days < 30:
+            findings.append(_f(expiry_title, Status.WARNING,
+                               M("{domain} expires in {days} days, on {date}.{registrar}", domain=info.domain,
+                                 days=days, date=date, registrar=registrar),
+                               M("Check that automatic renewal is on and that the payment card is valid."), -10, src))
+        else:
+            findings.append(_f(expiry_title, Status.OK,
+                               M("{domain} is registered until {date} ({days} days).{registrar}", domain=info.domain,
+                                 date=date, days=days, registrar=registrar), source=src))
+    if info.statuses:
+        if TRANSFER_LOCKS & set(info.statuses):
+            findings.append(_f(lock_title, Status.OK,
+                               M("The domain is locked against transfers to another registrar."), source=src))
+        else:
+            findings.append(_f(lock_title, Status.WARNING,
+                               M("The domain is not locked against transfers: with a stolen access to your registrar "
+                                 "account, it is easier to move it elsewhere."),
+                               M("Turn on the transfer lock (often called \"registrar lock\") at your registrar."),
+                               -5, src))
+    return findings

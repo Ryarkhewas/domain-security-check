@@ -547,4 +547,57 @@ FR: dict[str, str] = {
     "RFC 8460 (SMTP TLS Reporting)": "RFC 8460 (rapports TLS pour SMTP)",
     "RFC 4033 (DNS Security Introduction and Requirements)": "RFC 4033 (introduction et exigences de la sécurité DNS)",
     "RFC 8659 (DNS Certification Authority Authorization)": "RFC 8659 (autorisation des autorités de certification par DNS)",
+    # --- Registration (RDAP) -----------------------------------------------------------
+    "Domain expiry date": "Date d'expiration du domaine",
+    "Transfer lock": "Verrou de transfert",
+    "no RDAP server for this extension": "aucun serveur RDAP pour cette extension",
+    "unreadable answer": "réponse illisible",
+    " Registrar: {name}.": " Registrar : {name}.",
+    "The registry does not publish the expiry date of {domain}.{registrar}":
+        "Le registre ne publie pas la date d'expiration de {domain}.{registrar}",
+    "{domain} expired on {date}: the website and the email will stop working, and someone else could register the "
+    "name.{registrar}":
+        "{domain} a expiré le {date} : le site et les emails vont cesser de fonctionner, et quelqu'un d'autre pourrait "
+        "enregistrer ce nom.{registrar}",
+    "Renew the domain immediately at your registrar.": "Renouvelez le domaine immédiatement chez votre registrar.",
+    "{domain} expires in {days} day(s), on {date}.{registrar}": "{domain} expire dans {days} jour(s), le {date}.{registrar}",
+    "Renew it now and turn on automatic renewal at your registrar.":
+        "Renouvelez-le maintenant et activez le renouvellement automatique chez votre registrar.",
+    "{domain} expires in {days} days, on {date}.{registrar}": "{domain} expire dans {days} jours, le {date}.{registrar}",
+    "Check that automatic renewal is on and that the payment card is valid.":
+        "Vérifiez que le renouvellement automatique est activé et que la carte de paiement est valide.",
+    "{domain} is registered until {date} ({days} days).{registrar}":
+        "{domain} est enregistré jusqu'au {date} ({days} jours).{registrar}",
+    "The domain is locked against transfers to another registrar.":
+        "Le domaine est verrouillé contre les transferts vers un autre registrar.",
+    "The domain is not locked against transfers: with a stolen access to your registrar account, it is easier to "
+    "move it elsewhere.":
+        "Le domaine n'est pas verrouillé contre les transferts : avec un accès volé à votre compte chez le registrar, "
+        "il est plus facile de le déplacer ailleurs.",
+    'Turn on the transfer lock (often called "registrar lock") at your registrar.':
+        "Activez le verrou de transfert (souvent appelé « registrar lock ») chez votre registrar.",
+    "RFC 9083 (RDAP, registration data of domain names)": "RFC 9083 (RDAP, données d'enregistrement des noms de domaine)",
+    # --- security.txt ------------------------------------------------------------------
+    "security.txt (vulnerability reporting)": "security.txt (signalement de failles)",
+    "RFC 9116 (security.txt)": "RFC 9116 (security.txt)",
+    "No security.txt file: someone who finds a vulnerability on the site does not know whom to warn.":
+        "Aucun fichier security.txt : une personne qui trouve une faille sur le site ne sait pas qui prévenir.",
+    "Publish /.well-known/security.txt with at least a Contact and an Expires field (for example generated on "
+    "securitytxt.org).":
+        "Publiez /.well-known/security.txt avec au moins un champ Contact et un champ Expires (par exemple généré sur "
+        "securitytxt.org).",
+    " (at the old address /security.txt; the standard one is /.well-known/security.txt)":
+        " (à l'ancienne adresse /security.txt ; l'adresse standard est /.well-known/security.txt)",
+    "The file has no Contact field{where}.": "Le fichier n'a pas de champ Contact{where}.",
+    "Add a Contact line, for example Contact: mailto:security@your-domain.":
+        "Ajoutez une ligne Contact, par exemple Contact: mailto:securite@votre-domaine.",
+    "The file has no valid Expires field (exactly one date is required){where}.":
+        "Le fichier n'a pas de champ Expires valide (une seule date est exigée){where}.",
+    "Add an Expires line, for example Expires: 2027-01-01T00:00:00Z, and renew it every year.":
+        "Ajoutez une ligne Expires, par exemple Expires: 2027-01-01T00:00:00Z, et renouvelez-la chaque année.",
+    "The file expired on {date}: it should no longer be trusted{where}.":
+        "Le fichier a expiré le {date} : il ne doit plus être considéré comme fiable{where}.",
+    "Update the file and its Expires date (at most one year ahead).":
+        "Mettez à jour le fichier et sa date Expires (au plus un an à l'avance).",
+    "Present: contact {contact}, valid until {date}{where}.": "Présent : contact {contact}, valide jusqu'au {date}{where}.",
 }

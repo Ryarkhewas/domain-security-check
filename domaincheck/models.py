@@ -104,6 +104,26 @@ class MTASTSInfo:
 
 
 @dataclass
+class SecurityTxtInfo:
+    """The site's security.txt file (RFC 9116), if it publishes one."""
+
+    url: str = ""  # where it was found
+    content: str | None = None  # None: not found
+    error: str = ""
+
+
+@dataclass
+class RDAPInfo:
+    """Registration data of the domain, from the registry's RDAP server."""
+
+    domain: str = ""  # registrable domain that was looked up (example.co.uk for www.example.co.uk)
+    expires: datetime | None = None
+    statuses: list[str] = field(default_factory=list)  # e.g. "client transfer prohibited"
+    registrar: str = ""
+    error: str = ""
+
+
+@dataclass
 class CollectedData:
     """Everything fetched from the network, before analysis."""
 
@@ -118,6 +138,8 @@ class CollectedData:
     dnssec: DNSSECInfo | None = None
     caa: CAAInfo | None = None
     mta_sts: MTASTSInfo | None = None
+    security_txt: SecurityTxtInfo | None = None
+    rdap: RDAPInfo | None = None
 
 
 @dataclass

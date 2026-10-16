@@ -23,7 +23,7 @@ pytestmark = pytest.mark.live
 
 REFERENCE_DOMAINS = ["github.com", "google.com", "cloudflare.com", "wikipedia.org"]
 BAD_CERT_HOSTS = ["expired.badssl.com", "self-signed.badssl.com", "wrong.host.badssl.com", "untrusted-root.badssl.com"]
-AUDITED = [*REFERENCE_DOMAINS, *BAD_CERT_HOSTS, "badssl.com", "docs.github.com", "gmail.com"]
+AUDITED = [*REFERENCE_DOMAINS, *BAD_CERT_HOSTS, "badssl.com", "docs.github.com", "gmail.com", "afnic.fr"]
 
 
 _AUDITS: dict = {}
@@ -151,3 +151,23 @@ def test_mta_sts_enforced_on_gmail():
     mta_sts = findings["MTA-STS (encrypted email delivery)"]
     assert mta_sts.status == Status.OK and "enforce" in mta_sts.detail, mta_sts
     assert findings["TLS reporting (TLS-RPT)"].status == Status.OK
+
+
+# --- Registration (RDAP) and security.txt ------------------------------------
+@pytest.mark.parametrize("domain", ["github.com", "google.com", "wikipedia.org", "afnic.fr"])
+def test_registration_data_is_read(domain):
+    findings = {f.title: f for f in audit(domain).findings}
+    expiry = findings["Domain expiry date"]
+    assert expiry.status == Status.OK and "registered until" in expiry.detail, expiry
+
+
+@pytest.mark.parametrize("domain", ["github.com", "google.com"])
+def test_transfer_lock_is_seen_on_large_sites(domain):
+    lock = {f.title: f for f in audit(domain).findings}["Transfer lock"]
+    assert lock.status == Status.OK, lock
+
+
+@pytest.mark.parametrize("domain", ["github.com", "google.com"])
+def test_security_txt_is_found(domain):
+    found = {f.title: f for f in audit(domain).findings}["security.txt (vulnerability reporting)"]
+    assert found.status == Status.OK and "contact" in found.detail, found

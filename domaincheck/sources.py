@@ -25,6 +25,7 @@ SOURCES: dict[str, tuple[str, str]] = {
     "coep": ("MDN: Cross-Origin-Embedder-Policy",
              "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cross-Origin-Embedder-Policy"),
     "permissions": ("W3C Permissions Policy", "https://www.w3.org/TR/permissions-policy/"),
+    "security-txt": ("RFC 9116 (security.txt)", "https://www.rfc-editor.org/rfc/rfc9116"),
     "owasp-headers": ("OWASP Secure Headers Project", "https://owasp.org/www-project-secure-headers/"),
     # Certificate & TLS
     "tls-guide": ("MDN TLS guide", f"{MDN}/TLS"),
@@ -39,6 +40,7 @@ SOURCES: dict[str, tuple[str, str]] = {
     # Domain & DNS
     "dnssec": ("RFC 4033 (DNS Security Introduction and Requirements)", "https://www.rfc-editor.org/rfc/rfc4033"),
     "caa": ("RFC 8659 (DNS Certification Authority Authorization)", "https://www.rfc-editor.org/rfc/rfc8659"),
+    "rdap": ("RFC 9083 (RDAP, registration data of domain names)", "https://www.rfc-editor.org/rfc/rfc9083"),
     # Scoring
     "observatory": ("Mozilla HTTP Observatory scoring",
                     "https://developer.mozilla.org/en-US/observatory/docs/tests_and_scoring"),
