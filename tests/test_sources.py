@@ -56,15 +56,16 @@ def test_transfer_lock_has_its_own_source():
 
 def test_html_report_lists_every_reference():
     html = render_html(demo())
-    assert "Sources:" in html
-    assert "ANSSI website guide PA-009 v2.0 (2021), R2</a>" in html
+    assert re.search(r"Source: <a [^>]+>RFC 6797[^<]*</a> — See also: "
+                     r"<a [^>]+>ANSSI website guide PA-009 v2.0 \(2021\), R2</a>", html)
     assert "ANSSI Internet gateway guide PA-066 v3.0 (2020), R44</a>" in html
     assert not re.search(r"compl\w* (with )?anssi|anssi[- ]compliant", html.lower())
 
 
 def test_french_report_translates_the_guide_names():
     html = render_html(demo(), lang="fr")
-    assert "Sources :" in html
+    assert "— Voir aussi : <a" in html
+    assert "Sources :" not in html
     assert "Guide ANSSI site web PA-009 v2.0 (2021), R2</a>" in html
     assert "Guide ANSSI noms de domaine BP-038 v1.3 (2017), R4+</a>" in html
     assert not re.search(r"conforme? (à l.|aux? )?(recommandations )?(de l.)?anssi", html.lower())

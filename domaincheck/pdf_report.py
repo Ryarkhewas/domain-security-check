@@ -26,7 +26,7 @@ from .report import (
     change_lines,
     changes_heading,
     letter,
-    reference_label,
+    reference_groups,
 )
 from .sources import references
 
@@ -157,10 +157,11 @@ def render_pdf(r: Result, author: str = "", lang: str = "en") -> bytes:
                 text += f'<br/><font color="#1f4e78">&gt; {t(L(f.recommendation))}</font>'
             refs = references(f.source)
             if refs:
-                links = " · ".join(f'<a href="{escape(url)}">{t(reference_label(L, label, rec))}</a>'
-                                   for label, url, rec in refs)
-                heading = L("Sources:") if len(refs) > 1 else L("Source:")
-                text += f'<br/><font size="7.5" color="{MUTED}">{t(heading)} {links}</font>'
+                parts = []
+                for heading, links_group in reference_groups(L, refs):
+                    links = " · ".join(f'<a href="{escape(url)}">{t(label)}</a>' for label, url in links_group)
+                    parts.append(f"{t(heading)} {links}")
+                text += f'<br/><font size="7.5" color="{MUTED}">{" — ".join(parts)}</font>'
             rows.append([badge(f.status), Paragraph(text, body), Paragraph(t(_points(f.points, lang)), small)])
             row_styles.append(("LINEBEFORE", (0, i), (0, i), 2.5, colors.HexColor(STATUS_COLORS[f.status][0])))
         table = Table(rows, colWidths=[24 * mm, 136 * mm, 20 * mm], repeatRows=0)

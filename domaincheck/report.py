@@ -110,9 +110,20 @@ def _sorted(findings):
     return sorted(findings, key=lambda f: (ORDER[f.status], f.points if f.points is not None else 0))
 
 
-def reference_label(t, label: str, recommendation: str) -> str:
-    """Translated label of a reference, followed by the recommendation number when there is one."""
-    return f"{t(label)}, {recommendation}" if recommendation else t(label)
+def reference_groups(t, refs: list[tuple[str, str, str]]) -> list[tuple[str, list[tuple[str, str]]]]:
+    """[(heading, [(link text, url)])]: "Source:" for the standard, "See also:" for the ANSSI guides.
+
+    The guides come under "See also" so that a "Compliant" item does not read as "complies with ANSSI":
+    the check relates to the recommendation, it cannot prove the recommendation is met.
+    """
+    standard = [(t(label), url) for label, url, rec in refs if not rec]
+    guides = [(f"{t(label)}, {rec}", url) for label, url, rec in refs if rec]
+    groups = []
+    if standard:
+        groups.append((t("Source:"), standard))
+    if guides:
+        groups.append((t("See also:"), guides))
+    return groups
 
 
 def capital(text: str) -> str:
@@ -165,9 +176,11 @@ def render_html(r: Result, author: str = "", lang: str = "en") -> str:
             src = ""
             refs = references(f.source)
             if refs:
-                links = " · ".join(f'<a href="{e(url)}">{e(reference_label(t, label, rec))}</a>'
-                                   for label, url, rec in refs)
-                src = f'<p class="src">{e(t("Sources:") if len(refs) > 1 else t("Source:"))} {links}</p>'
+                parts = []
+                for heading, links_group in reference_groups(t, refs):
+                    links = " · ".join(f'<a href="{e(url)}">{e(text)}</a>' for text, url in links_group)
+                    parts.append(f"{e(heading)} {links}")
+                src = f'<p class="src">{" — ".join(parts)}</p>'
             items += (
                 f'<div class="item {f.status.value}"><div class="row"><span class="title">{e(t(f.title))}</span>'
                 f'<span><span class="badge {f.status.value}">{e(t(LABELS[f.status]))}</span>{pts}</span></div>'

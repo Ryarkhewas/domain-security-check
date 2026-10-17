@@ -37,7 +37,7 @@ FR: dict[str, str] = {
     "Domain": "Domaine",
     "Priority actions": "Actions prioritaires",
     "Source:": "Source :",
-    "Sources:": "Sources :",
+    "See also:": "Voir aussi :",
     "not scored": "non noté",
     "{points} pts": "{points} pts",
     "Page {number}": "Page {number}",
