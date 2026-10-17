@@ -10,7 +10,7 @@ from html import escape
 from .i18n import M, date, tr
 from .models import Category, Result, Status
 from .scoring import GRADE_ORDER
-from .sources import SOURCES
+from .sources import SOURCES, references
 
 LABELS = {
     Status.CRITICAL: "Critical",
@@ -110,6 +110,11 @@ def _sorted(findings):
     return sorted(findings, key=lambda f: (ORDER[f.status], f.points if f.points is not None else 0))
 
 
+def reference_label(t, label: str, recommendation: str) -> str:
+    """Translated label of a reference, followed by the recommendation number when there is one."""
+    return f"{t(label)}, {recommendation}" if recommendation else t(label)
+
+
 def capital(text: str) -> str:
     """First letter in upper case (a translated sentence can start with an empty placeholder)."""
     return text[:1].upper() + text[1:]
@@ -158,9 +163,11 @@ def render_html(r: Result, author: str = "", lang: str = "en") -> str:
                    if f.recommendation and f.status != Status.OK else "")
             pts = f'<span class="pts">{e(_points(f.points, lang))}</span>'
             src = ""
-            if f.source in SOURCES:
-                label, url = SOURCES[f.source]
-                src = f'<p class="src">{e(t("Source:"))} <a href="{e(url)}">{e(t(label))}</a></p>'
+            refs = references(f.source)
+            if refs:
+                links = " · ".join(f'<a href="{e(url)}">{e(reference_label(t, label, rec))}</a>'
+                                   for label, url, rec in refs)
+                src = f'<p class="src">{e(t("Sources:") if len(refs) > 1 else t("Source:"))} {links}</p>'
             items += (
                 f'<div class="item {f.status.value}"><div class="row"><span class="title">{e(t(f.title))}</span>'
                 f'<span><span class="badge {f.status.value}">{e(t(LABELS[f.status]))}</span>{pts}</span></div>'
@@ -252,7 +259,9 @@ GRADES_TEXT = ("The website grade follows the {link} (penalties and bonuses per 
                "DNS grades use this project's own scale, based on the standards cited under each item. The overall "
                "grade is the lowest of the four.")
 LIMITS_TEXT = ("This audit does not cover the site's applications, workstations or user accounts. It gives an "
-               "overview of the exposure visible from the Internet on the date shown.")
+               "overview of the exposure visible from the Internet on the date shown. The ANSSI recommendations cited "
+               "show what each check relates to; meeting them fully also depends on settings that cannot be seen "
+               "from outside, so this report is not a certificate of compliance.")
 
 
 def render_index(results: list[Result], errors: dict[str, str], author: str = "", lang: str = "en") -> str:

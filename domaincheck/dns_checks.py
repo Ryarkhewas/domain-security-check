@@ -86,7 +86,7 @@ def check_caa(info: CAAInfo, has_website: bool) -> Finding:
 # --- Registration (RDAP) -----------------------------------------------------------
 def check_registration(info: RDAPInfo, now: datetime) -> list[Finding]:
     """Expiry date of the domain and its transfer lock, as published by the registry."""
-    expiry_title, lock_title, src = "Domain expiry date", "Transfer lock", "rdap"
+    expiry_title, lock_title, src, lock_src = "Domain expiry date", "Transfer lock", "rdap", "transfer-lock"
     if info.error:
         return [_f(expiry_title, Status.INFO, M("Could not be checked ({error}).", error=info.error), points=None,
                    source=src)]
@@ -122,11 +122,11 @@ def check_registration(info: RDAPInfo, now: datetime) -> list[Finding]:
     if info.statuses:
         if TRANSFER_LOCKS & set(info.statuses):
             findings.append(_f(lock_title, Status.OK,
-                               M("The domain is locked against transfers to another registrar."), source=src))
+                               M("The domain is locked against transfers to another registrar."), source=lock_src))
         else:
             findings.append(_f(lock_title, Status.WARNING,
                                M("The domain is not locked against transfers: with a stolen access to your registrar "
                                  "account, it is easier to move it elsewhere."),
                                M("Turn on the transfer lock (often called \"registrar lock\") at your registrar."),
-                               -5, src))
+                               -5, lock_src))
     return findings

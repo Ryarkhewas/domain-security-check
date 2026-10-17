@@ -37,6 +37,7 @@ FR: dict[str, str] = {
     "Domain": "Domaine",
     "Priority actions": "Actions prioritaires",
     "Source:": "Source :",
+    "Sources:": "Sources :",
     "not scored": "non noté",
     "{points} pts": "{points} pts",
     "Page {number}": "Page {number}",
@@ -56,9 +57,13 @@ FR: dict[str, str] = {
         "DNS suivent le barème propre au projet, fondé sur les normes citées sous chaque point. La note globale est la "
         "plus basse des quatre.",
     "This audit does not cover the site's applications, workstations or user accounts. It gives an overview of the "
-    "exposure visible from the Internet on the date shown.":
+    "exposure visible from the Internet on the date shown. The ANSSI recommendations cited show what each check "
+    "relates to; meeting them fully also depends on settings that cannot be seen from outside, so this report is not "
+    "a certificate of compliance.":
         "Cet audit ne couvre pas les applications du site, les postes de travail ni les comptes utilisateurs. Il donne "
-        "une vue d'ensemble de l'exposition visible depuis Internet à la date indiquée.",
+        "une vue d'ensemble de l'exposition visible depuis Internet à la date indiquée. Les recommandations de l'ANSSI "
+        "citées indiquent à quoi se rattache chaque contrôle ; les respecter pleinement dépend aussi de réglages "
+        "invisibles depuis l'extérieur : ce rapport n'est donc pas une attestation de conformité.",
     "Security audit of {count} domains": "Audit de sécurité de {count} domaines",
     "weakest domains first · click a domain for its full report":
         "domaines les plus faibles en premier · cliquez sur un domaine pour son rapport complet",
@@ -577,6 +582,12 @@ FR: dict[str, str] = {
     'Turn on the transfer lock (often called "registrar lock") at your registrar.':
         "Activez le verrou de transfert (souvent appelé « registrar lock ») chez votre registrar.",
     "RFC 9083 (RDAP, registration data of domain names)": "RFC 9083 (RDAP, données d'enregistrement des noms de domaine)",
+    "RFC 5731 (domain status, including transfer prohibited)":
+        "RFC 5731 (statuts d'un domaine, dont l'interdiction de transfert)",
+    "ANSSI TLS guide v1.2 (2020)": "Guide ANSSI TLS v1.2 (2020)",
+    "ANSSI website guide PA-009 v2.0 (2021)": "Guide ANSSI site web PA-009 v2.0 (2021)",
+    "ANSSI domain name guide BP-038 v1.3 (2017)": "Guide ANSSI noms de domaine BP-038 v1.3 (2017)",
+    "ANSSI Internet gateway guide PA-066 v3.0 (2020)": "Guide ANSSI interconnexion à Internet PA-066 v3.0 (2020)",
     # --- security.txt ------------------------------------------------------------------
     "security.txt (vulnerability reporting)": "security.txt (signalement de failles)",
     "RFC 9116 (security.txt)": "RFC 9116 (security.txt)",

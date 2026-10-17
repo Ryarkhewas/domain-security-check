@@ -2,6 +2,13 @@
 
 Every finding points to one of these keys, and the report shows the
 reference so that readers can check the rule themselves.
+
+Besides the standard (RFC, W3C...), a finding can also cite the guides of
+ANSSI, the French national cybersecurity agency. Only recommendation numbers
+read in the guides themselves are cited; when a topic has no numbered
+recommendation, the section of the guide is cited instead. Citing a guide
+means "this check relates to that recommendation", not "the domain complies
+with ANSSI guidance": the tool only sees what is visible from outside.
 """
 
 from __future__ import annotations
@@ -41,7 +48,61 @@ SOURCES: dict[str, tuple[str, str]] = {
     "dnssec": ("RFC 4033 (DNS Security Introduction and Requirements)", "https://www.rfc-editor.org/rfc/rfc4033"),
     "caa": ("RFC 8659 (DNS Certification Authority Authorization)", "https://www.rfc-editor.org/rfc/rfc8659"),
     "rdap": ("RFC 9083 (RDAP, registration data of domain names)", "https://www.rfc-editor.org/rfc/rfc9083"),
+    "transfer-lock": ("RFC 5731 (domain status, including transfer prohibited)",
+                      "https://www.rfc-editor.org/rfc/rfc5731#section-2.3"),
     # Scoring
     "observatory": ("Mozilla HTTP Observatory scoring",
                     "https://developer.mozilla.org/en-US/observatory/docs/tests_and_scoring"),
 }
+
+# --- ANSSI guides ---------------------------------------------------------------------
+ANSSI_GUIDES: dict[str, tuple[str, str]] = {
+    "tls": ("ANSSI TLS guide v1.2 (2020)",
+            "https://messervices.cyber.gouv.fr/documents-guides/"
+            "anssi-guide-recommandations_de_securite_relatives_a_tls-v1.2.pdf"),
+    "web": ("ANSSI website guide PA-009 v2.0 (2021)",
+            "https://cyber.gouv.fr/uploads/2013/05/anssi-guide-recommandations_mise_en_oeuvre_site_web_"
+            "maitriser_standards_securite_cote_navigateur-v2.0.pdf"),
+    "dns": ("ANSSI domain name guide BP-038 v1.3 (2017)",
+            "https://messervices.cyber.gouv.fr/documents-guides/guide_dns_fr_anssi_1.3.pdf"),
+    "internet": ("ANSSI Internet gateway guide PA-066 v3.0 (2020)",
+                 "https://messervices.cyber.gouv.fr/documents-guides/anssi-guide-passerelle_internet_securisee-v3.pdf"),
+}
+
+# Finding source key -> [(guide, recommendations or section)]
+ANSSI: dict[str, list[tuple[str, str]]] = {
+    # Website: PA-009
+    "redirection": [("web", "R1")],
+    "hsts": [("web", "R2")],
+    "hsts-preload": [("web", "R2")],
+    "csp": [("web", "R14, R15, R16")],
+    "xfo": [("web", "R17, R18")],
+    "xcto": [("web", "R6")],
+    "sri": [("web", "R11, R12")],
+    "referrer": [("web", "§5.4")],
+    "cookies": [("web", "§5.5.3")],
+    # Certificate & TLS
+    "tls-guide": [("tls", "R8")],
+    "rfc8996": [("tls", "R3, R4"), ("web", "R1")],
+    # Email: PA-066, section 5.3 (transport) and 5.4 (SPF, DKIM, DMARC)
+    "spf": [("internet", "R44")],
+    "dkim": [("internet", "R46+")],
+    "dmarc": [("internet", "R48+")],
+    "mta-sts": [("internet", "§5.3")],
+    "tls-rpt": [("internet", "§5.3")],
+    # Domain & DNS: BP-038, and PA-066 for the email domains
+    "dnssec": [("dns", "R4+"), ("internet", "R50+")],
+    "transfer-lock": [("dns", "R1, R3+")],
+    "rdap": [("dns", "§4.10")],
+}
+
+
+def references(key: str) -> list[tuple[str, str, str]]:
+    """[(label, url, recommendation)] for a finding source key: the standard first, then the ANSSI guides.
+
+    The recommendation is "" for the standard, and "R2" or "§5.4" for a guide (the same in every language).
+    """
+    refs = [(*SOURCES[key], "")] if key in SOURCES else []
+    for guide, recommendation in ANSSI.get(key, []):
+        refs.append((*ANSSI_GUIDES[guide], recommendation))
+    return refs

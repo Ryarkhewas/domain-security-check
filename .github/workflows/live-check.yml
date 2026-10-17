@@ -50,6 +50,7 @@ jobs:
           ls reports/cli/index.html reports/cli/github.com.pdf reports/cli/gmail.com.json reports/cli/cloudflare.com.pdf
           grep -q "Depuis le dernier audit" reports/cli/index.html
           grep -q 'class="changes"' reports/cli/github.com.html
+          grep -q "Guide ANSSI interconnexion" reports/cli/gmail.com.html
       - name: Live tests
         run: python -m pytest -m live -v -rA
       - name: Keep the HTML reports

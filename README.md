@@ -19,7 +19,7 @@ Example reports: [HTML](examples/demo_report.html) and [PDF](examples/demo_repor
 | **Email** | MX servers, SPF (presence, `all` rule, 10 DNS lookup limit), DMARC (policy, coverage, reports, inheritance from the parent domain for subdomains), DKIM (common selectors), MTA-STS (record, policy file, mode, coverage of the mail servers); not scored: TLS reporting (TLS-RPT) |
 | **Domain & DNS** | DNSSEC (enabled, and consistent between the parent zone and the domain's keys), CAA (which certificate authorities may issue certificates), expiry date of the domain and transfer lock (from the registry, through RDAP) |
 
-Each item is rated **Critical**, **To improve**, **Compliant** or **Info**, shows the points it weighs in the grade, cites the standard it is based on, and comes with a plain-language recommendation.
+Each item is rated **Critical**, **To improve**, **Compliant** or **Info**, shows the points it weighs in the grade, cites the standard it is based on (and the matching ANSSI recommendation, when there is one), and comes with a plain-language recommendation.
 
 ## A strictly passive audit
 
@@ -139,9 +139,20 @@ Every check is based on a published standard or guide, cited under each item of 
 | MTA-STS, TLS reporting | [RFC 8461](https://www.rfc-editor.org/rfc/rfc8461), [RFC 8460](https://www.rfc-editor.org/rfc/rfc8460) |
 | DNSSEC | [RFC 4033](https://www.rfc-editor.org/rfc/rfc4033) to 4035 |
 | CAA | [RFC 8659](https://www.rfc-editor.org/rfc/rfc8659) |
-| Domain registration data (expiry, status) | [RFC 9083](https://www.rfc-editor.org/rfc/rfc9083) (RDAP), [RFC 9224](https://www.rfc-editor.org/rfc/rfc9224) (finding the RDAP server) |
+| Domain registration data (expiry, status) | [RFC 9083](https://www.rfc-editor.org/rfc/rfc9083) (RDAP), [RFC 9224](https://www.rfc-editor.org/rfc/rfc9224) (finding the RDAP server), [RFC 5731](https://www.rfc-editor.org/rfc/rfc5731#section-2.3) (transfer lock status) |
 | security.txt (not scored) | [RFC 9116](https://www.rfc-editor.org/rfc/rfc9116) |
 | Website scoring | [Mozilla HTTP Observatory](https://github.com/mdn/mdn-http-observatory) (MPL 2.0) |
+
+**ANSSI guides.** For a French audience, each item also cites, when there is one, the matching recommendation of the guides published by [ANSSI](https://cyber.gouv.fr/) (the French national cybersecurity agency). Only recommendation numbers read in the guides themselves are cited; when a topic has no numbered recommendation, the section is cited instead.
+
+| Guide | Cited for |
+|---|---|
+| [Recommandations pour la mise en œuvre d'un site web](https://cyber.gouv.fr/uploads/2013/05/anssi-guide-recommandations_mise_en_oeuvre_site_web_maitriser_standards_securite_cote_navigateur-v2.0.pdf) (ANSSI-PA-009, v2.0, 2021) | HTTPS redirect and TLS (R1), HSTS (R2), X-Content-Type-Options (R6), Subresource Integrity (R11, R12), CSP (R14 to R16), clickjacking (R17, R18), Referrer-Policy (§5.4), cookies (§5.5.3) |
+| [Recommandations de sécurité relatives à TLS](https://messervices.cyber.gouv.fr/documents-guides/anssi-guide-recommandations_de_securite_relatives_a_tls-v1.2.pdf) (v1.2, 2020) | TLS version (R3, R4), certificate (R8) |
+| [Recommandations relatives à l'interconnexion d'un SI à Internet](https://messervices.cyber.gouv.fr/documents-guides/anssi-guide-passerelle_internet_securisee-v3.pdf) (ANSSI-PA-066, v3.0, 2020) | SPF (R44), DKIM (R46+), DMARC (R48+), DNSSEC of email domains (R50+), MTA-STS and TLS reporting (§5.3) |
+| [Bonnes pratiques pour l'acquisition et l'exploitation de noms de domaine](https://messervices.cyber.gouv.fr/documents-guides/guide_dns_fr_anssi_1.3.pdf) (ANSSI-BP-038, v1.3, 2017) | transfer lock (R1, R3+), DNSSEC (R4+), domain expiry (§4.10) |
+
+A citation says which recommendation a check relates to. It does not mean the domain complies with ANSSI guidance: most recommendations also cover settings that cannot be seen from outside. This project is not affiliated with ANSSI.
 
 **Differences with the Observatory.** One Observatory test is not reproduced: CORS, whose only penalty requires sending a forged `Origin` header. A Content-Security-Policy declared in a `<meta http-equiv>` tag is not read (the `<meta name="referrer">` tag is), and only the first CSP policy is analysed when a site sends several. In these rare cases the website grade can differ from the Observatory's.
 
@@ -160,7 +171,7 @@ domaincheck/
   web_checks.py             Website checks (Mozilla HTTP Observatory tests)
   tls_checks.py             Certificate and TLS checks
   scoring.py                Grades: Observatory algorithm, own scales, overall grade
-  sources.py                Standards cited for each check
+  sources.py                Standards and ANSSI guides cited for each check
   audit.py                  Orchestration
   report.py                 HTML report, summary page for several domains, console summary, JSON
   pdf_report.py             PDF report (optional: needs ReportLab)

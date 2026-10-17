@@ -6,6 +6,13 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Each item of the report now cites the matching ANSSI recommendation next to the standard, when there is one (website guide PA-009, TLS guide, Internet gateway guide PA-066, domain name guide BP-038), with the guide's version and date. Several references are shown as "Sources: A · B" in the HTML and PDF reports, in English and French.
+- The Limits paragraph of the report says that the ANSSI citations show what each check relates to, and that the report is not a certificate of compliance.
+
+### Changed
+- The transfer lock cites RFC 5731 (domain statuses) instead of RFC 9083.
+
 ### Fixed
 - The domain name no longer gets a capital letter at the start of the expiry sentence ("Bakery-example.com est enregistré…" is now "Le domaine bakery-example.com est enregistré…").
 
