@@ -50,7 +50,7 @@ DKIM_SELECTORS = [
 ]
 TIMEOUT = 8
 # crt.sh answers 502 when one address sends it many queries at once (several domains audited together)
-CRT_SH_SLOTS = threading.Semaphore(2)
+CRT_SH_SLOTS = threading.Semaphore(4)
 # Some sites (Google, for instance) answer differently to bots and to browsers:
 # no HTTPS redirect, missing security headers... To report what a real visitor
 # gets, requests look like a current desktop browser. The tool's name is kept
@@ -244,7 +244,7 @@ class Collector:
         errors = []
         for attempt in range(3):  # crt.sh is often slow or overloaded: a few tries, a few seconds apart
             if attempt:
-                time.sleep(10 * attempt)
+                time.sleep(5 * attempt)
             try:
                 with CRT_SH_SLOTS:
                     r = requests.get(ct.CRT_SH, params={"q": f"%.{domain}", "output": "json"}, timeout=90,

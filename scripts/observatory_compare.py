@@ -32,7 +32,7 @@ def main(out_dir: str, domains: list[str]) -> int:
     # so that no comparison is skipped.
     with ThreadPoolExecutor(max_workers=len(domains) or 1) as pool:
         pending = {d: pool.submit(_observatory, d) for d in domains}
-        audits = audit_many(domains, workers=8)
+        audits = audit_many(domains, workers=8, ct_logs=False)  # only the website grade is compared
         answers = {d: f.result() for d, f in pending.items()}
     comparisons = []
     for domain, result in audits.items():

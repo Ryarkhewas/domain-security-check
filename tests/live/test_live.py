@@ -33,7 +33,7 @@ def audit(domain: str):
     """Each domain is audited once, whatever the number of tests that look at it."""
     if domain not in _AUDITS:
         try:
-            _AUDITS[domain] = run_audit(domain)
+            _AUDITS[domain] = run_audit(domain, ct_logs=False)
         except Exception as e:  # noqa: BLE001 - kept, then raised again for the test that asked
             _AUDITS[domain] = e
     outcome = _AUDITS[domain]
@@ -45,7 +45,7 @@ def audit(domain: str):
 @pytest.fixture(scope="module", autouse=True)
 def audit_in_parallel():
     """Audit every domain at the same time before the tests run (the network waits dominate)."""
-    _AUDITS.update(audit_many(AUDITED, workers=8))
+    _AUDITS.update(audit_many(AUDITED, workers=8, ct_logs=False))  # CT logs: tested on their own below
 
 
 def doh(name: str, rtype: str) -> list[dict]:
