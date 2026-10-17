@@ -1,4 +1,4 @@
-"""Domain & DNS checks: DNSSEC and CAA.
+"""Domain & DNS checks: DNSSEC, CAA, registration data and forgotten subdomains.
 
 What is valid comes from the standards (RFC 4033-4035 DNSSEC, RFC 8659 CAA).
 The points are this project's own, kept moderate: both are defence in depth,
@@ -11,8 +11,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from .ct import takeover_provider
 from .i18n import Date, M
-from .models import CAAInfo, Category, DNSSECInfo, Finding, RDAPInfo, Status
+from .models import CAAInfo, Category, DNSSECInfo, Finding, RDAPInfo, Status, SubdomainInfo
 from .rdap import TRANSFER_LOCKS
 
 D = Category.DNS
@@ -129,4 +130,50 @@ def check_registration(info: RDAPInfo, now: datetime) -> list[Finding]:
                                  "account, it is easier to move it elsewhere."),
                                M("Turn on the transfer lock (often called \"registrar lock\") at your registrar."),
                                -5, lock_src))
+    return findings
+
+
+# --- Subdomains in Certificate Transparency logs -----------------------------------
+SHOWN = 12  # names listed in a detail; the others are counted
+
+
+def _names(names: list[str]) -> str:
+    shown = ", ".join(names[:SHOWN])
+    return shown if len(names) <= SHOWN else M("{names} and {count} more", names=shown, count=len(names) - SHOWN)
+
+
+def check_subdomains(info: SubdomainInfo) -> list[Finding]:
+    """Dangling CNAME records among the subdomains published in CT logs (subdomain takeover)."""
+    title, src = "Forgotten subdomains (CT logs)", "ct"
+    if info.error:
+        return [_f(title, Status.INFO, M("Could not be checked ({error}).", error=info.error), points=None,
+                   source=src)]
+    if not info.names:
+        return [_f(title, Status.OK, M("No subdomain found in Certificate Transparency logs ({source}).",
+                                       source=info.source), source=src)]
+    seen = M("{count} subdomain(s) found in Certificate Transparency logs ({source}), {active} still in use.",
+             count=len(info.names), source=info.source, active=len(info.resolving))
+    findings = []
+    open_to_takeover = [(n, t, takeover_provider(t)) for n, t in info.dangling if takeover_provider(t)]
+    other = [(n, t) for n, t in info.dangling if not takeover_provider(t)]
+    if open_to_takeover:
+        listed = ", ".join(f"{n} → {t} ({p})" for n, t, p in open_to_takeover)
+        findings.append(_f(title, Status.CRITICAL,
+                           M("{seen} These subdomains point to a resource that no longer exists at a provider where "
+                             "anyone can create it again, and then publish content on your domain (subdomain "
+                             "takeover): {listed}.", seen=seen, listed=listed),
+                           "Delete these DNS records now, or recreate the resource at the provider before someone "
+                           "else does.", -30, src))
+    if other:
+        listed = ", ".join(f"{n} → {t}" for n, t in other)
+        findings.append(_f(title, Status.WARNING,
+                           M("{seen} These subdomains point to a name that no longer exists: {listed}.",
+                             seen=seen, listed=listed),
+                           "Delete the DNS records of subdomains that are no longer used.", -10, src))
+    if not findings:
+        unknown = M(" {count} could not be looked up.", count=info.unknown) if info.unknown else ""
+        active = M(" In use: {names}.", names=_names(info.resolving)) if info.resolving else ""
+        findings.append(_f(title, Status.OK,
+                           M("{seen} None points to a resource that no longer exists.{active}{unknown}",
+                             seen=seen, active=active, unknown=unknown), source=src))
     return findings

@@ -22,6 +22,7 @@ import dns.name
 import dns.resolver
 import requests
 
+from . import ct
 from . import tls_scan as scan
 from ._version import __version__
 from .hsts_preload import PreloadList
@@ -35,6 +36,7 @@ from .models import (
     MTASTSInfo,
     RDAPInfo,
     SecurityTxtInfo,
+    SubdomainInfo,
     TLSScanInfo,
 )
 from .rdap import load_bootstrap, read_answer, server_for
@@ -230,6 +232,55 @@ class Collector:
             info.error = M("unreadable answer")
         return info
 
+    # --- Certificate Transparency ----------------------------------------------
+    def subdomains(self, domain: str) -> SubdomainInfo:
+        """Subdomains published in CT logs, each looked up in DNS (no connection to the subdomains themselves)."""
+        info = SubdomainInfo()
+        raw: list[str] | None = None
+        errors = []
+        for _ in range(2):  # crt.sh is often slow or overloaded
+            try:
+                r = requests.get(ct.CRT_SH, params={"q": f"%.{domain}", "output": "json"}, timeout=90,
+                                 headers={"User-Agent": USER_AGENT})
+                r.raise_for_status()
+                raw, info.source = ct.names_from_crt_sh(r.json()), "crt.sh"
+                break
+            except (requests.RequestException, ValueError) as e:
+                errors.append(f"crt.sh: {_short(e)}")
+        if raw is None:
+            try:
+                raw, info.source = self._cert_spotter(domain), "Cert Spotter"
+            except (requests.RequestException, ValueError) as e:
+                errors.append(f"Cert Spotter: {_short(e)}")
+        if raw is None:
+            info.error = M("CT logs could not be read ({errors})", errors="; ".join(errors[-2:]))
+            return info
+        info.names = ct.clean_names(raw, domain)
+        resolver = dns.resolver.Resolver()
+        resolver.lifetime = self.timeout
+        with ThreadPoolExecutor(max_workers=32) as pool:
+            states = list(pool.map(lambda name: _subdomain_state(resolver, name), info.names))
+        for name, (state, target) in zip(info.names, states, strict=True):
+            if state == "resolving":
+                info.resolving.append(name)
+            elif state == "dangling":
+                info.dangling.append((name, target))
+            elif state == "unknown":
+                info.unknown += 1
+        return info
+
+    def _cert_spotter(self, domain: str) -> list[str]:
+        names: list[str] = []
+        params = {"domain": domain, "include_subdomains": "true", "expand": "dns_names"}
+        while True:
+            r = requests.get(ct.CERT_SPOTTER, params=params, timeout=60, headers={"User-Agent": USER_AGENT})
+            r.raise_for_status()
+            page = r.json()
+            if not page:
+                return names
+            names += ct.names_from_cert_spotter(page)
+            params["after"] = str(page[-1].get("id", ""))
+
     # --- TLS ---------------------------------------------------------------
     def certificate(self, host: str) -> CertificateInfo | None:
         ctx = ssl.create_default_context()
@@ -391,6 +442,26 @@ _SSL_ERRORS = {
     "self signed certificate in certificate chain": M("self-signed certificate in certificate chain"),
     "unable to get local issuer certificate": M("unable to get local issuer certificate"),
 }
+
+
+def _subdomain_state(resolver: dns.resolver.Resolver, name: str) -> tuple[str, str]:
+    """("resolving" | "dangling" | "gone" | "unknown", CNAME target when dangling)."""
+    for rtype in ("A", "AAAA"):
+        try:
+            resolver.resolve(name, rtype)
+            return "resolving", ""
+        except dns.resolver.NXDOMAIN as e:
+            try:
+                target = str(e.canonical_name).rstrip(".")
+            except (KeyError, TypeError, AttributeError, dns.exception.DNSException):
+                target = name
+            # the name exists as a CNAME, but the name it points to does not
+            return ("dangling", target) if target.lower() != name.lower() else ("gone", "")
+        except dns.resolver.NoAnswer:
+            continue
+        except (dns.resolver.NoNameservers, dns.exception.Timeout):
+            return "unknown", ""
+    return "gone", ""
 
 
 def _public_key(der: bytes | None) -> dict:

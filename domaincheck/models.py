@@ -63,6 +63,18 @@ class TLSScanInfo:
 
 
 @dataclass
+class SubdomainInfo:
+    """Subdomains read in Certificate Transparency logs, and what their DNS records point to now."""
+
+    names: list[str] = field(default_factory=list)
+    source: str = ""  # "crt.sh" or "Cert Spotter"
+    resolving: list[str] = field(default_factory=list)  # still have an address
+    dangling: list[tuple[str, str]] = field(default_factory=list)  # (subdomain, CNAME target that does not exist)
+    unknown: int = 0  # names whose DNS lookup failed (timeout)
+    error: str = ""
+
+
+@dataclass
 class CookieInfo:
     name: str
     secure: bool
@@ -155,6 +167,7 @@ class CollectedData:
     security_txt: SecurityTxtInfo | None = None
     rdap: RDAPInfo | None = None
     tls_scan: TLSScanInfo | None = None
+    subdomains: SubdomainInfo | None = None
 
 
 @dataclass

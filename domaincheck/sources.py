@@ -52,6 +52,7 @@ SOURCES: dict[str, tuple[str, str]] = {
     "dnssec": ("RFC 4033 (DNS Security Introduction and Requirements)", "https://www.rfc-editor.org/rfc/rfc4033"),
     "caa": ("RFC 8659 (DNS Certification Authority Authorization)", "https://www.rfc-editor.org/rfc/rfc8659"),
     "rdap": ("RFC 9083 (RDAP, registration data of domain names)", "https://www.rfc-editor.org/rfc/rfc9083"),
+    "ct": ("RFC 9162 (Certificate Transparency)", "https://www.rfc-editor.org/rfc/rfc9162"),
     "transfer-lock": ("RFC 5731 (domain status, including transfer prohibited)",
                       "https://www.rfc-editor.org/rfc/rfc5731#section-2.3"),
     # Scoring
@@ -100,6 +101,7 @@ GUIDE_REFS: dict[str, list[tuple[str, str]]] = {
     # Domain & DNS: BP-038, and PA-066 for the email domains
     "dnssec": [("dns", "R4+"), ("internet", "R50+")],
     "transfer-lock": [("dns", "R1, R3+")],
+    "ct": [("web", "R3")],
     "rdap": [("dns", "§4.10")],
 }
 

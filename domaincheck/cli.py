@@ -80,6 +80,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--previous", type=Path, metavar="FILE",
                    help="JSON result of an earlier audit to compare with, for a single domain "
                         "(default: the <domain>.json saved next to the report by the previous run)")
+    p.add_argument("--no-ct-logs", action="store_true",
+                   help="Skip the subdomains published in Certificate Transparency logs (faster)")
     p.add_argument("--demo", action="store_true", help="Demo on a fictitious domain, without network access")
     p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     args = p.parse_args(argv)
@@ -110,7 +112,7 @@ def main(argv: list[str] | None = None) -> int:
     print(say(REMINDER), file=sys.stderr)
     if len(domains) == 1:
         try:
-            result = run_audit(domains[0])
+            result = run_audit(domains[0], **({"ct_logs": False} if args.no_ct_logs else {}))
         except (InvalidDomain, DomainNotFound) as e:
             print(say("Error: {message}", message=message_of(e)), file=sys.stderr)
             return 1
@@ -171,7 +173,8 @@ def _several(domains: list[str], args) -> int:
         print(f"[{done}/{len(domains)}] {domain}: {status}", file=sys.stderr)
 
     # Several audits run at the same time: most of an audit is spent waiting for the network
-    for domain, outcome in audit_many(domains, workers=args.workers, on_done=progress).items():
+    for domain, outcome in audit_many(domains, workers=args.workers, on_done=progress,
+                                            **({"ct_logs": False} if args.no_ct_logs else {})).items():
         if isinstance(outcome, (InvalidDomain, DomainNotFound, CollectionError)):
             errors[domain] = message_of(outcome)
             continue

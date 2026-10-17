@@ -194,3 +194,10 @@ def test_3des_is_seen():
 def test_rsa_key_exchange_is_seen():
     info = Collector().tls_scan("static-rsa.badssl.com")
     assert info.static_rsa is True
+
+
+def test_subdomains_are_read_from_ct_logs():
+    info = Collector().subdomains("afnic.fr")
+    assert not info.error, info.error
+    assert info.names and info.resolving
+    assert all(name.endswith(".afnic.fr") for name in info.names)

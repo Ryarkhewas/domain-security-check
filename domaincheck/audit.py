@@ -7,7 +7,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
-from .dns_checks import check_caa, check_dnssec, check_registration
+from .dns_checks import check_caa, check_dnssec, check_registration, check_subdomains
 from .email_checks import check_dkim, check_dmarc, check_mta_sts, check_mx, check_spf, effective_dmarc_policy
 from .i18n import M
 from .models import CollectedData, Result
@@ -88,6 +88,8 @@ def analyze(data: CollectedData, tested_selectors: list[str], now: datetime | No
         findings += check_registration(data.rdap, now)
     if exists and data.security_txt is not None:
         findings.append(check_security_txt(data.security_txt, now))
+    if data.subdomains is not None:
+        findings += check_subdomains(data.subdomains)
 
     cap_reason = broken_https_reason(data, now)
     grades = category_grades(findings, exists, cap_reason)
@@ -125,7 +127,11 @@ def find_dmarc(collector, domain: str) -> tuple[list[str], str]:
     return records, ""
 
 
-def run_audit(text: str, collector=None) -> Result:
+def run_audit(text: str, collector=None, ct_logs: bool = True) -> Result:
+    """Collect everything about a domain and analyse it.
+
+    ct_logs=False skips the subdomains published in Certificate Transparency logs (the slowest part).
+    """
     from .collector import DKIM_SELECTORS, Collector
 
     domain = normalize_domain(text)
@@ -135,6 +141,11 @@ def run_audit(text: str, collector=None) -> Result:
     if hasattr(collector, "check_exists"):
         collector.check_exists(domain)
 
+    # CT logs answer slowly: they are read while the rest is collected
+    ct_pool = ThreadPoolExecutor(max_workers=1)
+    subdomains = (ct_pool.submit(collector.subdomains, mail_domain)
+                  if ct_logs and hasattr(collector, "subdomains") else None)
+    ct_pool.shutdown(wait=False)
     dmarc_records, dmarc_parent = find_dmarc(collector, mail_domain)
     data = CollectedData(
         domain=domain,
@@ -153,11 +164,14 @@ def run_audit(text: str, collector=None) -> Result:
     )
     if data.certificate is not None and hasattr(collector, "tls_scan"):
         data.tls_scan = collector.tls_scan(domain)
+    if subdomains is not None:
+        data.subdomains = subdomains.result()
     return analyze(data, DKIM_SELECTORS)
 
 
 def audit_many(domains: list[str], workers: int = 6,
-               on_done: Callable[[str, Result | Exception], None] | None = None) -> dict[str, Result | Exception]:
+               on_done: Callable[[str, Result | Exception], None] | None = None,
+               ct_logs: bool = True) -> dict[str, Result | Exception]:
     """Audit several domains at the same time (most of an audit is spent waiting for the network).
 
     Returns {domain: Result, or the exception that stopped its audit}, in the order given.
@@ -168,7 +182,8 @@ def audit_many(domains: list[str], workers: int = 6,
     Collector().preload_list()  # downloaded once, before the threads share it
     outcomes: dict[str, Result | Exception] = {}
     with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
-        futures = {pool.submit(run_audit, d): d for d in domains}
+        options = {} if ct_logs else {"ct_logs": False}
+        futures = {pool.submit(run_audit, d, **options): d for d in domains}
         for future in as_completed(futures):
             domain = futures[future]
             try:

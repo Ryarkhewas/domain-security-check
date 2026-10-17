@@ -63,8 +63,8 @@ def test_full_demo():
     assert (r.grades["TLS"].score, r.grades["TLS"].grade) == (70, "B")
     # ?all -20, p=none -20, no MTA-STS -5
     assert (r.grades["EMAIL"].score, r.grades["EMAIL"].grade) == (55, "C")
-    # no DNSSEC -15, no CAA -5, no transfer lock -5
-    assert (r.grades["DNS"].score, r.grades["DNS"].grade) == (75, "B")
+    # no DNSSEC -15, no CAA -5, no transfer lock -5, subdomain open to takeover -30
+    assert (r.grades["DNS"].score, r.grades["DNS"].grade) == (45, "C-")
     assert r.grade == "F"  # overall = weakest area
     assert {f.category for f in r.findings} == set(Category)
 

@@ -16,6 +16,7 @@ from .models import (
     MTASTSInfo,
     RDAPInfo,
     SecurityTxtInfo,
+    SubdomainInfo,
     TLSScanInfo,
 )
 
@@ -45,6 +46,12 @@ class DemoCollector:
             key_type="RSA",
             key_bits=2048,
         )
+
+    def subdomains(self, domain: str) -> SubdomainInfo:
+        # The shop moved in 2021, the old Azure app was deleted, its DNS record was forgotten
+        names = [f"{n}.{domain}" for n in ("mail", "old-shop", "shop", "www")]
+        return SubdomainInfo(names=names, source="crt.sh", resolving=[names[0], names[2], names[3]],
+                             dangling=[(names[1], "bakery-shop-2019.azurewebsites.net")])
 
     def tls_scan(self, host: str) -> TLSScanInfo:
         # An old shared hosting configuration: TLS 1.0 and 1.1 still on

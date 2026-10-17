@@ -603,6 +603,29 @@ FR: dict[str, str] = {
     "RFC 4033 (DNS Security Introduction and Requirements)": "RFC 4033 (introduction et exigences de la sécurité DNS)",
     "RFC 8659 (DNS Certification Authority Authorization)": "RFC 8659 (autorisation des autorités de certification par DNS)",
     # --- Registration (RDAP) -----------------------------------------------------------
+    "Forgotten subdomains (CT logs)": "Sous-domaines oubliés (journaux CT)",
+    "CT logs could not be read ({errors})": "les journaux CT n'ont pas pu être lus ({errors})",
+    "No subdomain found in Certificate Transparency logs ({source}).":
+        "Aucun sous-domaine trouvé dans les journaux Certificate Transparency ({source}).",
+    "{count} subdomain(s) found in Certificate Transparency logs ({source}), {active} still in use.":
+        "{count} sous-domaine(s) trouvé(s) dans les journaux Certificate Transparency ({source}), dont {active} encore "
+        "utilisé(s).",
+    "{seen} These subdomains point to a resource that no longer exists at a provider where anyone can create it "
+    "again, and then publish content on your domain (subdomain takeover): {listed}.":
+        "{seen} Ces sous-domaines pointent vers une ressource qui n'existe plus chez un fournisseur où n'importe qui "
+        "peut la recréer, puis publier du contenu sur votre domaine (prise de contrôle de sous-domaine) : {listed}.",
+    "Delete these DNS records now, or recreate the resource at the provider before someone else does.":
+        "Supprimez ces enregistrements DNS dès maintenant, ou recréez la ressource chez le fournisseur avant que "
+        "quelqu'un d'autre ne le fasse.",
+    "{seen} These subdomains point to a name that no longer exists: {listed}.":
+        "{seen} Ces sous-domaines pointent vers un nom qui n'existe plus : {listed}.",
+    "Delete the DNS records of subdomains that are no longer used.":
+        "Supprimez les enregistrements DNS des sous-domaines qui ne servent plus.",
+    " {count} could not be looked up.": " {count} n'ont pas pu être résolus.",
+    " In use: {names}.": " Utilisés : {names}.",
+    "{names} and {count} more": "{names} et {count} autres",
+    "{seen} None points to a resource that no longer exists.{active}{unknown}":
+        "{seen} Aucun ne pointe vers une ressource qui n'existe plus.{active}{unknown}",
     "Domain expiry date": "Date d'expiration du domaine",
     "Transfer lock": "Verrou de transfert",
     "no RDAP server for this extension": "aucun serveur RDAP pour cette extension",
@@ -638,6 +661,7 @@ FR: dict[str, str] = {
     "ANSSI website guide PA-009 v2.0 (2021)": "Guide ANSSI site web PA-009 v2.0 (2021)",
     "ANSSI domain name guide BP-038 v1.3 (2017)": "Guide ANSSI noms de domaine BP-038 v1.3 (2017)",
     "ANSSI Internet gateway guide PA-066 v3.0 (2020)": "Guide ANSSI interconnexion à Internet PA-066 v3.0 (2020)",
+    "RFC 9162 (Certificate Transparency)": "RFC 9162 (Certificate Transparency)",
     "RFC 8446 (TLS 1.3)": "RFC 8446 (TLS 1.3)",
     "RFC 9325 (recommendations for the secure use of TLS)": "RFC 9325 (recommandations pour un usage sûr de TLS)",
     "CNIL personal data security guide (2024): securing websites":
