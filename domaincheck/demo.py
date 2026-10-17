@@ -8,7 +8,16 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from .models import CAAInfo, CertificateInfo, DNSSECInfo, HTTPInfo, MTASTSInfo, RDAPInfo, SecurityTxtInfo
+from .models import (
+    CAAInfo,
+    CertificateInfo,
+    DNSSECInfo,
+    HTTPInfo,
+    MTASTSInfo,
+    RDAPInfo,
+    SecurityTxtInfo,
+    TLSScanInfo,
+)
 
 DEMO_DOMAIN = "bakery-example.com"
 
@@ -32,7 +41,16 @@ class DemoCollector:
             issuer="Let's Encrypt",
             names=[host, f"www.{host}"],
             tls_version="TLSv1.3",
+            cipher="TLS_AES_256_GCM_SHA384",
+            key_type="RSA",
+            key_bits=2048,
         )
+
+    def tls_scan(self, host: str) -> TLSScanInfo:
+        # An old shared hosting configuration: TLS 1.0 and 1.1 still on
+        return TLSScanInfo(versions={"SSLv3": False, "TLSv1": True, "TLSv1.1": True, "TLSv1.2": True,
+                                     "TLSv1.3": True},
+                           weak_ciphers=[], weak_tested=True, static_rsa=False)
 
     def http(self, host: str) -> HTTPInfo:
         return HTTPInfo(

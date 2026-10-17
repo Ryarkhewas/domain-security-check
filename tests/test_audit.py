@@ -59,7 +59,8 @@ def test_full_demo():
     r = run_audit("bakery-example.com", collector=DemoCollector())
     # website: 100 - 20 (redirect) - 25 (CSP) - 20 (HSTS) - 20 (clickjacking) = 15
     assert (r.grades["WEB"].score, r.grades["WEB"].grade) == (15, "F")
-    assert (r.grades["TLS"].score, r.grades["TLS"].grade) == (90, "A")  # expires in 21 days: -10
+    # expires in 21 days -10, TLS 1.0 and 1.1 still accepted -20
+    assert (r.grades["TLS"].score, r.grades["TLS"].grade) == (70, "B")
     # ?all -20, p=none -20, no MTA-STS -5
     assert (r.grades["EMAIL"].score, r.grades["EMAIL"].grade) == (55, "C")
     # no DNSSEC -15, no CAA -5, no transfer lock -5

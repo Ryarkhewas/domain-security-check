@@ -12,7 +12,7 @@ from .email_checks import check_dkim, check_dmarc, check_mta_sts, check_mx, chec
 from .i18n import M
 from .models import CollectedData, Result
 from .scoring import category_grades, overall_grade
-from .tls_checks import check_certificate
+from .tls_checks import check_certificate, check_tls_scan
 from .web_checks import check_security_txt, check_website
 
 _VALID_DOMAIN = re.compile(r"^(?=.{1,253}$)(?!-)([a-z0-9-]{1,63}(?<!-)\.)+[a-z]{2,63}$")
@@ -71,6 +71,8 @@ def analyze(data: CollectedData, tested_selectors: list[str], now: datetime | No
     findings = []
     if exists:
         findings += check_certificate(data.certificate, now)
+        if data.tls_scan is not None:
+            findings += check_tls_scan(data.tls_scan, data.certificate)
         findings += check_website(data.http, data.domain)
     findings += check_mx(data.mx)
     enforced = effective_dmarc_policy(data.dmarc_txt, data.dmarc_inherited_from) in ("quarantine", "reject")
@@ -149,6 +151,8 @@ def run_audit(text: str, collector=None) -> Result:
         security_txt=collector.security_txt(domain),
         rdap=collector.rdap(domain),
     )
+    if data.certificate is not None and hasattr(collector, "tls_scan"):
+        data.tls_scan = collector.tls_scan(domain)
     return analyze(data, DKIM_SELECTORS)
 
 

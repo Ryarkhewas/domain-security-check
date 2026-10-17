@@ -1,7 +1,8 @@
 """Passive collection of a domain's public information.
 
 Only requests that any visitor or mail server makes normally: DNS lookups,
-a TLS handshake, the home page (over HTTPS and HTTP) and robots.txt, like
+TLS handshakes (including the first message of an old client's handshake, to
+see which protocol versions and cipher suites are accepted), the home page (over HTTPS and HTTP) and robots.txt, like
 Mozilla HTTP Observatory. No port scanning, no intrusion attempt.
 """
 
@@ -11,6 +12,7 @@ import contextlib
 import re
 import socket
 import ssl
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import cast
 
@@ -20,6 +22,7 @@ import dns.name
 import dns.resolver
 import requests
 
+from . import tls_scan as scan
 from ._version import __version__
 from .hsts_preload import PreloadList
 from .i18n import M, Message
@@ -32,6 +35,7 @@ from .models import (
     MTASTSInfo,
     RDAPInfo,
     SecurityTxtInfo,
+    TLSScanInfo,
 )
 from .rdap import load_bootstrap, read_answer, server_for
 from .web_checks import registrable_domain
@@ -234,6 +238,8 @@ class Collector:
                     ctx.wrap_socket(sock, server_hostname=host) as tls:
                 cert = tls.getpeercert()
                 version = tls.version() or ""
+                cipher = (tls.cipher() or ("", "", 0))[0]
+                der = tls.getpeercert(binary_form=True)
         except ssl.SSLCertVerificationError as e:
             return CertificateInfo(valid=False, error=_ssl_error(e.verify_message or str(e)))
         except (OSError, ssl.SSLError):
@@ -255,7 +261,50 @@ class Collector:
             issuer=issuer.get("organizationName") or issuer.get("commonName", ""),
             names=names,
             tls_version=version,
+            cipher=cipher,
+            **_public_key(der),
         )
+
+    def tls_scan(self, host: str, port: int = 443) -> TLSScanInfo:
+        """Accepted protocol versions and cipher suites (one short connection each)."""
+        info = TLSScanInfo()
+
+        def version(v: int) -> bool | None:
+            try:
+                hello = scan.probe(host, v, scan.VERSION_PROBE_SUITES, timeout=self.timeout, port=port)
+            except OSError:
+                return None
+            return hello.accepted and hello.version == v
+
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            legacy = {name: pool.submit(version, v) for v, name in scan.VERSION_NAMES.items()}
+            tls13 = pool.submit(scan.accepts_tls13, host, self.timeout, port)
+            weak = pool.submit(self._accepted_suites, host, scan.WEAK_SUITES, port)
+            static_rsa = pool.submit(self._accepted_suites, host, scan.STATIC_RSA_SUITES, port)
+            info.versions = {name: f.result() for name, f in legacy.items()}
+            info.versions["TLSv1.3"] = tls13.result()
+            weak_suites, static_suites = weak.result(), static_rsa.result()
+        if all(v is None for v in info.versions.values()):
+            info.error = M("the server did not answer the test connections")
+        if weak_suites is not None:
+            info.weak_ciphers, info.weak_tested = weak_suites, True
+        if static_suites is not None:
+            info.static_rsa = bool(static_suites)
+        return info
+
+    def _accepted_suites(self, host: str, suites: dict[int, str], port: int = 443) -> list[str] | None:
+        """Names of the given suites the server accepts with TLS 1.2 or older, None if it could not be tested."""
+        offered, accepted = list(suites), list[str]()
+        while offered:
+            try:
+                hello = scan.probe(host, scan.TLS12, offered, timeout=self.timeout, port=port)
+            except OSError:
+                return accepted or None
+            if not hello.accepted or hello.cipher not in offered:
+                break
+            accepted.append(suites[hello.cipher])
+            offered.remove(hello.cipher)
+        return accepted
 
     # --- HTTP --------------------------------------------------------------
     def http(self, host: str) -> HTTPInfo:
@@ -342,6 +391,30 @@ _SSL_ERRORS = {
     "self signed certificate in certificate chain": M("self-signed certificate in certificate chain"),
     "unable to get local issuer certificate": M("unable to get local issuer certificate"),
 }
+
+
+def _public_key(der: bytes | None) -> dict:
+    """{"key_type": ..., "key_bits": ...} of a DER certificate, empty when it cannot be read."""
+    if not der:
+        return {}
+    try:
+        from cryptography import x509
+        from cryptography.hazmat.primitives.asymmetric import dsa, ec, ed448, ed25519, rsa
+
+        key = x509.load_der_x509_certificate(der).public_key()
+    except (ImportError, ValueError):
+        return {}
+    if isinstance(key, rsa.RSAPublicKey):
+        return {"key_type": "RSA", "key_bits": key.key_size}
+    if isinstance(key, ec.EllipticCurvePublicKey):
+        return {"key_type": "EC", "key_bits": key.curve.key_size}
+    if isinstance(key, dsa.DSAPublicKey):
+        return {"key_type": "DSA", "key_bits": key.key_size}
+    if isinstance(key, ed25519.Ed25519PublicKey):
+        return {"key_type": "Ed25519", "key_bits": 256}
+    if isinstance(key, ed448.Ed448PublicKey):
+        return {"key_type": "Ed448", "key_bits": 456}
+    return {}
 
 
 def _ssl_error(text: str) -> str:

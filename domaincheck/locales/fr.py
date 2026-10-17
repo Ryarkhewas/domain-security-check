@@ -83,6 +83,56 @@ FR: dict[str, str] = {
     # --- Certificate & TLS -----------------------------------------------------------
     "HTTPS certificate": "Certificat HTTPS",
     "TLS protocol version": "Version du protocole TLS",
+    "Accepted TLS versions": "Versions de TLS acceptées",
+    "TLS 1.3": "TLS 1.3",
+    "Weak cipher suites": "Suites de chiffrement faibles",
+    "Forward secrecy": "Confidentialité persistante",
+    "Certificate key": "Clé du certificat",
+    "the server did not answer the test connections": "le serveur n'a pas répondu aux connexions de test",
+    "The server still accepts SSL 3.0, broken since 2014 (POODLE attack). Accepted: {versions}.":
+        "Le serveur accepte encore SSL 3.0, cassé depuis 2014 (attaque POODLE). Versions acceptées : {versions}.",
+    "Disable SSL 3.0, TLS 1.0 and TLS 1.1 and only allow TLS 1.2 and 1.3.":
+        "Désactivez SSL 3.0, TLS 1.0 et TLS 1.1 et n'autorisez que TLS 1.2 et 1.3.",
+    "The server still accepts old versions ({old}), deprecated since 2021: an attacker who can force an old version weakens the "
+    "encryption. Accepted: {versions}.":
+        "Le serveur accepte encore d'anciennes versions ({old}), abandonnées depuis 2021 : un attaquant capable d'imposer une ancienne "
+        "version affaiblit le chiffrement. Versions acceptées : {versions}.",
+    "Disable TLS 1.0 and 1.1 and only allow TLS 1.2 and 1.3 (current browsers no longer use the old versions).":
+        "Désactivez TLS 1.0 et 1.1 et n'autorisez que TLS 1.2 et 1.3 (les navigateurs actuels n'utilisent plus les "
+        "anciennes versions).",
+    "Only current versions are accepted: {versions}.": "Seules des versions actuelles sont acceptées : {versions}.",
+    "Not supported: TLS 1.3 is faster and removes the weak options of older versions.":
+        "Non pris en charge : TLS 1.3 est plus rapide et supprime les options faibles des versions précédentes.",
+    "Enable TLS 1.3 in the server or hosting configuration, next to TLS 1.2.":
+        "Activez TLS 1.3 dans la configuration du serveur ou de l'hébergement, en plus de TLS 1.2.",
+    "The server accepts broken cipher suites (RC4, 3DES, export, no encryption or no authentication): {suites}.":
+        "Le serveur accepte des suites de chiffrement cassées (RC4, 3DES, export, sans chiffrement ou sans "
+        "authentification) : {suites}.",
+    "Remove these suites from the server configuration and keep only AES-GCM and ChaCha20 suites with ECDHE.":
+        "Retirez ces suites de la configuration du serveur et ne gardez que des suites AES-GCM et ChaCha20 avec ECDHE.",
+    "No broken cipher suite accepted (RC4, 3DES, export, no encryption or no authentication).":
+        "Aucune suite de chiffrement cassée acceptée (RC4, 3DES, export, sans chiffrement ou sans authentification).",
+    "The suite chosen for a current browser ({suite}) has no forward secrecy: if the server's private key is stolen "
+    "one day, recorded traffic can be decrypted.":
+        "La suite choisie pour un navigateur actuel ({suite}) n'offre pas de confidentialité persistante : si la clé "
+        "privée du serveur est volée un jour, le trafic enregistré pourra être déchiffré.",
+    "Prefer ECDHE suites (and TLS 1.3) in the server configuration.":
+        "Privilégiez les suites ECDHE (et TLS 1.3) dans la configuration du serveur.",
+    "Current browsers get forward secrecy, but the server still accepts the RSA key exchange for old clients: their "
+    "recorded traffic could be decrypted if the private key is stolen.":
+        "Les navigateurs actuels bénéficient de la confidentialité persistante, mais le serveur accepte encore "
+        "l'échange de clés RSA pour les anciens clients : leur trafic enregistré pourrait être déchiffré si la clé "
+        "privée était volée.",
+    "Remove the suites without ECDHE or DHE (AES128-SHA, AES256-GCM-SHA384...).":
+        "Retirez les suites sans ECDHE ni DHE (AES128-SHA, AES256-GCM-SHA384...).",
+    "Every accepted key exchange has forward secrecy: a stolen private key would not decrypt recorded traffic.":
+        "Tous les échanges de clés acceptés offrent la confidentialité persistante : une clé privée volée ne "
+        "permettrait pas de déchiffrer le trafic enregistré.",
+    "{kind} {bits} bits": "{kind} {bits} bits",
+    "Key too short ({key}): it could be broken.": "Clé trop courte ({key}) : elle pourrait être cassée.",
+    "Issue a new certificate with an RSA key of at least 2048 bits or an ECDSA P-256 key.":
+        "Faites émettre un nouveau certificat avec une clé RSA d'au moins 2048 bits ou une clé ECDSA P-256.",
+    "Key strong enough ({key}).": "Clé suffisamment robuste ({key}).",
     "Could not establish an HTTPS connection on port 443.": "Impossible d'établir une connexion HTTPS sur le port 443.",
     "Install a certificate (Let's Encrypt is free) and enable HTTPS.":
         "Installez un certificat (Let's Encrypt est gratuit) et activez le HTTPS.",
@@ -588,6 +638,8 @@ FR: dict[str, str] = {
     "ANSSI website guide PA-009 v2.0 (2021)": "Guide ANSSI site web PA-009 v2.0 (2021)",
     "ANSSI domain name guide BP-038 v1.3 (2017)": "Guide ANSSI noms de domaine BP-038 v1.3 (2017)",
     "ANSSI Internet gateway guide PA-066 v3.0 (2020)": "Guide ANSSI interconnexion à Internet PA-066 v3.0 (2020)",
+    "RFC 8446 (TLS 1.3)": "RFC 8446 (TLS 1.3)",
+    "RFC 9325 (recommendations for the secure use of TLS)": "RFC 9325 (recommandations pour un usage sûr de TLS)",
     "CNIL personal data security guide (2024): securing websites":
         "Guide CNIL de la sécurité des données personnelles (2024) : sécuriser les sites web",
     # --- security.txt ------------------------------------------------------------------

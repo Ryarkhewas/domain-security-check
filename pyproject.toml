@@ -12,6 +12,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "Loïc Tellier" }]
 requires-python = ">=3.10"
 dependencies = [
+    "cryptography>=41",
     "dnspython>=2.4",
     "requests>=2.31",
     "tldextract>=5.1",

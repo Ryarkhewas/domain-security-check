@@ -46,6 +46,20 @@ class CertificateInfo:
     names: list[str] = field(default_factory=list)
     tls_version: str = ""
     error: str = ""
+    cipher: str = ""  # suite negotiated by a current client, OpenSSL name
+    key_type: str = ""  # "RSA", "EC", "Ed25519"...
+    key_bits: int = 0
+
+
+@dataclass
+class TLSScanInfo:
+    """Protocol versions and cipher suites the server accepts (see tls_scan.py)."""
+
+    versions: dict[str, bool | None] = field(default_factory=dict)  # "TLSv1": True / False / None (not tested)
+    weak_ciphers: list[str] = field(default_factory=list)
+    weak_tested: bool = False
+    static_rsa: bool | None = None  # RSA key exchange (no forward secrecy) accepted
+    error: str = ""
 
 
 @dataclass
@@ -140,6 +154,7 @@ class CollectedData:
     mta_sts: MTASTSInfo | None = None
     security_txt: SecurityTxtInfo | None = None
     rdap: RDAPInfo | None = None
+    tls_scan: TLSScanInfo | None = None
 
 
 @dataclass

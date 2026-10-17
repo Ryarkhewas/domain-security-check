@@ -39,6 +39,8 @@ SOURCES: dict[str, tuple[str, str]] = {
     # Certificate & TLS
     "tls-guide": ("MDN TLS guide", f"{MDN}/TLS"),
     "rfc8996": ("RFC 8996 (deprecating TLS 1.0 and 1.1)", "https://www.rfc-editor.org/rfc/rfc8996"),
+    "tls13": ("RFC 8446 (TLS 1.3)", "https://www.rfc-editor.org/rfc/rfc8446"),
+    "rfc9325": ("RFC 9325 (recommendations for the secure use of TLS)", "https://www.rfc-editor.org/rfc/rfc9325"),
     # Email
     "spf": ("RFC 7208 (SPF)", "https://www.rfc-editor.org/rfc/rfc7208"),
     "dmarc": ("RFC 7489 (DMARC)", "https://www.rfc-editor.org/rfc/rfc7489"),
@@ -88,6 +90,7 @@ GUIDE_REFS: dict[str, list[tuple[str, str]]] = {
     # Certificate & TLS
     "tls-guide": [("tls", "R8"), ("cnil", "")],
     "rfc8996": [("tls", "R3, R4"), ("web", "R1"), ("cnil", "")],
+    "tls13": [("tls", "R3")],
     # Email: PA-066, section 5.3 (transport) and 5.4 (SPF, DKIM, DMARC)
     "spf": [("internet", "R44")],
     "dkim": [("internet", "R46+")],

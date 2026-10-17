@@ -171,3 +171,26 @@ def test_transfer_lock_is_seen_on_large_sites(domain):
 def test_security_txt_is_found(domain):
     found = {f.title: f for f in audit(domain).findings}["security.txt (vulnerability reporting)"]
     assert found.status == Status.OK and "contact" in found.detail, found
+
+
+def test_tls_scan_of_a_modern_site():
+    r = audit("github.com")
+    titles = {f.title: f for f in r.findings if f.category == Category.TLS}
+    assert titles["Accepted TLS versions"].status == Status.OK
+    assert titles["Weak cipher suites"].status == Status.OK
+    assert titles["Certificate key"].status == Status.OK
+
+
+def test_tls_1_0_is_seen():
+    info = Collector().tls_scan("tls-v1-0.badssl.com", port=1010)
+    assert info.versions["TLSv1"] is True
+
+
+def test_3des_is_seen():
+    info = Collector().tls_scan("3des.badssl.com")
+    assert any("DES-CBC3" in suite for suite in info.weak_ciphers), info
+
+
+def test_rsa_key_exchange_is_seen():
+    info = Collector().tls_scan("static-rsa.badssl.com")
+    assert info.static_rsa is True
