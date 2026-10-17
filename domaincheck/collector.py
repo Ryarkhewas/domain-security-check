@@ -12,6 +12,8 @@ import contextlib
 import re
 import socket
 import ssl
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import cast
@@ -47,6 +49,8 @@ DKIM_SELECTORS = [
     "s1", "s2", "smtp", "mandrill", "mxvault", "zoho", "protonmail", "sib",
 ]
 TIMEOUT = 8
+# crt.sh answers 502 when one address sends it many queries at once (several domains audited together)
+CRT_SH_SLOTS = threading.Semaphore(2)
 # Some sites (Google, for instance) answer differently to bots and to browsers:
 # no HTTPS redirect, missing security headers... To report what a real visitor
 # gets, requests look like a current desktop browser. The tool's name is kept
@@ -238,10 +242,13 @@ class Collector:
         info = SubdomainInfo()
         raw: list[str] | None = None
         errors = []
-        for _ in range(2):  # crt.sh is often slow or overloaded
+        for attempt in range(3):  # crt.sh is often slow or overloaded: a few tries, a few seconds apart
+            if attempt:
+                time.sleep(10 * attempt)
             try:
-                r = requests.get(ct.CRT_SH, params={"q": f"%.{domain}", "output": "json"}, timeout=90,
-                                 headers={"User-Agent": USER_AGENT})
+                with CRT_SH_SLOTS:
+                    r = requests.get(ct.CRT_SH, params={"q": f"%.{domain}", "output": "json"}, timeout=90,
+                                     headers={"User-Agent": USER_AGENT})
                 r.raise_for_status()
                 raw, info.source = ct.names_from_crt_sh(r.json()), "crt.sh"
                 break
@@ -258,8 +265,15 @@ class Collector:
         info.names = ct.clean_names(raw, domain)
         resolver = dns.resolver.Resolver()
         resolver.lifetime = self.timeout
-        with ThreadPoolExecutor(max_workers=32) as pool:
+        with ThreadPoolExecutor(max_workers=16) as pool:
             states = list(pool.map(lambda name: _subdomain_state(resolver, name), info.names))
+            # Lookups that failed (local resolver overloaded, timeout): once more through public resolvers
+            retry = [i for i, (state, _) in enumerate(states) if state == "unknown"]
+            if retry:
+                public = _public_resolver(self.timeout)
+                for i, again in zip(retry, pool.map(lambda i: _subdomain_state(public, info.names[i]), retry),
+                                    strict=True):
+                    states[i] = again
         for name, (state, target) in zip(info.names, states, strict=True):
             if state == "resolving":
                 info.resolving.append(name)

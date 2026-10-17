@@ -607,9 +607,10 @@ FR: dict[str, str] = {
     "CT logs could not be read ({errors})": "les journaux CT n'ont pas pu être lus ({errors})",
     "No subdomain found in Certificate Transparency logs ({source}).":
         "Aucun sous-domaine trouvé dans les journaux Certificate Transparency ({source}).",
-    "{count} subdomain(s) found in Certificate Transparency logs ({source}), {active} still in use.":
+    "{count} subdomain(s) found in Certificate Transparency logs ({source}), {active} still in use{unknown}.":
         "{count} sous-domaine(s) trouvé(s) dans les journaux Certificate Transparency ({source}), dont {active} encore "
-        "utilisé(s).",
+        "utilisé(s){unknown}.",
+    " ({count} could not be looked up)": " ({count} n'ont pas pu être résolus)",
     "{seen} These subdomains point to a resource that no longer exists at a provider where anyone can create it "
     "again, and then publish content on your domain (subdomain takeover): {listed}.":
         "{seen} Ces sous-domaines pointent vers une ressource qui n'existe plus chez un fournisseur où n'importe qui "
@@ -621,11 +622,10 @@ FR: dict[str, str] = {
         "{seen} Ces sous-domaines pointent vers un nom qui n'existe plus : {listed}.",
     "Delete the DNS records of subdomains that are no longer used.":
         "Supprimez les enregistrements DNS des sous-domaines qui ne servent plus.",
-    " {count} could not be looked up.": " {count} n'ont pas pu être résolus.",
     " In use: {names}.": " Utilisés : {names}.",
     "{names} and {count} more": "{names} et {count} autres",
-    "{seen} None points to a resource that no longer exists.{active}{unknown}":
-        "{seen} Aucun ne pointe vers une ressource qui n'existe plus.{active}{unknown}",
+    "{seen} None points to a resource that no longer exists.{active}":
+        "{seen} Aucun ne pointe vers une ressource qui n'existe plus.{active}",
     "Domain expiry date": "Date d'expiration du domaine",
     "Transfer lock": "Verrou de transfert",
     "no RDAP server for this extension": "aucun serveur RDAP pour cette extension",

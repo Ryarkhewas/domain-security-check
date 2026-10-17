@@ -151,8 +151,9 @@ def check_subdomains(info: SubdomainInfo) -> list[Finding]:
     if not info.names:
         return [_f(title, Status.OK, M("No subdomain found in Certificate Transparency logs ({source}).",
                                        source=info.source), source=src)]
-    seen = M("{count} subdomain(s) found in Certificate Transparency logs ({source}), {active} still in use.",
-             count=len(info.names), source=info.source, active=len(info.resolving))
+    unknown = M(" ({count} could not be looked up)", count=info.unknown) if info.unknown else ""
+    seen = M("{count} subdomain(s) found in Certificate Transparency logs ({source}), {active} still in use{unknown}.",
+             count=len(info.names), source=info.source, active=len(info.resolving), unknown=unknown)
     findings = []
     open_to_takeover = [(n, t, takeover_provider(t)) for n, t in info.dangling if takeover_provider(t)]
     other = [(n, t) for n, t in info.dangling if not takeover_provider(t)]
@@ -171,9 +172,8 @@ def check_subdomains(info: SubdomainInfo) -> list[Finding]:
                              seen=seen, listed=listed),
                            "Delete the DNS records of subdomains that are no longer used.", -10, src))
     if not findings:
-        unknown = M(" {count} could not be looked up.", count=info.unknown) if info.unknown else ""
         active = M(" In use: {names}.", names=_names(info.resolving)) if info.resolving else ""
         findings.append(_f(title, Status.OK,
-                           M("{seen} None points to a resource that no longer exists.{active}{unknown}",
-                             seen=seen, active=active, unknown=unknown), source=src))
+                           M("{seen} None points to a resource that no longer exists.{active}",
+                             seen=seen, active=active), source=src))
     return findings

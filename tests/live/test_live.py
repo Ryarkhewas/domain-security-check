@@ -198,6 +198,8 @@ def test_rsa_key_exchange_is_seen():
 
 def test_subdomains_are_read_from_ct_logs():
     info = Collector().subdomains("afnic.fr")
+    if info.error and any(code in info.error for code in ("429", "500", "502", "503", "504", "timed out")):
+        pytest.skip(f"CT log services unavailable: {info.error}")  # an outage of crt.sh is not a bug of the tool
     assert not info.error, info.error
     assert info.names and info.resolving
     assert all(name.endswith(".afnic.fr") for name in info.names)

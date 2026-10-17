@@ -94,10 +94,11 @@ def test_collector_falls_back_to_cert_spotter(monkeypatch):
         return Answer([] if params.get("after") else [{"id": "7", "dns_names": ["www.example.com"]}])
 
     monkeypatch.setattr(collector_module.requests, "get", fake_get)
+    monkeypatch.setattr(collector_module.time, "sleep", lambda seconds: None)
     monkeypatch.setattr(collector_module, "_subdomain_state", lambda resolver, name: ("resolving", ""))
     info = collector_module.Collector().subdomains("example.com")
     assert (info.source, info.names, info.resolving) == ("Cert Spotter", ["www.example.com"], ["www.example.com"])
-    assert calls.count("https://crt.sh/") == 2
+    assert calls.count("https://crt.sh/") == 3
 
 
 def test_both_logs_down(monkeypatch):
@@ -105,6 +106,7 @@ def test_both_logs_down(monkeypatch):
         raise collector_module.requests.ConnectionError("down")
 
     monkeypatch.setattr(collector_module.requests, "get", fake_get)
+    monkeypatch.setattr(collector_module.time, "sleep", lambda seconds: None)
     info = collector_module.Collector().subdomains("example.com")
     assert info.error and not info.names
     assert check_subdomains(info)[0].status == Status.INFO
@@ -139,3 +141,21 @@ def test_audit_can_skip_ct_logs():
 
     r = run_audit("bakery-example.com", collector=DemoCollector(), ct_logs=False)
     assert not any(f.source == "ct" for f in r.findings)
+
+
+def test_failed_lookups_are_retried_through_public_resolvers(monkeypatch):
+    monkeypatch.setattr(collector_module.requests, "get", lambda url, **kw: type("A", (), {
+        "raise_for_status": lambda self: None,
+        "json": lambda self: [{"name_value": "a.example.com\nb.example.com"}]})())
+    public = object()
+    monkeypatch.setattr(collector_module, "_public_resolver", lambda timeout: public)
+    monkeypatch.setattr(collector_module, "_subdomain_state",
+                        lambda resolver, name: ("resolving", "") if resolver is public or name.startswith("a.")
+                        else ("unknown", ""))
+    info = collector_module.Collector().subdomains("example.com")
+    assert (info.resolving, info.unknown) == (["a.example.com", "b.example.com"], 0)
+
+
+def test_unknown_lookups_are_counted():
+    info = SubdomainInfo(["a.example.com", "b.example.com"], "crt.sh", ["a.example.com"], [], unknown=1)
+    assert "(1 could not be looked up)" in check_subdomains(info)[0].detail
