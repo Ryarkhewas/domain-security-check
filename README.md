@@ -19,7 +19,7 @@ Example reports: [HTML](examples/demo_report.html) and [PDF](examples/demo_repor
 | **Email** | MX servers, SPF (presence, `all` rule, 10 DNS lookup limit), DMARC (policy, coverage, reports, inheritance from the parent domain for subdomains), DKIM (common selectors), MTA-STS (record, policy file, mode, coverage of the mail servers); not scored: TLS reporting (TLS-RPT) |
 | **Domain & DNS** | DNSSEC (enabled, and consistent between the parent zone and the domain's keys), CAA (which certificate authorities may issue certificates), expiry date of the domain and transfer lock (from the registry, through RDAP) |
 
-Each item is rated **Critical**, **To improve**, **Compliant** or **Info**, shows the points it weighs in the grade, cites the standard it is based on (and the matching ANSSI recommendation, when there is one), and comes with a plain-language recommendation.
+Each item is rated **Critical**, **To improve**, **Compliant** or **Info**, shows the points it weighs in the grade, cites the standard it is based on (and the matching ANSSI or CNIL recommendation, when there is one), and comes with a plain-language recommendation.
 
 ## A strictly passive audit
 
@@ -152,7 +152,9 @@ Every check is based on a published standard or guide, cited under each item of 
 | [Recommandations relatives à l'interconnexion d'un SI à Internet](https://messervices.cyber.gouv.fr/documents-guides/anssi-guide-passerelle_internet_securisee-v3.pdf) (ANSSI-PA-066, v3.0, 2020) | SPF (R44), DKIM (R46+), DMARC (R48+), DNSSEC of email domains (R50+), MTA-STS and TLS reporting (§5.3) |
 | [Bonnes pratiques pour l'acquisition et l'exploitation de noms de domaine](https://messervices.cyber.gouv.fr/documents-guides/guide_dns_fr_anssi_1.3.pdf) (ANSSI-BP-038, v1.3, 2017) | transfer lock (R1, R3+), DNSSEC (R4+), domain expiry (§4.10) |
 
-A citation says which recommendation a check relates to. It does not mean the domain complies with ANSSI guidance: most recommendations also cover settings that cannot be seen from outside. This project is not affiliated with ANSSI.
+The [CNIL](https://www.cnil.fr/) (the French data protection authority) is also cited for the few topics its sheet [Sécuriser les sites web](https://www.cnil.fr/fr/securite-securiser-les-sites-web) (personal data security guide, 2024 edition) covers: certificate, TLS version, HTTPS redirect and cookies. Its guide is general and refers to ANSSI for technical details, but for a French company it links the website's security to the GDPR's security obligation.
+
+A citation says which recommendation a check relates to. It does not mean the domain complies with ANSSI guidance: most recommendations also cover settings that cannot be seen from outside. This project is not affiliated with ANSSI or CNIL.
 
 **Differences with the Observatory.** One Observatory test is not reproduced: CORS, whose only penalty requires sending a forged `Origin` header. A Content-Security-Policy declared in a `<meta http-equiv>` tag is not read (the `<meta name="referrer">` tag is), and only the first CSP policy is analysed when a site sends several. In these rare cases the website grade can differ from the Observatory's.
 

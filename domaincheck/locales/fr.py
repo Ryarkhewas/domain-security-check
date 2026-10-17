@@ -588,6 +588,8 @@ FR: dict[str, str] = {
     "ANSSI website guide PA-009 v2.0 (2021)": "Guide ANSSI site web PA-009 v2.0 (2021)",
     "ANSSI domain name guide BP-038 v1.3 (2017)": "Guide ANSSI noms de domaine BP-038 v1.3 (2017)",
     "ANSSI Internet gateway guide PA-066 v3.0 (2020)": "Guide ANSSI interconnexion à Internet PA-066 v3.0 (2020)",
+    "CNIL personal data security guide (2024): securing websites":
+        "Guide CNIL de la sécurité des données personnelles (2024) : sécuriser les sites web",
     # --- security.txt ------------------------------------------------------------------
     "security.txt (vulnerability reporting)": "security.txt (signalement de failles)",
     "RFC 9116 (security.txt)": "RFC 9116 (security.txt)",

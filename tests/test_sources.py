@@ -11,33 +11,39 @@ from domaincheck.dns_checks import check_registration
 from domaincheck.models import RDAPInfo
 from domaincheck.observatory import TEST_FOR_SOURCE
 from domaincheck.report import render_html
-from domaincheck.sources import ANSSI, ANSSI_GUIDES, SOURCES, references
+from domaincheck.sources import GUIDE_REFS, GUIDES, SOURCES, references
 
 
 def demo():
     return run_audit("bakery-example.com", collector=DemoCollector())
 
 
-def test_every_anssi_entry_points_to_a_known_source_and_guide():
-    for key, refs in ANSSI.items():
+def test_every_guide_entry_points_to_a_known_source_and_guide():
+    for key, refs in GUIDE_REFS.items():
         assert key in SOURCES, key
         assert refs
         for guide, recommendation in refs:
-            assert guide in ANSSI_GUIDES
+            assert guide in GUIDES
+            if guide == "cnil":  # the CNIL sheet has no numbered recommendations
+                assert recommendation == ""
+                continue
             assert re.fullmatch(r"(R\d+[+-]?)(, R\d+[+-]?)*|§\d+(\.\d+)*", recommendation), recommendation
 
 
 def test_guides_are_official_pdfs_with_version_and_year():
-    for label, url in ANSSI_GUIDES.values():
+    for key, (label, url) in GUIDES.items():
+        if key == "cnil":
+            assert url.startswith("https://www.cnil.fr/") and "(2024)" in label
+            continue
         assert url.startswith("https://") and "cyber.gouv.fr/" in url and url.endswith(".pdf")
         assert re.search(r"v\d+\.\d+ \(20\d\d\)$", label), label
 
 
 def test_references_put_the_standard_first():
     refs = references("dnssec")
-    assert refs[0] == (*SOURCES["dnssec"], "")
-    assert [r[2] for r in refs[1:]] == ["R4+", "R50+"]
-    assert references("null-mx") == [(*SOURCES["null-mx"], "")]
+    assert refs[0] == (*SOURCES["dnssec"], "", False)
+    assert [(r[2], r[3]) for r in refs[1:]] == [("R4+", True), ("R50+", True)]
+    assert references("null-mx") == [(*SOURCES["null-mx"], "", False)]
     assert references("unknown") == []
 
 
@@ -69,3 +75,9 @@ def test_french_report_translates_the_guide_names():
     assert "Guide ANSSI site web PA-009 v2.0 (2021), R2</a>" in html
     assert "Guide ANSSI noms de domaine BP-038 v1.3 (2017), R4+</a>" in html
     assert not re.search(r"conforme? (à l.|aux? )?(recommandations )?(de l.)?anssi", html.lower())
+
+
+def test_cnil_is_cited_without_recommendation_number():
+    html = render_html(demo(), lang="fr")
+    assert "Guide CNIL de la sécurité des données personnelles (2024) : sécuriser les sites web</a>" in html
+    assert "sites web, " not in html

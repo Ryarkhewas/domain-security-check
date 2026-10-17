@@ -54,11 +54,11 @@ def translatable_texts() -> dict[str, set[str]]:
                 if getattr(targets, "id", "") in LABEL_DICTS and isinstance(node.value, ast.Dict):
                     for value in node.value.values:
                         add(value, module)
-                if getattr(targets, "id", "") in ("REMINDER", "SOURCES", "ANSSI_GUIDES"):
+                if getattr(targets, "id", "") in ("REMINDER", "SOURCES", "GUIDES"):
                     values_ = [node.value] if not isinstance(node.value, ast.Dict) else node.value.values
                     for value in values_:
                         add(value.elts[0] if isinstance(value, ast.Tuple) else value, module)
-            elif isinstance(node, ast.AnnAssign) and getattr(node.target, "id", "") in ("SOURCES", "ANSSI_GUIDES"):
+            elif isinstance(node, ast.AnnAssign) and getattr(node.target, "id", "") in ("SOURCES", "GUIDES"):
                 for value in getattr(node.value, "values", []):
                     add(value.elts[0] if isinstance(value, ast.Tuple) else value, module)
             elif isinstance(node, ast.ClassDef) and node.name == "Category":

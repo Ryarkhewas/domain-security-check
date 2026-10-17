@@ -8,6 +8,7 @@ All notable changes to this project are listed here. The format follows
 
 ### Added
 - Each item of the report now cites the matching ANSSI recommendation next to the standard, when there is one (website guide PA-009, TLS guide, Internet gateway guide PA-066, domain name guide BP-038), with the guide's version and date. The standard comes under "Source:", the guides under "See also:", so that a "Compliant" item does not read as "complies with ANSSI". HTML and PDF reports, in English and French.
+- The CNIL security guide (2024, sheet "Sécuriser les sites web") is also cited, under "See also:", for the certificate, the TLS version, the HTTPS redirect and cookies.
 - The Limits paragraph of the report says that the ANSSI citations show what each check relates to, and that the report is not a certificate of compliance.
 
 ### Changed

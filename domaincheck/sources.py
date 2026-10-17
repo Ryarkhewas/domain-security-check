@@ -4,7 +4,9 @@ Every finding points to one of these keys, and the report shows the
 reference so that readers can check the rule themselves.
 
 Besides the standard (RFC, W3C...), a finding can also cite the guides of
-ANSSI, the French national cybersecurity agency. Only recommendation numbers
+ANSSI, the French national cybersecurity agency, and the security guide of
+CNIL, the French data protection authority (for the few topics its website
+sheet covers: certificate, TLS version, HTTPS, cookies). Only recommendation numbers
 read in the guides themselves are cited; when a topic has no numbered
 recommendation, the section of the guide is cited instead. Citing a guide
 means "this check relates to that recommendation", not "the domain complies
@@ -55,8 +57,8 @@ SOURCES: dict[str, tuple[str, str]] = {
                     "https://developer.mozilla.org/en-US/observatory/docs/tests_and_scoring"),
 }
 
-# --- ANSSI guides ---------------------------------------------------------------------
-ANSSI_GUIDES: dict[str, tuple[str, str]] = {
+# --- French guides (ANSSI, CNIL) --------------------------------------------------------
+GUIDES: dict[str, tuple[str, str]] = {
     "tls": ("ANSSI TLS guide v1.2 (2020)",
             "https://messervices.cyber.gouv.fr/documents-guides/"
             "anssi-guide-recommandations_de_securite_relatives_a_tls-v1.2.pdf"),
@@ -67,12 +69,14 @@ ANSSI_GUIDES: dict[str, tuple[str, str]] = {
             "https://messervices.cyber.gouv.fr/documents-guides/guide_dns_fr_anssi_1.3.pdf"),
     "internet": ("ANSSI Internet gateway guide PA-066 v3.0 (2020)",
                  "https://messervices.cyber.gouv.fr/documents-guides/anssi-guide-passerelle_internet_securisee-v3.pdf"),
+    "cnil": ("CNIL personal data security guide (2024): securing websites",
+             "https://www.cnil.fr/fr/securite-securiser-les-sites-web"),
 }
 
-# Finding source key -> [(guide, recommendations or section)]
-ANSSI: dict[str, list[tuple[str, str]]] = {
+# Finding source key -> [(guide, recommendations or section, "" when the guide is cited as a whole)]
+GUIDE_REFS: dict[str, list[tuple[str, str]]] = {
     # Website: PA-009
-    "redirection": [("web", "R1")],
+    "redirection": [("web", "R1"), ("cnil", "")],
     "hsts": [("web", "R2")],
     "hsts-preload": [("web", "R2")],
     "csp": [("web", "R14, R15, R16")],
@@ -80,10 +84,10 @@ ANSSI: dict[str, list[tuple[str, str]]] = {
     "xcto": [("web", "R6")],
     "sri": [("web", "R11, R12")],
     "referrer": [("web", "§5.4")],
-    "cookies": [("web", "§5.5.3")],
+    "cookies": [("web", "§5.5.3"), ("cnil", "")],
     # Certificate & TLS
-    "tls-guide": [("tls", "R8")],
-    "rfc8996": [("tls", "R3, R4"), ("web", "R1")],
+    "tls-guide": [("tls", "R8"), ("cnil", "")],
+    "rfc8996": [("tls", "R3, R4"), ("web", "R1"), ("cnil", "")],
     # Email: PA-066, section 5.3 (transport) and 5.4 (SPF, DKIM, DMARC)
     "spf": [("internet", "R44")],
     "dkim": [("internet", "R46+")],
@@ -97,12 +101,12 @@ ANSSI: dict[str, list[tuple[str, str]]] = {
 }
 
 
-def references(key: str) -> list[tuple[str, str, str]]:
-    """[(label, url, recommendation)] for a finding source key: the standard first, then the ANSSI guides.
+def references(key: str) -> list[tuple[str, str, str, bool]]:
+    """[(label, url, recommendation, is_guide)] for a finding source key: the standard first, then the guides.
 
-    The recommendation is "" for the standard, and "R2" or "§5.4" for a guide (the same in every language).
+    The recommendation is "R2" or "§5.4" for a guide (the same in every language), "" otherwise.
     """
-    refs = [(*SOURCES[key], "")] if key in SOURCES else []
-    for guide, recommendation in ANSSI.get(key, []):
-        refs.append((*ANSSI_GUIDES[guide], recommendation))
+    refs = [(*SOURCES[key], "", False)] if key in SOURCES else []
+    for guide, recommendation in GUIDE_REFS.get(key, []):
+        refs.append((*GUIDES[guide], recommendation, True))
     return refs

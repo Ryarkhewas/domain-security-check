@@ -110,14 +110,14 @@ def _sorted(findings):
     return sorted(findings, key=lambda f: (ORDER[f.status], f.points if f.points is not None else 0))
 
 
-def reference_groups(t, refs: list[tuple[str, str, str]]) -> list[tuple[str, list[tuple[str, str]]]]:
-    """[(heading, [(link text, url)])]: "Source:" for the standard, "See also:" for the ANSSI guides.
+def reference_groups(t, refs: list[tuple[str, str, str, bool]]) -> list[tuple[str, list[tuple[str, str]]]]:
+    """[(heading, [(link text, url)])]: "Source:" for the standard, "See also:" for the ANSSI and CNIL guides.
 
     The guides come under "See also" so that a "Compliant" item does not read as "complies with ANSSI":
     the check relates to the recommendation, it cannot prove the recommendation is met.
     """
-    standard = [(t(label), url) for label, url, rec in refs if not rec]
-    guides = [(f"{t(label)}, {rec}", url) for label, url, rec in refs if rec]
+    standard = [(t(label), url) for label, url, _, guide in refs if not guide]
+    guides = [(f"{t(label)}, {rec}" if rec else t(label), url) for label, url, rec, guide in refs if guide]
     groups = []
     if standard:
         groups.append((t("Source:"), standard))
