@@ -6,6 +6,8 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-17
+
 ### Added
 - Deeper TLS checks: protocol versions accepted by the server (SSL 3.0 to TLS 1.3), broken cipher suites (RC4, 3DES, export, no encryption, no authentication), forward secrecy, size of the certificate key. Old protocols and ciphers are tested with a hand-built ClientHello, since the local OpenSSL no longer offers them.
 - Forgotten subdomains: names published in Certificate Transparency logs (crt.sh, Cert Spotter as fallback), each looked up in DNS. A CNAME pointing to a deleted resource at a provider open to takeover (Azure, AWS, Heroku, Netlify…) is critical (−30); another dangling record is a warning (−10). `--no-ct-logs` skips this check.
@@ -82,6 +84,7 @@ First release.
 - 201 unit tests on Python 3.10 to 3.13, lint (ruff) and type check (mypy) in CI, and a build test of the package.
 - Weekly Live check against real domains, including a test-by-test comparison with the Mozilla HTTP Observatory API.
 
+[1.4.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.4.0
 [1.3.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.3.0
 [1.2.1]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.2.1
 [1.2.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.2.0
