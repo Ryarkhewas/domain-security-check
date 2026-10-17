@@ -159,3 +159,19 @@ def test_failed_lookups_are_retried_through_public_resolvers(monkeypatch):
 def test_unknown_lookups_are_counted():
     info = SubdomainInfo(["a.example.com", "b.example.com"], "crt.sh", ["a.example.com"], [], unknown=1)
     assert "(1 could not be looked up)" in check_subdomains(info)[0].detail
+
+
+def test_cert_spotter_results_are_flagged_as_possibly_incomplete():
+    (f,) = check_subdomains(SubdomainInfo(["www.example.com"], "Cert Spotter", ["www.example.com"]))
+    assert "may list fewer old certificates" in f.detail
+    (f,) = check_subdomains(SubdomainInfo([], "Cert Spotter"))
+    assert "Run the audit again later" in f.detail
+    (f,) = check_subdomains(SubdomainInfo(["www.example.com"], "crt.sh", ["www.example.com"]))
+    assert "Cert Spotter" not in f.detail
+
+
+def test_cert_spotter_note_in_french():
+    from domaincheck.i18n import tr
+
+    (f,) = check_subdomains(SubdomainInfo([], "Cert Spotter"))
+    assert "crt.sh n'a pas répondu" in tr(f.detail, "fr")

@@ -193,7 +193,7 @@ domaincheck/
   hsts_preload.py           HSTS preload list (download, cache, lookups)
   rdap.py                   Domain registration data (RDAP servers, answers)
   observatory.py            Test-by-test comparison with the Observatory API
-tests/                      806 unit tests + live tests (tests/live)
+tests/                      810 unit tests + live tests (tests/live)
 scripts/live_summary.py     Audits a list of domains for the Live check workflow
 scripts/observatory_compare.py  Compares the website grades with the Observatory
 ```
@@ -203,7 +203,7 @@ Collection is kept separate from analysis: every rule can be tested on fixed dat
 ## Tests
 
 ```bash
-python -m pytest -q          # 806 unit tests, no network needed
+python -m pytest -q          # 810 unit tests, no network needed
 ruff check .                 # lint
 mypy                         # type check
 python -m pytest -m live -v  # live tests against real domains (Internet required)
@@ -227,7 +227,7 @@ Three GitHub Actions workflows keep the tool honest:
 
 ## Limits
 
-The audit does not cover the site's applications (forms, CMS, plugins), workstations or user accounts. It gives an overview of the exposure visible from the Internet at a given date, not a security guarantee. The subdomain check only sees names that appeared in a public certificate: a subdomain that never had one (or only a wildcard certificate) stays invisible. The platform-specific fixes are starting points to adapt, checked against each provider's documentation at the time of writing; provider menus change over time.
+The audit does not cover the site's applications (forms, CMS, plugins), workstations or user accounts. It gives an overview of the exposure visible from the Internet at a given date, not a security guarantee. The subdomain check only sees names that appeared in a public certificate: a subdomain that never had one (or only a wildcard certificate) stays invisible. When crt.sh does not answer, the names come from Cert Spotter, which may list fewer old certificates; the report then says so. The platform-specific fixes are starting points to adapt, checked against each provider's documentation at the time of writing; provider menus change over time.
 
 ## Changelog
 

@@ -148,6 +148,18 @@ def check_subdomains(info: SubdomainInfo) -> list[Finding]:
     if info.error:
         return [_f(title, Status.INFO, M("Could not be checked ({error}).", error=info.error), points=None,
                    source=src)]
+    findings = _subdomain_findings(info, title, src)
+    if info.source == "Cert Spotter":
+        # Seen in the Live check: for wikipedia.org, 1 name from Cert Spotter against 3 from crt.sh
+        note = M("crt.sh did not answer, so the names come from Cert Spotter, which may list fewer old "
+                 "certificates: forgotten subdomains can be missing. Run the audit again later for a complete "
+                 "check.")
+        for f in findings:
+            f.detail = M("{detail} {note}", detail=f.detail, note=note)
+    return findings
+
+
+def _subdomain_findings(info: SubdomainInfo, title: str, src: str) -> list[Finding]:
     if not info.names:
         return [_f(title, Status.OK, M("No subdomain found in Certificate Transparency logs ({source}).",
                                        source=info.source), source=src)]

@@ -649,6 +649,11 @@ FR: dict[str, str] = {
         "DNS > Settings > Enable DNSSEC, puis recopiez l'enregistrement DS chez le bureau d'enregistrement.",
     "turn on DNSSEC in the settings of the DNS zone.": "activez DNSSEC dans les réglages de la zone DNS.",
     "add or edit the record in the DNS zone of the domain.": "ajoutez ou modifiez l'enregistrement dans la zone DNS du domaine.",
+    "crt.sh did not answer, so the names come from Cert Spotter, which may list fewer old certificates: forgotten "
+    "subdomains can be missing. Run the audit again later for a complete check.":
+        "crt.sh n'a pas répondu : les noms viennent de Cert Spotter, qui peut lister moins d'anciens certificats, donc "
+        "des sous-domaines oubliés peuvent manquer. Relancez l'audit plus tard pour un contrôle complet.",
+    "{detail} {note}": "{detail} {note}",
     "Forgotten subdomains (CT logs)": "Sous-domaines oubliés (journaux CT)",
     "CT logs could not be read ({errors})": "les journaux CT n'ont pas pu être lus ({errors})",
     "No subdomain found in Certificate Transparency logs ({source}).":

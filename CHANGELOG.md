@@ -6,6 +6,9 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- When crt.sh does not answer and the subdomains come from Cert Spotter, the report says the list may be incomplete (Cert Spotter may list fewer old certificates) and suggests running the audit again later.
+
 ## [1.4.0] - 2026-10-17
 
 ### Added
