@@ -7,12 +7,17 @@ All notable changes to this project are listed here. The format follows
 ## [Unreleased]
 
 ### Added
+- Deeper TLS checks: protocol versions accepted by the server (SSL 3.0 to TLS 1.3), broken cipher suites (RC4, 3DES, export, no encryption, no authentication), forward secrecy, size of the certificate key. Old protocols and ciphers are tested with a hand-built ClientHello, since the local OpenSSL no longer offers them.
+- Forgotten subdomains: names published in Certificate Transparency logs (crt.sh, Cert Spotter as fallback), each looked up in DNS. A CNAME pointing to a deleted resource at a provider open to takeover (Azure, AWS, Heroku, Netlify…) is critical (−30); another dangling record is a warning (−10). `--no-ct-logs` skips this check.
+- Fixes for the platform in use: the web server or hosting platform (Apache, nginx, IIS, LiteSpeed, Cloudflare, Netlify, Vercel, GitHub Pages), the DNS host and the email provider are recognised, and each problem comes with the configuration line or the menu to open, with a link to the provider's documentation.
 - Each item of the report now cites the matching ANSSI recommendation next to the standard, when there is one (website guide PA-009, TLS guide, Internet gateway guide PA-066, domain name guide BP-038), with the guide's version and date. The standard comes under "Source:", the guides under "See also:", so that a "Compliant" item does not read as "complies with ANSSI". HTML and PDF reports, in English and French.
 - The CNIL security guide (2024, sheet "Sécuriser les sites web") is also cited, under "See also:", for the certificate, the TLS version, the HTTPS redirect and cookies.
 - The Limits paragraph of the report says that the ANSSI citations show what each check relates to, and that the report is not a certificate of compliance.
 
 ### Changed
 - The transfer lock cites RFC 5731 (domain statuses) instead of RFC 9083.
+- The Certificate & TLS and Domain & DNS grades can be lower than with 1.3, because of the new checks.
+- New dependency: `cryptography`, to read the certificate's key.
 
 ### Fixed
 - The domain name no longer gets a capital letter at the start of the expiry sentence ("Bakery-example.com est enregistré…" is now "Le domaine bakery-example.com est enregistré…").

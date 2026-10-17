@@ -23,9 +23,9 @@ GRADE_COLOR = {"A": "ok", "B": "ok", "C": "warning", "D": "critical", "F": "crit
 CATEGORY_LABELS = {"WEB": "Website", "TLS": "Certificate & TLS", "EMAIL": "Email", "DNS": "Domain & DNS"}
 CATEGORY_METHOD = {
     "WEB": "Mozilla HTTP Observatory scoring",
-    "TLS": "this project's scale (RFC 8996, certificate validity)",
+    "TLS": "this project's scale (RFC 8996, 9325, certificate validity)",
     "EMAIL": "this project's scale (RFC 7208, 7489, 6376, 8461)",
-    "DNS": "this project's scale (RFC 4033, 8659)",
+    "DNS": "this project's scale (RFC 4033, 8659, 9083, 9162)",
 }
 def letter(grade: str) -> str:
     """"A+" -> "A", "N/A" -> "N"."""

@@ -17,9 +17,9 @@ FR: dict[str, str] = {
     "Compliant": "Conforme",
     "Info": "Info",
     "Mozilla HTTP Observatory scoring": "barème Mozilla HTTP Observatory",
-    "this project's scale (RFC 8996, certificate validity)": "barème du projet (RFC 8996, validité du certificat)",
+    "this project's scale (RFC 8996, 9325, certificate validity)": "barème du projet (RFC 8996, 9325, validité du certificat)",
     "this project's scale (RFC 7208, 7489, 6376, 8461)": "barème du projet (RFC 7208, 7489, 6376, 8461)",
-    "this project's scale (RFC 4033, 8659)": "barème du projet (RFC 4033, 8659)",
+    "this project's scale (RFC 4033, 8659, 9083, 9162)": "barème du projet (RFC 4033, 8659, 9083, 9162)",
     "Very good configuration. A few minor adjustments at most.":
         "Très bonne configuration. Au plus quelques ajustements mineurs.",
     "Solid foundation, with a few points to strengthen.": "Bonne base, avec quelques points à renforcer.",
