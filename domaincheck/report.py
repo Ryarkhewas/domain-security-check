@@ -85,6 +85,9 @@ padding:14px 16px;margin-bottom:10px}
 .detail{margin:6px 0 0;color:var(--muted)}
 .fix{margin:8px 0 0;padding:8px 12px;background:var(--bg);border-radius:8px;font-size:14px}
 .fix::before{content:"→ ";font-weight:700;color:var(--accent)}
+.howto{margin:6px 0 0;padding:8px 12px;border-left:3px solid var(--accent);font-size:13px}
+.howto pre{margin:4px 0 0;padding:6px 8px;background:var(--bg);border-radius:6px;font-size:12px;white-space:pre-wrap;
+word-break:break-all}.howto a{font-size:12px}
 ol.priority{padding-left:22px}ol.priority li{margin-bottom:8px}
 footer{margin-top:40px;color:var(--muted);font-size:13px;border-top:1px solid var(--border);padding-top:16px}
 table.list{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--border);border-radius:12px;
@@ -172,6 +175,10 @@ def render_html(r: Result, author: str = "", lang: str = "en") -> str:
         for f in _sorted(group):
             fix = (f'<p class="fix">{e(t(f.recommendation))}</p>'
                    if f.recommendation and f.status != Status.OK else "")
+            if fix and f.fix:
+                body = f"<pre>{e(f.fix.text)}</pre>" if f.fix.code else f" {e(t(f.fix.text))}"
+                doc = f' <a href="{e(f.fix.link)}">{e(t("Documentation"))}</a>' if f.fix.link else ""
+                fix += f'<div class="howto"><b>{e(t(f.fix.label))}</b>{body}{doc}</div>'
             pts = f'<span class="pts">{e(_points(f.points, lang))}</span>'
             src = ""
             refs = references(f.source)

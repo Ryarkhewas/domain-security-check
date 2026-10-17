@@ -47,6 +47,9 @@ class DemoCollector:
             key_bits=2048,
         )
 
+    def ns(self, domain: str) -> list[str]:
+        return ["dns110.ovh.net", "ns110.ovh.net"]
+
     def subdomains(self, domain: str) -> SubdomainInfo:
         # The shop moved in 2021, the old Azure app was deleted, its DNS record was forgotten
         names = [f"{n}.{domain}" for n in ("mail", "old-shop", "shop", "www")]

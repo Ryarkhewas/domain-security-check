@@ -155,6 +155,11 @@ def render_pdf(r: Result, author: str = "", lang: str = "en") -> bytes:
             text = f"<b>{t(L(f.title))}</b><br/>{t(_capital(L(f.detail)))}"
             if f.recommendation and f.status != Status.OK:
                 text += f'<br/><font color="#1f4e78">&gt; {t(L(f.recommendation))}</font>'
+                if f.fix:
+                    how = (f'<br/><font name="Courier" size="8">{t(f.fix.text).replace(chr(10), "<br/>")}</font>'
+                           if f.fix.code else t(L(f.fix.text)))
+                    doc = f' <a href="{escape(f.fix.link)}">{t(L("Documentation"))}</a>' if f.fix.link else ""
+                    text += f'<br/><font size="8.5"><b>{t(L(f.fix.label))}</b> {how}{doc}</font>'
             refs = references(f.source)
             if refs:
                 parts = []

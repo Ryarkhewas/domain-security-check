@@ -603,6 +603,52 @@ FR: dict[str, str] = {
     "RFC 4033 (DNS Security Introduction and Requirements)": "RFC 4033 (introduction et exigences de la sécurité DNS)",
     "RFC 8659 (DNS Certification Authority Authorization)": "RFC 8659 (autorisation des autorités de certification par DNS)",
     # --- Registration (RDAP) -----------------------------------------------------------
+    # --- Fixes per hosting platform (menu names stay in English, as in the providers' interfaces) ---
+    "Documentation": "Documentation",
+    "On {platform}:": "Sur {platform} :",
+    "On {provider}:": "Chez {provider} :",
+    "On {platform} (.htaccess):": "Sur {platform} (.htaccess) :",
+    "On nginx (server block listening on port 80):": "Sur nginx (bloc server qui écoute le port 80) :",
+    "On Apache (main configuration; for PHP, expose_php = Off in php.ini):":
+        "Sur Apache (configuration principale ; pour PHP, expose_php = Off dans php.ini) :",
+    "On Cloudflare:": "Sur Cloudflare :",
+    "On Google Workspace:": "Sur Google Workspace :",
+    "On Microsoft 365:": "Sur Microsoft 365 :",
+    "In web.config (system.webServer > httpProtocol > customHeaders):":
+        "Dans web.config (system.webServer > httpProtocol > customHeaders) :",
+    "In the _headers file of the site (Netlify):": "Dans le fichier _headers du site (Netlify) :",
+    "In vercel.json:": "Dans vercel.json :",
+    "add the header {name}: {value} with a response header Transform Rule (Rules section of the dashboard), or on "
+    "the origin server.":
+        "ajoutez l'en-tête {name}: {value} avec une Transform Rule de réponse (section Rules du tableau de bord), ou "
+        "sur le serveur d'origine.",
+    "HTTP headers cannot be added. Put the site behind a service that can add them (a CDN such as Cloudflare) or "
+    "move it to a host that allows it.":
+        "impossible d'ajouter des en-têtes HTTP. Placez le site derrière un service qui le permet (un CDN comme "
+        "Cloudflare) ou changez d'hébergeur.",
+    "Edge Certificates > HTTP Strict Transport Security (HSTS) > Enable HSTS.":
+        "Edge Certificates > HTTP Strict Transport Security (HSTS) > Enable HSTS.",
+    "Edge Certificates > Always Use HTTPS.": "Edge Certificates > Always Use HTTPS.",
+    "Settings > Pages > Enforce HTTPS, in the site's repository.":
+        "Settings > Pages > Enforce HTTPS, dans le dépôt du site.",
+    "Edge Certificates > Minimum TLS Version: TLS 1.2 (TLS 1.3 is set on the same page).":
+        "Edge Certificates > Minimum TLS Version : TLS 1.2 (TLS 1.3 se règle sur la même page).",
+    "the Mozilla SSL Configuration Generator gives a ready configuration for this server (\"Intermediate\" profile).":
+        "le générateur de configuration TLS de Mozilla donne une configuration prête pour ce serveur (profil "
+        "« Intermediate »).",
+    "Admin console > Apps > Google Workspace > Gmail > Authenticate email, then Generate new record and Start "
+    "authentication.":
+        "Console d'administration > Apps > Google Workspace > Gmail > Authenticate email, puis Generate new record et "
+        "Start authentication.",
+    "Defender portal > Policies & rules > Threat policies > Email authentication settings > DKIM.":
+        "Portail Defender > Policies & rules > Threat policies > Email authentication settings > DKIM.",
+    "turn on DKIM signing in the email administration interface, then publish the record it gives.":
+        "activez la signature DKIM dans l'interface d'administration de la messagerie, puis publiez "
+        "l'enregistrement qu'elle fournit.",
+    "DNS > Settings > Enable DNSSEC, then copy the DS record to the registrar.":
+        "DNS > Settings > Enable DNSSEC, puis recopiez l'enregistrement DS chez le bureau d'enregistrement.",
+    "turn on DNSSEC in the settings of the DNS zone.": "activez DNSSEC dans les réglages de la zone DNS.",
+    "add or edit the record in the DNS zone of the domain.": "ajoutez ou modifiez l'enregistrement dans la zone DNS du domaine.",
     "Forgotten subdomains (CT logs)": "Sous-domaines oubliés (journaux CT)",
     "CT logs could not be read ({errors})": "les journaux CT n'ont pas pu être lus ({errors})",
     "No subdomain found in Certificate Transparency logs ({source}).":

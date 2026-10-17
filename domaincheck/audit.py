@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 
 from .dns_checks import check_caa, check_dnssec, check_registration, check_subdomains
 from .email_checks import check_dkim, check_dmarc, check_mta_sts, check_mx, check_spf, effective_dmarc_policy
+from .hosting import add_fixes, detect
 from .i18n import M
 from .models import CollectedData, Result
 from .scoring import category_grades, overall_grade
@@ -90,6 +91,7 @@ def analyze(data: CollectedData, tested_selectors: list[str], now: datetime | No
         findings.append(check_security_txt(data.security_txt, now))
     if data.subdomains is not None:
         findings += check_subdomains(data.subdomains)
+    add_fixes(findings, detect(data.http.headers, data.ns, data.mx, data.domain))
 
     cap_reason = broken_https_reason(data, now)
     grades = category_grades(findings, exists, cap_reason)
@@ -164,6 +166,8 @@ def run_audit(text: str, collector=None, ct_logs: bool = True) -> Result:
     )
     if data.certificate is not None and hasattr(collector, "tls_scan"):
         data.tls_scan = collector.tls_scan(domain)
+    if hasattr(collector, "ns"):
+        data.ns = collector.ns(domain)
     if subdomains is not None:
         data.subdomains = subdomains.result()
     return analyze(data, DKIM_SELECTORS)

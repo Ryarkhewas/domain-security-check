@@ -203,3 +203,11 @@ def test_subdomains_are_read_from_ct_logs():
     assert not info.error, info.error
     assert info.names and info.resolving
     assert all(name.endswith(".afnic.fr") for name in info.names)
+
+
+def test_hosting_platforms_are_recognised():
+    from domaincheck.hosting import detect
+
+    c = Collector()
+    assert detect({}, c.ns("cloudflare.com"), []).dns == "Cloudflare"
+    assert detect({}, [], c.mx("gmail.com")).mail == "Google Workspace"

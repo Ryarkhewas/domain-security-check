@@ -26,6 +26,16 @@ class Category(str, Enum):
 
 
 @dataclass
+class Fix:
+    """How to apply a recommendation on the platform that hosts the site, the DNS zone or the mailboxes."""
+
+    label: str  # "On nginx:", translated
+    text: str  # configuration lines (code=True, never translated) or an instruction (translated)
+    code: bool = False
+    link: str = ""  # provider documentation
+
+
+@dataclass
 class Finding:
     category: Category
     title: str
@@ -34,6 +44,7 @@ class Finding:
     recommendation: str = ""
     points: int | None = None  # score modifier; None = shown but not scored
     source: str = ""  # key into sources.SOURCES
+    fix: Fix | None = None  # platform-specific "how to", added after the checks (hosting.py)
 
 
 @dataclass
@@ -168,6 +179,7 @@ class CollectedData:
     rdap: RDAPInfo | None = None
     tls_scan: TLSScanInfo | None = None
     subdomains: SubdomainInfo | None = None
+    ns: list[str] = field(default_factory=list)  # name servers of the domain (to recognise the DNS host)
 
 
 @dataclass

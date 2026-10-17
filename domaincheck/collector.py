@@ -125,6 +125,15 @@ class Collector:
             return []
         return [str(r.exchange).rstrip(".") for r in sorted(answer, key=lambda r: r.preference)]
 
+    def ns(self, domain: str) -> list[str]:
+        """Name servers of the zone the domain belongs to (www.example.com -> those of example.com)."""
+        name = registrable_domain(domain) or domain
+        try:
+            answer = self._resolve(name, "NS")
+        except CollectionError:
+            return []  # only used to tailor advice: never a reason to stop the audit
+        return sorted(str(r.target).rstrip(".") for r in answer) if answer is not None else []
+
     def dkim_selectors(self, domain: str) -> list[str]:
         found = []
         for sel in DKIM_SELECTORS:
