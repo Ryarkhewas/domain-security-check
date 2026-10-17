@@ -7,6 +7,7 @@ Usage: python scripts/live_summary.py reports/ github.com google.com ...
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -22,7 +23,16 @@ def main(out_dir: str, domains: list[str]) -> int:
     results = []
     print("| Domain | Overall | Website | Cert & TLS | Email | DNS | Main issue |")
     print("|---|---|---|---|---|---|---|")
-    for domain, r in audit_many(domains, workers=8).items():
+    start = time.monotonic()
+
+    def timing(domain, outcome):
+        # GitHub annotation (on stderr, so that the Markdown table stays clean): how long each audit took,
+        # and what the CT logs gave, the slowest part
+        ct = "" if isinstance(outcome, Exception) else next(
+            (f" CT logs: {f.status.value}, {f.detail[:160]}" for f in outcome.findings if f.source == "ct"), "")
+        print(f"::notice title=Audit time::{domain}: {time.monotonic() - start:.0f} s.{ct}", file=sys.stderr)
+
+    for domain, r in audit_many(domains, workers=8, on_done=timing).items():
         if isinstance(r, Exception):
             print(f"| {domain} | – | – | – | – | – | error: {r} |")
             continue
