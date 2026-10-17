@@ -6,6 +6,8 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-17
+
 ### Added
 - Each item of the report now cites the matching ANSSI recommendation next to the standard, when there is one (website guide PA-009, TLS guide, Internet gateway guide PA-066, domain name guide BP-038), with the guide's version and date. Several references are shown as "Sources: A · B" in the HTML and PDF reports, in English and French.
 - The Limits paragraph of the report says that the ANSSI citations show what each check relates to, and that the report is not a certificate of compliance.
@@ -76,6 +78,7 @@ First release.
 - 201 unit tests on Python 3.10 to 3.13, lint (ruff) and type check (mypy) in CI, and a build test of the package.
 - Weekly Live check against real domains, including a test-by-test comparison with the Mozilla HTTP Observatory API.
 
+[1.4.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.4.0
 [1.3.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.3.0
 [1.2.1]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.2.1
 [1.2.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.2.0

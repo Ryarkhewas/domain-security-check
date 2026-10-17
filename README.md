@@ -35,10 +35,10 @@ Requires Python 3.10 or later.
 
 ```bash
 # Latest release, straight from GitHub
-pip install "git+https://github.com/Ryarkhewas/domain-security-check@v1.3.0"
+pip install "git+https://github.com/Ryarkhewas/domain-security-check@v1.4.0"
 
 # With PDF output
-pip install "domain-security-check[pdf] @ git+https://github.com/Ryarkhewas/domain-security-check@v1.3.0"
+pip install "domain-security-check[pdf] @ git+https://github.com/Ryarkhewas/domain-security-check@v1.4.0"
 
 # Or from a clone, to work on the code
 git clone https://github.com/Ryarkhewas/domain-security-check.git
