@@ -30,6 +30,9 @@ def main(out_dir: str, domains: list[str]) -> int:
         # and what the CT logs gave, the slowest part
         ct = "" if isinstance(outcome, Exception) else next(
             (f" CT logs: {f.status.value}, {f.detail[:160]}" for f in outcome.findings if f.source == "ct"), "")
+        if not isinstance(outcome, Exception):
+            ct += next((f" Mail servers: {f.status.value}, {f.detail[:120]}" for f in outcome.findings
+                        if f.source == "starttls"), "")
         print(f"::notice title=Audit time::{domain}: {time.monotonic() - start:.0f} s.{ct}", file=sys.stderr)
 
     for domain, r in audit_many(domains, workers=8, on_done=timing).items():
