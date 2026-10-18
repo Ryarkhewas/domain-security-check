@@ -82,6 +82,8 @@ def main(argv: list[str] | None = None) -> int:
                         "(default: the <domain>.json saved next to the report by the previous run)")
     p.add_argument("--no-ct-logs", action="store_true",
                    help="Skip the subdomains published in Certificate Transparency logs (faster)")
+    p.add_argument("--no-mail-servers", action="store_true",
+                   help="Do not connect to the mail servers on port 25 (STARTTLS, certificates)")
     p.add_argument("--demo", action="store_true", help="Demo on a fictitious domain, without network access")
     p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     args = p.parse_args(argv)
@@ -112,7 +114,7 @@ def main(argv: list[str] | None = None) -> int:
     print(say(REMINDER), file=sys.stderr)
     if len(domains) == 1:
         try:
-            result = run_audit(domains[0], **({"ct_logs": False} if args.no_ct_logs else {}))
+            result = run_audit(domains[0], **_skip(args))
         except (InvalidDomain, DomainNotFound) as e:
             print(say("Error: {message}", message=message_of(e)), file=sys.stderr)
             return 1
@@ -173,8 +175,7 @@ def _several(domains: list[str], args) -> int:
         print(f"[{done}/{len(domains)}] {domain}: {status}", file=sys.stderr)
 
     # Several audits run at the same time: most of an audit is spent waiting for the network
-    for domain, outcome in audit_many(domains, workers=args.workers, on_done=progress,
-                                            **({"ct_logs": False} if args.no_ct_logs else {})).items():
+    for domain, outcome in audit_many(domains, workers=args.workers, on_done=progress, **_skip(args)).items():
         if isinstance(outcome, (InvalidDomain, DomainNotFound, CollectionError)):
             errors[domain] = message_of(outcome)
             continue
@@ -207,5 +208,16 @@ def _several(domains: list[str], args) -> int:
     return 0 if not errors else 3
 
 
+def _skip(args) -> dict[str, bool]:
+    """Checks turned off on the command line (only passed when used, so the defaults stay in one place)."""
+    skip = {}
+    if args.no_ct_logs:
+        skip["ct_logs"] = False
+    if args.no_mail_servers:
+        skip["mail_servers"] = False
+    return skip
+
+
 if __name__ == "__main__":
     sys.exit(main())
+

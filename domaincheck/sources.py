@@ -46,6 +46,8 @@ SOURCES: dict[str, tuple[str, str]] = {
     "dmarc": ("RFC 7489 (DMARC)", "https://www.rfc-editor.org/rfc/rfc7489"),
     "dkim": ("RFC 6376 (DKIM)", "https://www.rfc-editor.org/rfc/rfc6376"),
     "null-mx": ("RFC 7505 (null MX for domains that receive no email)", "https://www.rfc-editor.org/rfc/rfc7505"),
+    "starttls": ("RFC 3207 (STARTTLS for SMTP)", "https://www.rfc-editor.org/rfc/rfc3207"),
+    "dane": ("RFC 7672 (DANE for SMTP)", "https://www.rfc-editor.org/rfc/rfc7672"),
     "mta-sts": ("RFC 8461 (SMTP MTA Strict Transport Security)", "https://www.rfc-editor.org/rfc/rfc8461"),
     "tls-rpt": ("RFC 8460 (SMTP TLS Reporting)", "https://www.rfc-editor.org/rfc/rfc8460"),
     # Domain & DNS
@@ -97,6 +99,8 @@ GUIDE_REFS: dict[str, list[tuple[str, str]]] = {
     "dkim": [("internet", "R46+")],
     "dmarc": [("internet", "R48+")],
     "mta-sts": [("internet", "§5.3")],
+    "starttls": [("internet", "R42")],
+    "dane": [("internet", "§5.3")],
     "tls-rpt": [("internet", "§5.3")],
     # Domain & DNS: BP-038, and PA-066 for the email domains
     "dnssec": [("dns", "R4+"), ("internet", "R50+")],

@@ -1,7 +1,8 @@
 """Email protection checks: MX, SPF, DMARC, DKIM, MTA-STS, TLS reporting.
 
 What is valid comes from the standards (RFC 7208 SPF, RFC 7489 DMARC,
-RFC 6376 DKIM, RFC 7505 null MX, RFC 8461 MTA-STS, RFC 8460 TLS-RPT). The points are this project's own:
+RFC 6376 DKIM, RFC 7505 null MX, RFC 8461 MTA-STS, RFC 8460 TLS-RPT, RFC 3207 STARTTLS,
+RFC 7672 DANE for SMTP). The points are this project's own:
 there is no public scoring standard for email security.
 
 These functions make no network calls: they receive DNS records that were
@@ -11,9 +12,10 @@ already fetched, which makes them easy to test.
 from __future__ import annotations
 
 import re
+from datetime import datetime
 
-from .i18n import Joined, M
-from .models import Category, Finding, MTASTSInfo, Status
+from .i18n import Date, Joined, M
+from .models import Category, Finding, MailServerInfo, MTASTSInfo, Status
 
 C = Category.EMAIL
 
@@ -283,3 +285,88 @@ def _check_mta_sts_policy(info: MTASTSInfo, receivers: list[str], title: str, sr
                   "Once the TLS reports are clean, switch to \"enforce\".", 0, src)
     return _f(title, Status.OK, "Policy in \"enforce\" mode, covering all mail servers: incoming email is always "
               "delivered encrypted.", source=src)
+
+
+# --- The mail servers themselves -------------------------------------------------------
+def _enforced(info: MTASTSInfo | None) -> bool:
+    if info is None or not info.policy:
+        return False
+    return [m.lower() for m in parse_mta_sts_policy(info.policy).get("mode", [])] == ["enforce"]
+
+
+def check_mail_servers(servers: list[MailServerInfo], mta_sts: MTASTSInfo | None, now: datetime) -> list[Finding]:
+    """STARTTLS, TLS version, certificates and DANE of the mail servers, as a sending server sees them."""
+    if not servers:
+        return []
+    reached = [s for s in servers if s.reachable]
+    if not reached:
+        return [_f("Mail servers: encryption", Status.INFO,
+                   M("Could not connect to the mail servers on port 25 ({error}). This port is often blocked by the "
+                     "network the audit runs from (home connections, cloud providers): nothing can be concluded.",
+                     error=servers[0].error or M("no answer")),
+                   "Run the audit from a network that allows outgoing connections on port 25.", None, "starttls")]
+    findings = []
+    missed = [s.host for s in servers if not s.reachable]
+    unreached = M(" Not reached: {hosts}.", hosts=", ".join(missed)) if missed else ""
+
+    title = "Encryption of incoming email (STARTTLS)"
+    plain = [s.host for s in reached if not s.starttls]
+    if plain:
+        findings.append(_f(title, Status.WARNING,
+                           M("These mail servers do not offer encryption: emails sent to you travel in clear text "
+                             "and can be read on the way: {hosts}.{unreached}", hosts=", ".join(plain),
+                             unreached=unreached),
+                           "Enable STARTTLS with a valid certificate on these servers (or ask your email provider).",
+                           -20, "starttls"))
+    else:
+        versions = ", ".join(sorted({s.tls_version for s in reached if s.tls_version}))
+        findings.append(_f(title, Status.OK,
+                           M("Every mail server reached offers encryption ({versions}).{unreached}",
+                             versions=versions or "TLS", unreached=unreached), source="starttls"))
+
+    old = [f"{s.host} ({s.tls_version})" for s in reached if s.tls_version in ("SSLv3", "TLSv1", "TLSv1.1")]
+    if old:
+        findings.append(_f("Mail server TLS version", Status.WARNING,
+                           M("These mail servers negotiate an obsolete TLS version with a current sender: {hosts}.",
+                             hosts=", ".join(old)),
+                           "Allow TLS 1.2 and 1.3 on these servers.", -10, "rfc8996"))
+
+    title = "Mail server certificates"
+    enforced = _enforced(mta_sts)
+    bad: list[str] = []
+    for s in reached:
+        if s.cert_valid is False:
+            bad.append(f"{s.host} ({s.cert_error})")
+        elif s.cert_expires and s.cert_expires < now:
+            bad.append(M("{host} (expired on {date})", host=s.host, date=Date(s.cert_expires)))
+    if bad and enforced:
+        findings.append(_f(title, Status.CRITICAL,
+                           M("Your MTA-STS policy is in enforce mode, but these certificates are not valid: senders "
+                             "that apply MTA-STS (Gmail, Outlook...) will refuse to deliver emails to you: {hosts}.",
+                             hosts=Joined(bad)),
+                           "Install a valid certificate for the server's name now, or switch MTA-STS to testing mode "
+                           "until it is fixed.", -30, "mta-sts"))
+    elif bad:
+        findings.append(_f(title, Status.WARNING,
+                           M("Not valid: {hosts}. Senders still encrypt, but cannot check they reach the real server, "
+                             "and MTA-STS or DANE cannot be enforced.", hosts=Joined(bad)),
+                           "Install a certificate valid for the mail server's name (Let's Encrypt is free).", -5,
+                           "starttls"))
+    elif any(s.cert_valid for s in reached):
+        findings.append(_f(title, Status.OK, "The certificates of the mail servers are valid.", source="starttls"))
+
+    if any(s.starttls for s in reached):
+        with_dane = [s.host for s in servers if s.tlsa]
+        if with_dane and len(with_dane) == len(servers):
+            findings.append(_f("DANE (mail server keys in DNS)", Status.OK,
+                               "Every mail server publishes TLSA records: senders that support DANE check the "
+                               "server's key through DNSSEC.", source="dane"))
+        else:
+            findings.append(_f("DANE (mail server keys in DNS)", Status.INFO,
+                               M("Not used{partial}. Optional: DANE lets senders check the mail server's key through "
+                                 "DNSSEC, and is required by some administrations.",
+                                 partial=M(" by {hosts}", hosts=", ".join(s.host for s in servers if not s.tlsa))
+                                 if with_dane else ""),
+                               "If the domain uses DNSSEC, publish a TLSA record for each mail server "
+                               "(_25._tcp.<server>), or ask your email provider.", None, "dane"))
+    return findings

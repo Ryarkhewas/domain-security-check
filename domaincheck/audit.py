@@ -8,7 +8,15 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
 from .dns_checks import check_caa, check_dnssec, check_registration, check_subdomains
-from .email_checks import check_dkim, check_dmarc, check_mta_sts, check_mx, check_spf, effective_dmarc_policy
+from .email_checks import (
+    check_dkim,
+    check_dmarc,
+    check_mail_servers,
+    check_mta_sts,
+    check_mx,
+    check_spf,
+    effective_dmarc_policy,
+)
 from .hosting import add_fixes, detect
 from .i18n import M
 from .models import CollectedData, Result
@@ -81,6 +89,8 @@ def analyze(data: CollectedData, tested_selectors: list[str], now: datetime | No
     findings += check_dmarc(data.dmarc_txt, data.dmarc_inherited_from)
     findings += check_dkim(data.dkim_selectors, tested_selectors)
     findings += check_mta_sts(data.mta_sts, data.mx)
+    if data.mail_servers is not None:
+        findings += check_mail_servers(data.mail_servers, data.mta_sts, now)
     if data.dnssec is not None:
         findings.append(check_dnssec(data.dnssec))
     if data.caa is not None:
@@ -129,10 +139,11 @@ def find_dmarc(collector, domain: str) -> tuple[list[str], str]:
     return records, ""
 
 
-def run_audit(text: str, collector=None, ct_logs: bool = True) -> Result:
+def run_audit(text: str, collector=None, ct_logs: bool = True, mail_servers: bool = True) -> Result:
     """Collect everything about a domain and analyse it.
 
     ct_logs=False skips the subdomains published in Certificate Transparency logs (the slowest part).
+    mail_servers=False skips the connections to the mail servers on port 25.
     """
     from .collector import DKIM_SELECTORS, Collector
 
@@ -166,6 +177,8 @@ def run_audit(text: str, collector=None, ct_logs: bool = True) -> Result:
     )
     if data.certificate is not None and hasattr(collector, "tls_scan"):
         data.tls_scan = collector.tls_scan(domain)
+    if mail_servers and hasattr(collector, "mail_servers"):
+        data.mail_servers = collector.mail_servers(data.mx)
     if hasattr(collector, "ns"):
         data.ns = collector.ns(domain)
     if subdomains is not None:
@@ -175,7 +188,7 @@ def run_audit(text: str, collector=None, ct_logs: bool = True) -> Result:
 
 def audit_many(domains: list[str], workers: int = 6,
                on_done: Callable[[str, Result | Exception], None] | None = None,
-               ct_logs: bool = True) -> dict[str, Result | Exception]:
+               ct_logs: bool = True, mail_servers: bool = True) -> dict[str, Result | Exception]:
     """Audit several domains at the same time (most of an audit is spent waiting for the network).
 
     Returns {domain: Result, or the exception that stopped its audit}, in the order given.
@@ -186,7 +199,7 @@ def audit_many(domains: list[str], workers: int = 6,
     Collector().preload_list()  # downloaded once, before the threads share it
     outcomes: dict[str, Result | Exception] = {}
     with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
-        options = {} if ct_logs else {"ct_logs": False}
+        options = ({} if ct_logs else {"ct_logs": False}) | ({} if mail_servers else {"mail_servers": False})
         futures = {pool.submit(run_audit, d, **options): d for d in domains}
         for future in as_completed(futures):
             domain = futures[future]

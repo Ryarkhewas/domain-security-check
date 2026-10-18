@@ -13,6 +13,7 @@ from .models import (
     CertificateInfo,
     DNSSECInfo,
     HTTPInfo,
+    MailServerInfo,
     MTASTSInfo,
     RDAPInfo,
     SecurityTxtInfo,
@@ -46,6 +47,10 @@ class DemoCollector:
             key_type="RSA",
             key_bits=2048,
         )
+
+    def mail_servers(self, mx: list[str]) -> list[MailServerInfo]:
+        return [MailServerInfo(host, reachable=True, starttls=True, tls_version="TLSv1.3", cert_valid=True,
+                               cert_expires=datetime.now(timezone.utc) + timedelta(days=60)) for host in mx]
 
     def ns(self, domain: str) -> list[str]:
         return ["dns110.ovh.net", "ns110.ovh.net"]

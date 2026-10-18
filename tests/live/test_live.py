@@ -211,3 +211,11 @@ def test_hosting_platforms_are_recognised():
     c = Collector()
     assert detect({}, c.ns("cloudflare.com"), []).dns == "Cloudflare"
     assert detect({}, [], c.mx("gmail.com")).mail == "Google Workspace"
+
+
+def test_gmail_mail_servers_offer_starttls():
+    c = Collector()
+    servers = c.mail_servers(c.mx("gmail.com")[:1])
+    if not servers[0].reachable:
+        pytest.skip(f"port 25 blocked from this network ({servers[0].error})")
+    assert servers[0].starttls and servers[0].cert_valid and servers[0].tls_version in ("TLSv1.2", "TLSv1.3")

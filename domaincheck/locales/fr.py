@@ -603,6 +603,59 @@ FR: dict[str, str] = {
     "RFC 4033 (DNS Security Introduction and Requirements)": "RFC 4033 (introduction et exigences de la sécurité DNS)",
     "RFC 8659 (DNS Certification Authority Authorization)": "RFC 8659 (autorisation des autorités de certification par DNS)",
     # --- Registration (RDAP) -----------------------------------------------------------
+    # --- Mail servers ----------------------------------------------------------------
+    "Mail servers: encryption": "Serveurs de mail : chiffrement",
+    "Encryption of incoming email (STARTTLS)": "Chiffrement des emails reçus (STARTTLS)",
+    "Mail server TLS version": "Version TLS des serveurs de mail",
+    "Mail server certificates": "Certificats des serveurs de mail",
+    "DANE (mail server keys in DNS)": "DANE (clés des serveurs de mail dans le DNS)",
+    "no answer": "pas de réponse",
+    "Could not connect to the mail servers on port 25 ({error}). This port is often blocked by the network the audit "
+    "runs from (home connections, cloud providers): nothing can be concluded.":
+        "Connexion impossible aux serveurs de mail sur le port 25 ({error}). Ce port est souvent bloqué par le réseau "
+        "d'où l'audit est lancé (connexions domestiques, hébergeurs cloud) : rien ne peut en être conclu.",
+    "Run the audit from a network that allows outgoing connections on port 25.":
+        "Relancez l'audit depuis un réseau qui autorise les connexions sortantes sur le port 25.",
+    " Not reached: {hosts}.": " Non joints : {hosts}.",
+    "These mail servers do not offer encryption: emails sent to you travel in clear text and can be read on the way: "
+    "{hosts}.{unreached}":
+        "Ces serveurs de mail ne proposent pas de chiffrement : les emails qui vous sont envoyés circulent en clair et "
+        "peuvent être lus en route : {hosts}.{unreached}",
+    "Enable STARTTLS with a valid certificate on these servers (or ask your email provider).":
+        "Activez STARTTLS avec un certificat valide sur ces serveurs (ou demandez-le à votre fournisseur de "
+        "messagerie).",
+    "Every mail server reached offers encryption ({versions}).{unreached}":
+        "Tous les serveurs de mail joints proposent le chiffrement ({versions}).{unreached}",
+    "These mail servers negotiate an obsolete TLS version with a current sender: {hosts}.":
+        "Ces serveurs de mail négocient une version obsolète de TLS avec un expéditeur actuel : {hosts}.",
+    "Allow TLS 1.2 and 1.3 on these servers.": "Autorisez TLS 1.2 et 1.3 sur ces serveurs.",
+    "{host} (expired on {date})": "{host} (expiré le {date})",
+    "Your MTA-STS policy is in enforce mode, but these certificates are not valid: senders that apply MTA-STS (Gmail, "
+    "Outlook...) will refuse to deliver emails to you: {hosts}.":
+        "Votre politique MTA-STS est en mode « enforce », mais ces certificats ne sont pas valides : les expéditeurs "
+        "qui appliquent MTA-STS (Gmail, Outlook...) refuseront de vous livrer les emails : {hosts}.",
+    "Install a valid certificate for the server's name now, or switch MTA-STS to testing mode until it is fixed.":
+        "Installez dès maintenant un certificat valide pour le nom du serveur, ou passez MTA-STS en mode « testing » "
+        "le temps de corriger.",
+    "Not valid: {hosts}. Senders still encrypt, but cannot check they reach the real server, and MTA-STS or DANE "
+    "cannot be enforced.":
+        "Non valides : {hosts}. Les expéditeurs chiffrent quand même, mais ne peuvent pas vérifier qu'ils joignent le "
+        "vrai serveur, et MTA-STS ou DANE ne peuvent pas être appliqués.",
+    "Install a certificate valid for the mail server's name (Let's Encrypt is free).":
+        "Installez un certificat valide pour le nom du serveur de mail (Let's Encrypt est gratuit).",
+    "The certificates of the mail servers are valid.": "Les certificats des serveurs de mail sont valides.",
+    "Every mail server publishes TLSA records: senders that support DANE check the server's key through DNSSEC.":
+        "Chaque serveur de mail publie des enregistrements TLSA : les expéditeurs compatibles DANE vérifient la clé du "
+        "serveur grâce à DNSSEC.",
+    " by {hosts}": " par {hosts}",
+    "Not used{partial}. Optional: DANE lets senders check the mail server's key through DNSSEC, and is required by "
+    "some administrations.":
+        "Non utilisé{partial}. Facultatif : DANE permet aux expéditeurs de vérifier la clé du serveur de mail grâce à "
+        "DNSSEC, et certaines administrations l'exigent.",
+    "If the domain uses DNSSEC, publish a TLSA record for each mail server (_25._tcp.<server>), or ask your email "
+    "provider.":
+        "Si le domaine utilise DNSSEC, publiez un enregistrement TLSA pour chaque serveur de mail (_25._tcp.<serveur>), "
+        "ou demandez-le à votre fournisseur de messagerie.",
     # --- Fixes per hosting platform (menu names stay in English, as in the providers' interfaces) ---
     "Documentation": "Documentation",
     "On {platform}:": "Sur {platform} :",
@@ -713,6 +766,8 @@ FR: dict[str, str] = {
     "ANSSI domain name guide BP-038 v1.3 (2017)": "Guide ANSSI noms de domaine BP-038 v1.3 (2017)",
     "ANSSI Internet gateway guide PA-066 v3.0 (2020)": "Guide ANSSI interconnexion à Internet PA-066 v3.0 (2020)",
     "RFC 9162 (Certificate Transparency)": "RFC 9162 (Certificate Transparency)",
+    "RFC 3207 (STARTTLS for SMTP)": "RFC 3207 (STARTTLS pour SMTP)",
+    "RFC 7672 (DANE for SMTP)": "RFC 7672 (DANE pour SMTP)",
     "RFC 8446 (TLS 1.3)": "RFC 8446 (TLS 1.3)",
     "RFC 9325 (recommendations for the secure use of TLS)": "RFC 9325 (recommandations pour un usage sûr de TLS)",
     "CNIL personal data security guide (2024): securing websites":

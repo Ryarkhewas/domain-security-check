@@ -86,6 +86,22 @@ class SubdomainInfo:
 
 
 @dataclass
+class MailServerInfo:
+    """What a mail server (MX) offers to a sending server: STARTTLS, TLS version, certificate, DANE."""
+
+    host: str
+    reachable: bool = False
+    starttls: bool = False
+    tls_version: str = ""
+    cipher: str = ""
+    cert_valid: bool | None = None  # None: not checked (no STARTTLS or failure)
+    cert_error: str = ""
+    cert_expires: datetime | None = None
+    tlsa: int = 0  # TLSA records for _25._tcp.<host> (DANE, RFC 7672)
+    error: str = ""
+
+
+@dataclass
 class CookieInfo:
     name: str
     secure: bool
@@ -179,6 +195,7 @@ class CollectedData:
     rdap: RDAPInfo | None = None
     tls_scan: TLSScanInfo | None = None
     subdomains: SubdomainInfo | None = None
+    mail_servers: list[MailServerInfo] | None = None
     ns: list[str] = field(default_factory=list)  # name servers of the domain (to recognise the DNS host)
 
 

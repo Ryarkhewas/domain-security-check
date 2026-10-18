@@ -24,7 +24,7 @@ import dns.name
 import dns.resolver
 import requests
 
-from . import ct
+from . import ct, smtp_scan
 from . import tls_scan as scan
 from ._version import __version__
 from .hsts_preload import PreloadList
@@ -35,6 +35,7 @@ from .models import (
     CookieInfo,
     DNSSECInfo,
     HTTPInfo,
+    MailServerInfo,
     MTASTSInfo,
     RDAPInfo,
     SecurityTxtInfo,
@@ -244,6 +245,25 @@ class Collector:
         except ValueError:
             info.error = M("unreadable answer")
         return info
+
+    # --- Mail servers ----------------------------------------------------------
+    def mail_servers(self, mx: list[str], port: int = 25) -> list[MailServerInfo]:
+        """STARTTLS, TLS and certificate of each mail server, as a sending server sees them, and DANE records."""
+        hosts = [h for h in mx if h and h != "."]
+
+        def one(host: str) -> MailServerInfo:
+            info = smtp_scan.probe(host, timeout=max(self.timeout, 10), port=port)
+            try:
+                answer = self._resolve(f"_25._tcp.{host}", "TLSA")
+                info.tlsa = len(answer) if answer is not None else 0
+            except CollectionError:
+                pass
+            return info
+
+        if not hosts:
+            return []
+        with ThreadPoolExecutor(max_workers=min(8, len(hosts))) as pool:
+            return list(pool.map(one, hosts))
 
     # --- Certificate Transparency ----------------------------------------------
     def subdomains(self, domain: str) -> SubdomainInfo:
