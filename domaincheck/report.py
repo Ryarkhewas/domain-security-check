@@ -152,7 +152,7 @@ def _linked(t, template: str, link: str, **params) -> str:
     return escape(t(template, link=marker, **params)).replace(marker, link)
 
 
-def render_html(r: Result, author: str = "", lang: str = "en") -> str:
+def render_html(r: Result, author: str = "", lang: str = "en", branding=None) -> str:
     e = escape
     t = _translator(lang)
     counts = {s: sum(1 for f in r.findings if f.status == s) for s in Status}
@@ -235,9 +235,21 @@ def render_html(r: Result, author: str = "", lang: str = "en") -> str:
 <p><b>{e(t("Method."))}</b> {e(t(METHOD_TEXT, by=by))}</p>
 <p><b>{e(t("Grades."))}</b> {_linked(t, GRADES_TEXT, obs_link)}</p>
 <p><b>{e(t("Limits."))}</b> {e(t(LIMITS_TEXT))}</p>
+{_branding_html(branding, t)}
 </footer>
 </main></body></html>
 """
+
+
+def _branding_html(branding, t) -> str:
+    """Client, auditor, company and contact, at the end of a branded HTML report."""
+    if branding is None or not branding.custom:
+        return ""
+    e = escape
+    who = " · ".join(x for x in (branding.author, branding.company) if x)
+    parts = [t("Prepared for {client}", client=branding.client) if branding.client else "",
+             t("Prepared by {who}", who=who) if who else "", branding.contact]
+    return f'<p class="brand">{" — ".join(e(x) for x in parts if x)}</p>'
 
 
 def executive_lines(r: Result, t) -> tuple[list[tuple[str, str]], str, str]:

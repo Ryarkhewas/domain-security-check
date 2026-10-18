@@ -26,6 +26,9 @@ from pathlib import Path
 
 from ._version import __version__
 from .audit import InvalidDomain, audit_many, run_audit
+from .branding import Branding, BrandingError
+from .branding import load as load_branding
+from .branding import merge as merge_branding
 from .collector import CollectionError, DomainNotFound
 from .demo import DEMO_DOMAIN, DemoCollector
 from .history import compare, load_previous
@@ -76,6 +79,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--lang", choices=LANGUAGES, default="en",
                    help="Language of the reports and summary: en (default) or fr; JSON stays in English")
     p.add_argument("--author", default="", help="Name shown in the report")
+    p.add_argument("--brand", type=Path, metavar="FILE",
+                   help="JSON file with author, company, contact, logo and color, for branded reports")
+    p.add_argument("--company", default="", help="Your company, shown on the PDF cover page and footer")
+    p.add_argument("--contact", default="", help="Your contact details (email, phone, website), on the cover page")
+    p.add_argument("--client", default="", help="Client name, on the cover page (\"Prepared for ...\")")
+    p.add_argument("--logo", default="", help="PNG or JPEG logo for the PDF cover page")
+    p.add_argument("--color", default="", help="Accent colour of the PDF, as #RRGGBB")
     p.add_argument("--json", action="store_true", help="Print the result as JSON instead of the summary")
     p.add_argument("--previous", type=Path, metavar="FILE",
                    help="JSON result of an earlier audit to compare with, for a single domain "
@@ -96,6 +106,14 @@ def main(argv: list[str] | None = None) -> int:
             p.error(f"cannot read {args.file}: {e.strerror or e}")
     domains = _unique(domains)
     say = _translator(args.lang)
+    try:
+        base = load_branding(args.brand) if args.brand else Branding()
+        args.branding = merge_branding(base, author=args.author, company=args.company, contact=args.contact,
+                                       client=args.client, logo=args.logo, color=args.color).check()
+    except BrandingError as e:
+        print(say("Error: {message}", message=str(e)), file=sys.stderr)
+        return 1
+    args.author = args.branding.author
     if args.pdf and not _pdf_available():
         print(say("Error: {message}", message=INSTALL_HINT), file=sys.stderr)
         return 1
@@ -130,13 +148,13 @@ def _single(result: Result, args) -> int:
     output = args.output or args.output_dir / f"{result.domain}.html"
     output.parent.mkdir(parents=True, exist_ok=True)
     _compare_and_save(result, output.with_suffix(".json"), args.previous)
-    output.write_text(render_html(result, args.author, args.lang), encoding="utf-8")
+    output.write_text(render_html(result, args.author, args.lang, args.branding), encoding="utf-8")
     print(render_json(result) if args.json else console_summary(result, args.lang))
     say = _translator(args.lang)
     print(say("HTML report: {path}", path=str(output)), file=sys.stderr)
     if args.pdf:
         pdf = output.with_suffix(".pdf")
-        pdf.write_bytes(render_pdf(result, args.author, args.lang))
+        pdf.write_bytes(render_pdf(result, args.author, args.lang, args.branding))
         print(say("PDF report: {path}", path=str(pdf)), file=sys.stderr)
     return 0
 
@@ -183,9 +201,10 @@ def _several(domains: list[str], args) -> int:
             raise outcome
         results.append(outcome)
         _compare_and_save(outcome, out / f"{outcome.domain}.json")
-        (out / f"{outcome.domain}.html").write_text(render_html(outcome, args.author, args.lang), encoding="utf-8")
+        html = render_html(outcome, args.author, args.lang, args.branding)
+        (out / f"{outcome.domain}.html").write_text(html, encoding="utf-8")
         if args.pdf:
-            (out / f"{outcome.domain}.pdf").write_bytes(render_pdf(outcome, args.author, args.lang))
+            (out / f"{outcome.domain}.pdf").write_bytes(render_pdf(outcome, args.author, args.lang, args.branding))
 
     (out / "index.html").write_text(render_index(results, errors, args.author, args.lang), encoding="utf-8")
     if args.json:

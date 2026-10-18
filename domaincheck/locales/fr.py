@@ -603,6 +603,13 @@ FR: dict[str, str] = {
     "RFC 4033 (DNS Security Introduction and Requirements)": "RFC 4033 (introduction et exigences de la sécurité DNS)",
     "RFC 8659 (DNS Certification Authority Authorization)": "RFC 8659 (autorisation des autorités de certification par DNS)",
     # --- Registration (RDAP) -----------------------------------------------------------
+    # --- Branded PDF cover page ------------------------------------------------------------
+    "Overall grade": "Note globale",
+    "Prepared for {client}": "Préparé pour {client}",
+    "Prepared by {who}": "Réalisé par {who}",
+    "Confidential: this report describes security weaknesses. Share it only with the people in charge of fixing them.":
+        "Confidentiel : ce rapport décrit des faiblesses de sécurité. Ne le transmettez qu'aux personnes chargées de "
+        "les corriger.",
     # --- Summary for decision makers -----------------------------------------------------
     "Summary for decision makers": "Synthèse pour la direction",
     "Main risks": "Principaux risques",

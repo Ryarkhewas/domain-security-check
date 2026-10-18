@@ -10,6 +10,7 @@ import os
 from io import BytesIO
 from xml.sax.saxutils import escape
 
+from .branding import Branding
 from .i18n import date
 from .models import Category, Result, Status
 from .report import (
@@ -50,8 +51,14 @@ GRADE_COLORS = {"A": STATUS_COLORS[Status.OK], "B": STATUS_COLORS[Status.OK], "C
 TEXT, MUTED, BORDER = "#1d2330", "#5d6677", "#e3e6eb"
 
 
-def render_pdf(r: Result, author: str = "", lang: str = "en") -> bytes:
-    """The report as PDF bytes. Raise PDFUnavailable if ReportLab is missing."""
+def render_pdf(r: Result, author: str = "", lang: str = "en", branding: Branding | None = None) -> bytes:
+    """The report as PDF bytes. Raise PDFUnavailable if ReportLab is missing.
+
+    With a branding (company, contact, client, logo or colour), the report starts with a cover page.
+    """
+    brand = branding or Branding(author=author)
+    author = brand.author or author
+    accent = brand.color
     try:
         from reportlab.lib import colors
         from reportlab.lib.enums import TA_CENTER
@@ -60,7 +67,7 @@ def render_pdf(r: Result, author: str = "", lang: str = "en") -> bytes:
         from reportlab.lib.units import mm
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
-        from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+        from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
     except ImportError as e:
         raise PDFUnavailable(INSTALL_HINT) from e
 
@@ -81,7 +88,7 @@ def render_pdf(r: Result, author: str = "", lang: str = "en") -> bytes:
     sub = style("sub", 9, MUTED)
     body = style("body")
     small = style("small", 8, MUTED)
-    h2 = style("h2", 13, font_name=bold, spaceBefore=10, spaceAfter=6, keepWithNext=1)
+    h2 = style("h2", 13, accent, font_name=bold, spaceBefore=10, spaceAfter=6, keepWithNext=1)
     centered = style("centered", 8, MUTED, alignment=TA_CENTER)
 
     def grade_cell(grade: str, size: int):
@@ -94,6 +101,8 @@ def render_pdf(r: Result, author: str = "", lang: str = "en") -> bytes:
         return Paragraph(f'<font color="{fg}"><b>{t(L(LABELS[status]))}</b></font>', style("badge", 8, font_name=bold))
 
     story: list = []
+    if brand.custom:
+        story += _cover(r, brand, L, t, style, grade_cell, lang, bold, (Image, PageBreak, Paragraph, Spacer, Table), mm)
     by = L(" by {author}", author=author) if author else ""
     story += [
         Paragraph(t(r.domain), title),
@@ -175,7 +184,7 @@ def render_pdf(r: Result, author: str = "", lang: str = "en") -> bytes:
         for i, f in enumerate(_sorted(group)):
             text = f"<b>{t(L(f.title))}</b><br/>{t(_capital(L(f.detail)))}"
             if f.recommendation and f.status != Status.OK:
-                text += f'<br/><font color="#1f4e78">&gt; {t(L(f.recommendation))}</font>'
+                text += f'<br/><font color="{accent}">&gt; {t(L(f.recommendation))}</font>'
                 if f.fix:
                     how = (f'<br/><font name="Courier" size="8">{t(f.fix.text).replace(chr(10), "<br/>")}</font>'
                            if f.fix.code else t(L(f.fix.text)))
@@ -202,7 +211,8 @@ def render_pdf(r: Result, author: str = "", lang: str = "en") -> bytes:
         canvas.saveState()
         canvas.setFont(font, 7.5)
         canvas.setFillColor(colors.HexColor(MUTED))
-        canvas.drawString(15 * mm, 10 * mm, f"{L('Security audit')} · {r.domain} · {date(r.date, lang)}")
+        prefix = f"{brand.company} · " if brand.company else ""
+        canvas.drawString(15 * mm, 10 * mm, f"{prefix}{L('Security audit')} · {r.domain} · {date(r.date, lang)}")
         canvas.drawRightString(A4[0] - 15 * mm, 10 * mm, L("Page {number}", number=doc.page))
         canvas.restoreState()
 
@@ -212,6 +222,52 @@ def render_pdf(r: Result, author: str = "", lang: str = "en") -> bytes:
                             subject=L("Passive security audit"))
     doc.build(story, onFirstPage=footer, onLaterPages=footer)
     return buffer.getvalue()
+
+
+def _cover(r, brand: Branding, L, t, style, grade_cell, lang, bold, flowables, mm):  # noqa: N803 - L: translator
+    """Cover page: logo, title, domain, client, date, overall grade, auditor and contact, confidentiality note."""
+    Image, PageBreak, Paragraph, Spacer, Table = flowables  # noqa: N806 - ReportLab class names
+    accent = brand.color
+    page: list = [Spacer(1, 25 * mm)]
+    if brand.logo is not None:
+        logo = Image(str(brand.logo))
+        ratio = min(60 * mm / logo.imageWidth, 30 * mm / logo.imageHeight)
+        logo.drawWidth, logo.drawHeight = logo.imageWidth * ratio, logo.imageHeight * ratio
+        logo.hAlign = "LEFT"
+        page += [logo, Spacer(1, 18 * mm)]
+    else:
+        page.append(Spacer(1, 30 * mm))
+    page += [Paragraph(t(L("Security audit")), style("cover_title", 30, accent, leading=36, font_name=bold)),
+             Spacer(1, 4 * mm),
+             Paragraph(t(r.domain), style("cover_domain", 18, leading=22))]
+    if brand.client:
+        page.append(Paragraph(t(L("Prepared for {client}", client=brand.client)), style("cover_client", 12)))
+    page += [Paragraph(t(f"{L('Passive security audit')} · {date(r.date, lang)}"), style("cover_date", 10, MUTED)),
+             Spacer(1, 16 * mm)]
+    grade = Table([[grade_cell(r.grade, 40), Paragraph(t(L(GRADE_SUMMARY[letter(r.grade)])), style("cover_sum", 12))]],
+                  colWidths=[35 * mm, 140 * mm])
+    grade.setStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("BACKGROUND", (0, 0), (0, 0), colors_hex(GRADE_COLORS[letter(r.grade)][1])),
+                    ("TOPPADDING", (0, 0), (0, 0), 10), ("BOTTOMPADDING", (0, 0), (0, 0), 10),
+                    ("LEFTPADDING", (1, 0), (1, 0), 12)])
+    page += [Paragraph(t(L("Overall grade")), style("cover_label", 9, MUTED)), Spacer(1, 2 * mm), grade,
+             Spacer(1, 40 * mm)]
+    who = " · ".join(x for x in (brand.author, brand.company) if x)
+    if who:
+        page.append(Paragraph(t(L("Prepared by {who}", who=who)), style("cover_by", 11)))
+    if brand.contact:
+        page.append(Paragraph(t(brand.contact), style("cover_contact", 10, MUTED)))
+    page += [Spacer(1, 10 * mm),
+             Paragraph(t(L("Confidential: this report describes security weaknesses. Share it only with the people "
+                           "in charge of fixing them.")), style("cover_conf", 8, MUTED)),
+             PageBreak()]
+    return page
+
+
+def colors_hex(value: str):
+    from reportlab.lib import colors
+
+    return colors.HexColor(value)
 
 
 def _grade_detail(L, key: str, grade) -> str:  # noqa: N803 - L is the translator

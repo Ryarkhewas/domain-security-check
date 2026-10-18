@@ -6,6 +6,11 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Mail servers: each MX is contacted on port 25 like a sending server (EHLO, STARTTLS, TLS handshake, QUIT; no email sent). STARTTLS missing −20, obsolete TLS −10, invalid certificate −5 (−30 with MTA-STS in enforce mode), DANE records shown. When port 25 is blocked, the report says nothing could be concluded. `--no-mail-servers` skips this step.
+- Summary for decision makers at the top of the HTML and PDF reports (and in the console): main risks in business terms, number of quick fixes / few-hour fixes / projects, and the overall grade after the quick fixes. Each priority action shows its impact and effort, and the list is ordered by impact, then effort.
+- Branded reports: `--company`, `--contact`, `--client`, `--logo`, `--color`, or a JSON file with `--brand`. The PDF gets a cover page (logo, client, overall grade, auditor, contact, confidentiality note), the accent colour and the company in the footer; the HTML report ends with the same details.
+
 ### Changed
 - When crt.sh does not answer and the subdomains come from Cert Spotter, the report says the list may be incomplete (Cert Spotter may list fewer old certificates) and suggests running the audit again later.
 
