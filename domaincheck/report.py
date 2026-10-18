@@ -11,6 +11,7 @@ from .i18n import M, date, tr
 from .models import Category, Result, Status
 from .scoring import GRADE_ORDER
 from .sources import SOURCES, references
+from .summary import EFFORT_LABELS, IMPACT_LABELS, actions, effort_line, grade_after_quick_fixes, main_risks
 
 LABELS = {
     Status.CRITICAL: "Critical",
@@ -89,6 +90,11 @@ padding:14px 16px;margin-bottom:10px}
 .howto pre{margin:4px 0 0;padding:6px 8px;background:var(--bg);border-radius:6px;font-size:12px;white-space:pre-wrap;
 word-break:break-all}.howto a{font-size:12px}
 ol.priority{padding-left:22px}ol.priority li{margin-bottom:8px}
+.tag{font-size:12px;padding:2px 8px;border-radius:99px;border:1px solid var(--border);color:var(--muted);
+white-space:nowrap}
+.tag.impact-high{border-color:var(--crit);color:var(--crit)}.tag.impact-medium{border-color:var(--warn);color:var(--warn)}
+.exec{margin:24px 0;padding:4px 20px 12px;background:var(--card);border:1px solid var(--border);border-radius:14px}
+.exec ul{padding-left:20px}.exec li{margin-bottom:6px}
 footer{margin-top:40px;color:var(--muted);font-size:13px;border-top:1px solid var(--border);padding-top:16px}
 table.list{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--border);border-radius:12px;
 overflow:hidden;font-size:14px}
@@ -156,13 +162,15 @@ def render_html(r: Result, author: str = "", lang: str = "en") -> str:
         for s in (Status.CRITICAL, Status.WARNING, Status.OK, Status.INFO)
     )
 
-    priorities = [f for f in _sorted(r.findings) if f.status in (Status.CRITICAL, Status.WARNING) and f.recommendation]
     priority_block = ""
-    if priorities:
+    todo = actions(r)
+    if todo:
         items = "".join(
-            f'<li><b>{e(t(f.title))}</b> <span class="badge {f.status.value}">{e(t(LABELS[f.status]))}</span>'
-            f'<br>{e(t(f.recommendation))}</li>'
-            for f in priorities
+            f'<li><b>{e(t(a.finding.title))}</b> <span class="badge {a.finding.status.value}">'
+            f'{e(t(LABELS[a.finding.status]))}</span> <span class="tag impact-{a.impact}">'
+            f'{e(t(IMPACT_LABELS[a.impact]))}</span> <span class="tag">{e(t(EFFORT_LABELS[a.effort]))}</span>'
+            f'<br>{e(t(a.finding.recommendation))}</li>'
+            for a in todo
         )
         priority_block = f'<h2>{e(t("Priority actions"))}</h2><ol class="priority">{items}</ol>'
 
@@ -219,6 +227,7 @@ def render_html(r: Result, author: str = "", lang: str = "en") -> str:
 <p class="summary">{e(t(GRADE_SUMMARY[letter(r.grade)]))}</p>{cap}</div></header>
 <section class="cats">{cats}</section>
 <section class="counters">{counters}</section>
+{_executive_html(r, t)}
 {_changes_html(r.changes, t, lang)}
 {priority_block}
 {sections}
@@ -229,6 +238,29 @@ def render_html(r: Result, author: str = "", lang: str = "en") -> str:
 </footer>
 </main></body></html>
 """
+
+
+def executive_lines(r: Result, t) -> tuple[list[tuple[str, str]], str, str]:
+    """(main risks [(sentence, impact label)], effort line, grade line), translated; for the HTML and PDF outputs."""
+    risks = [(t(sentence), t(IMPACT_LABELS[impact])) for sentence, impact in main_risks(r)]
+    effort = effort_line(r)
+    after = grade_after_quick_fixes(r)
+    grade = (t("Applying the quick fixes alone would raise the overall grade from {before} to {after}.",
+               before=r.grade, after=after) if after != r.grade else "")
+    return risks, t(effort) if effort else "", grade
+
+
+def _executive_html(r: Result, t) -> str:
+    e = escape
+    risks, effort, grade = executive_lines(r, t)
+    if not risks and not effort:
+        body = f"<p>{e(t('No priority action: keep these settings and audit the domain again regularly.'))}</p>"
+    else:
+        items = "".join(f"<li>{e(sentence)} <span class=\"tag\">{e(impact)}</span></li>" for sentence, impact in risks)
+        body = (f"<p><b>{e(t('Main risks'))}</b></p><ul>{items}</ul>" if items else "")
+        body += f"<p><b>{e(t('Effort'))}</b> {e(effort)}</p>" if effort else ""
+        body += f"<p>{e(grade)}</p>" if grade else ""
+    return f'<section class="exec"><h2>{e(t("Summary for decision makers"))}</h2>{body}</section>'
 
 
 def _area(t, key: str) -> str:
@@ -364,6 +396,13 @@ def console_summary(r: Result, lang: str = "en") -> str:
         note = f" — {t(g.note)}" if g.note else ""
         lines.append(f"    {t(CATEGORY_LABELS[key]):<20} {g.grade}{score}{note}")
     lines.append("")
+    risks, effort, grade_line = executive_lines(r, t)
+    if risks:
+        lines.append(f"  {t('Main risks')}")
+        lines += [f"    - {sentence} ({impact})" for sentence, impact in risks]
+    lines += [f"  {text}" for text in (effort, grade_line) if text]
+    if risks or effort:
+        lines.append("")
     if r.changes is not None:
         lines.append(f"  {changes_heading(r.changes, t, lang)}")
         for heading, items in change_lines(r.changes, t):

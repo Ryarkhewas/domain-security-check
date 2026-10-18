@@ -603,6 +603,53 @@ FR: dict[str, str] = {
     "RFC 4033 (DNS Security Introduction and Requirements)": "RFC 4033 (introduction et exigences de la sécurité DNS)",
     "RFC 8659 (DNS Certification Authority Authorization)": "RFC 8659 (autorisation des autorités de certification par DNS)",
     # --- Registration (RDAP) -----------------------------------------------------------
+    # --- Summary for decision makers -----------------------------------------------------
+    "Summary for decision makers": "Synthèse pour la direction",
+    "Main risks": "Principaux risques",
+    "Effort": "Effort",
+    "No priority action: keep these settings and audit the domain again regularly.":
+        "Aucune action prioritaire : conservez ces réglages et refaites un audit régulièrement.",
+    "Applying the quick fixes alone would raise the overall grade from {before} to {after}.":
+        "Les seules corrections rapides feraient passer la note globale de {before} à {after}.",
+    "{quick} quick fix(es) (under 30 min each), {hours} of a few hours, {projects} project(s) needing a developer or "
+    "a provider.":
+        "{quick} correction(s) rapide(s) (moins de 30 min chacune), {hours} de quelques heures, {projects} chantier(s) "
+        "demandant un développeur ou un prestataire.",
+    "Quick fix (under 30 min)": "Correction rapide (moins de 30 min)",
+    "A few hours": "Quelques heures",
+    "Project (developer or provider)": "Chantier (développeur ou prestataire)",
+    "High impact": "Impact fort",
+    "Medium impact": "Impact moyen",
+    "Low impact": "Impact faible",
+    "Visitors' data (forms, logins) can be intercepted, for instance on public Wi-Fi.":
+        "Les données des visiteurs (formulaires, identifiants) peuvent être interceptées, par exemple sur un Wi-Fi "
+        "public.",
+    "Visitors get a security warning, or their data can be intercepted.":
+        "Les visiteurs voient une alerte de sécurité, ou leurs données peuvent être interceptées.",
+    "Old encryption weakens the protection of visitors' data.":
+        "Un chiffrement dépassé affaiblit la protection des données des visiteurs.",
+    "A flaw in the site or in a third-party script can be used to steal visitors' data (XSS).":
+        "Une faille du site ou d'un script tiers peut servir à voler les données des visiteurs (XSS).",
+    "The site can be shown inside a fake site to trick visitors into clicking (clickjacking).":
+        "Le site peut être affiché dans un faux site pour piéger les visiteurs (clickjacking).",
+    "Session cookies can be stolen, giving access to users' accounts.":
+        "Les cookies de session peuvent être volés et donner accès aux comptes des utilisateurs.",
+    "Visible software versions make known flaws easier to target.":
+        "Les versions de logiciels visibles facilitent l'exploitation de failles connues.",
+    "Anyone can send emails in the company's name: phishing of clients, fake invoices.":
+        "N'importe qui peut envoyer des emails au nom de l'entreprise : hameçonnage des clients, fausses factures.",
+    "Emails sent to the company can be read or altered on the way.":
+        "Les emails envoyés à l'entreprise peuvent être lus ou modifiés en route.",
+    "Visitors and emails can be sent to a fake server through forged DNS answers.":
+        "Visiteurs et emails peuvent être détournés vers un faux serveur par de fausses réponses DNS.",
+    "Any certificate authority can issue a certificate for the domain.":
+        "N'importe quelle autorité de certification peut émettre un certificat pour le domaine.",
+    "The domain can expire: website and email down, and the name can be taken by someone else.":
+        "Le domaine peut expirer : site et emails coupés, et le nom peut être repris par quelqu'un d'autre.",
+    "With a stolen registrar password, the domain can be moved elsewhere.":
+        "Avec un mot de passe volé chez le bureau d'enregistrement, le domaine peut être transféré ailleurs.",
+    "A forgotten subdomain can be taken over to publish content in the company's name.":
+        "Un sous-domaine oublié peut être détourné pour publier du contenu au nom de l'entreprise.",
     # --- Mail servers ----------------------------------------------------------------
     "Mail servers: encryption": "Serveurs de mail : chiffrement",
     "Encryption of incoming email (STARTTLS)": "Chiffrement des emails reçus (STARTTLS)",

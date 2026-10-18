@@ -25,10 +25,12 @@ from .report import (
     _translator,
     change_lines,
     changes_heading,
+    executive_lines,
     letter,
     reference_groups,
 )
 from .sources import references
+from .summary import EFFORT_LABELS, IMPACT_LABELS, actions
 
 
 class PDFUnavailable(RuntimeError):
@@ -134,12 +136,31 @@ def render_pdf(r: Result, author: str = "", lang: str = "en") -> bytes:
             for line in lines:
                 story.append(Paragraph(f"• {t(line)}", style("change", 9.5, leftIndent=10)))
 
-    priorities = [f for f in _sorted(r.findings) if f.status in (Status.CRITICAL, Status.WARNING) and f.recommendation]
-    if priorities:
+    # Summary for decision makers
+    risks, effort, grade_line = executive_lines(r, L)
+    story.append(Paragraph(t(L("Summary for decision makers")), h2))
+    if not risks and not effort:
+        story.append(Paragraph(t(L("No priority action: keep these settings and audit the domain again regularly.")),
+                               body))
+    else:
+        if risks:
+            story.append(Paragraph(f"<b>{t(L('Main risks'))}</b>", body))
+            for sentence, impact in risks:
+                story.append(Paragraph(f'• {t(sentence)} <font color="{MUTED}" size="8">({t(impact)})</font>',
+                                       style("risk", 9.5, leftIndent=10)))
+        if effort:
+            story.append(Paragraph(f"<b>{t(L('Effort'))}</b> {t(effort)}", body))
+        if grade_line:
+            story.append(Paragraph(t(grade_line), body))
+
+    todo = actions(r)
+    if todo:
         story.append(Paragraph(t(L("Priority actions")), h2))
-        for i, f in enumerate(priorities, 1):
+        for i, a in enumerate(todo, 1):
+            f = a.finding
             fg, _ = STATUS_COLORS[f.status]
-            item = (f'{i}. <b>{t(L(f.title))}</b> <font color="{fg}" size="8">({t(L(LABELS[f.status]))})</font>'
+            tags = f"{L(LABELS[f.status])} · {L(IMPACT_LABELS[a.impact])} · {L(EFFORT_LABELS[a.effort])}"
+            item = (f'{i}. <b>{t(L(f.title))}</b> <font color="{fg}" size="8">({t(tags)})</font>'
                     f"<br/>{t(L(f.recommendation))}")
             story.append(Paragraph(item, style(f"p{i}", 9.5, spaceAfter=4, leftIndent=10, firstLineIndent=-10)))
 
