@@ -237,7 +237,7 @@ Three GitHub Actions workflows keep the tool honest:
   - DNSSEC must match an independent resolver, and CAA (google.com) and MTA-STS (gmail.com) must be found where they are published;
   - registration data and security.txt must be found on known domains (including a .fr domain);
   - TLS 1.0 (tls-v1-0.badssl.com), 3DES (3des.badssl.com) and the RSA key exchange (static-rsa.badssl.com) must be detected, and github.com must pass the TLS checks;
-  - gmail.com's mail server must offer STARTTLS with a valid certificate (skipped when port 25 is blocked, as on GitHub's runners);
+  - gmail.com's mail server must offer STARTTLS with a valid certificate (skipped when port 25 is blocked from the network running the tests);
   - subdomains of afnic.fr must be read from the Certificate Transparency logs (the test is skipped when crt.sh and Cert Spotter are both down), and the DNS host and email provider of known domains must be recognised;
   - the website grade of each domain is compared with Mozilla HTTP Observatory, test by test, and a warning is raised if the Observatory moves to another version of its scoring algorithm (this tool reproduces version 6).
 
