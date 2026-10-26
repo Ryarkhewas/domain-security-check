@@ -12,7 +12,7 @@ from pathlib import Path
 
 PACKAGE = Path(__file__).resolve().parent.parent / "domaincheck"
 MODULES = ["web_checks", "tls_checks", "email_checks", "dns_checks", "audit", "scoring", "report", "pdf_report",
-           "models", "collector", "cli", "sources", "hosting", "summary"]
+           "models", "collector", "cli", "sources", "hosting", "summary", "software"]
 # positions of title, detail and recommendation in each helper
 TEXT_ARGS = {"Finding": (1, 3, 4), "M": (0,), "t": (0,), "L": (0,), "tr": (0,), "say": (0,)}
 F_ARGS = {"web_checks": (0, 2, 3), "email_checks": (0, 2, 3), "dns_checks": (0, 2, 3)}

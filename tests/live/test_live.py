@@ -219,3 +219,12 @@ def test_gmail_mail_servers_offer_starttls():
     if not servers[0].reachable:
         pytest.skip(f"port 25 blocked from this network ({servers[0].error})")
     assert servers[0].starttls and servers[0].cert_valid and servers[0].tls_version in ("TLSv1.2", "TLSv1.3")
+
+
+@pytest.mark.parametrize("product", ["php", "wordpress", "drupal", "joomla", "typo3"])
+def test_support_dates_are_read(product):
+    from domaincheck.software import load_cycles
+
+    cycles = load_cycles(product)
+    assert len(cycles) > 3 and any(c.eol is False or not isinstance(c.eol, bool) for c in cycles)
+    assert any(c.latest for c in cycles)

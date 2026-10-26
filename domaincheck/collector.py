@@ -24,7 +24,7 @@ import dns.name
 import dns.resolver
 import requests
 
-from . import ct, smtp_scan
+from . import ct, smtp_scan, software
 from . import tls_scan as scan
 from ._version import __version__
 from .hsts_preload import PreloadList
@@ -245,6 +245,19 @@ class Collector:
         except ValueError:
             info.error = M("unreadable answer")
         return info
+
+    # --- Software support dates ------------------------------------------------
+    def lifecycles(self, products: list[str]) -> dict[str, list | None]:
+        """Support cycles of each product (endoflife.date), None for a product whose dates cannot be obtained."""
+        result: dict[str, list | None] = {}
+        for product in dict.fromkeys(products):
+            if product not in software.WITH_LIFECYCLE:
+                continue
+            try:
+                result[product] = software.load_cycles(product)
+            except (requests.RequestException, ValueError, OSError):
+                result[product] = None
+        return result
 
     # --- Mail servers ----------------------------------------------------------
     def mail_servers(self, mx: list[str], port: int = 25) -> list[MailServerInfo]:

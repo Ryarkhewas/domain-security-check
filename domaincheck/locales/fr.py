@@ -610,6 +610,44 @@ FR: dict[str, str] = {
     "Confidential: this report describes security weaknesses. Share it only with the people in charge of fixing them.":
         "Confidentiel : ce rapport décrit des faiblesses de sécurité. Ne le transmettez qu'aux personnes chargées de "
         "les corriger.",
+    # --- Outdated software -----------------------------------------------------------------
+    "Software: {name}": "Logiciel : {name}",
+    "Software on {host}: {name}": "Logiciel sur {host} : {name}",
+    " on {host}": " sur {host}",
+    " since {date}": " depuis le {date}",
+    "generator tag of the page": "balise generator de la page",
+    "addresses of the page's files": "adresses des fichiers de la page",
+    "scripts of the page": "scripts de la page",
+    "support dates unavailable": "dates de support indisponibles",
+    "version not listed in the support dates": "version absente des dates de support",
+    "{name} is used{where} ({seen}); its version is not shown, so whether it is up to date cannot be checked from "
+    "outside.":
+        "{name} est utilisé{where} ({seen}) ; sa version n'est pas affichée, donc impossible de vérifier depuis "
+        "l'extérieur s'il est à jour.",
+    "Check that {name} and its extensions are updated automatically.":
+        "Vérifiez que {name} et ses extensions se mettent à jour automatiquement.",
+    "{label} is used{where} ({seen}): this major version is still supported, but the exact version is not shown.":
+        "{label} est utilisé{where} ({seen}) : cette version majeure est encore maintenue, mais la version exacte n'est "
+        "pas affichée.",
+    "{label} is used{where} ({seen}); {reason}.": "{label} est utilisé{where} ({seen}) ; {reason}.",
+    "Check that {name} is a version that still gets security fixes.":
+        "Vérifiez que cette version de {name} reçoit encore des correctifs de sécurité.",
+    "{label}{where} no longer gets security fixes{since}: every flaw found since then stays open, and attackers scan "
+    "for these versions automatically.":
+        "{label}{where} ne reçoit plus de correctifs de sécurité{since} : toutes les failles découvertes depuis restent "
+        "ouvertes, et les attaquants recherchent ces versions automatiquement.",
+    "Upgrade {name} to a supported version (test on a copy of the site first), and hide the version number.":
+        "Passez {name} à une version maintenue (testez d'abord sur une copie du site) et masquez le numéro de version.",
+    "{label}{where} is not up to date: version {latest} fixes known problems.":
+        "{label}{where} n'est pas à jour : la version {latest} corrige des problèmes connus.",
+    "Update {name} to {latest} and turn on automatic minor updates.":
+        "Mettez {name} à jour en {latest} et activez les mises à jour mineures automatiques.",
+    "{label}{where} is a supported, up-to-date version (the number is still visible: hiding it gives attackers less "
+    "to go on).":
+        "{label}{where} est une version maintenue et à jour (le numéro reste visible : le masquer donne moins "
+        "d'indices aux attaquants).",
+    "Outdated software on the site has known flaws that attackers exploit automatically.":
+        "Des logiciels obsolètes sur le site ont des failles connues que les attaquants exploitent automatiquement.",
     # --- Summary for decision makers -----------------------------------------------------
     "Summary for decision makers": "Synthèse pour la direction",
     "Main risks": "Principaux risques",
@@ -822,6 +860,8 @@ FR: dict[str, str] = {
     "RFC 9162 (Certificate Transparency)": "RFC 9162 (Certificate Transparency)",
     "RFC 3207 (STARTTLS for SMTP)": "RFC 3207 (STARTTLS pour SMTP)",
     "RFC 7672 (DANE for SMTP)": "RFC 7672 (DANE pour SMTP)",
+    "endoflife.date (end of support dates of software versions)":
+        "endoflife.date (dates de fin de support des versions de logiciels)",
     "RFC 8446 (TLS 1.3)": "RFC 8446 (TLS 1.3)",
     "RFC 9325 (recommendations for the secure use of TLS)": "RFC 9325 (recommandations pour un usage sûr de TLS)",
     "CNIL personal data security guide (2024): securing websites":

@@ -35,6 +35,7 @@ SOURCES: dict[str, tuple[str, str]] = {
              "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cross-Origin-Embedder-Policy"),
     "permissions": ("W3C Permissions Policy", "https://www.w3.org/TR/permissions-policy/"),
     "security-txt": ("RFC 9116 (security.txt)", "https://www.rfc-editor.org/rfc/rfc9116"),
+    "eol": ("endoflife.date (end of support dates of software versions)", "https://endoflife.date/"),
     "owasp-headers": ("OWASP Secure Headers Project", "https://owasp.org/www-project-secure-headers/"),
     # Certificate & TLS
     "tls-guide": ("MDN TLS guide", f"{MDN}/TLS"),
@@ -90,6 +91,7 @@ GUIDE_REFS: dict[str, list[tuple[str, str]]] = {
     "sri": [("web", "R11, R12")],
     "referrer": [("web", "§5.4")],
     "cookies": [("web", "§5.5.3"), ("cnil", "")],
+    "eol": [("cnil", "")],
     # Certificate & TLS
     "tls-guide": [("tls", "R8"), ("cnil", "")],
     "rfc8996": [("tls", "R3, R4"), ("web", "R1"), ("cnil", "")],

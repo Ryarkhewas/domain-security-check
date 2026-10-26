@@ -33,7 +33,7 @@ EFFORT = {
     "rdap": QUICK, "ct": QUICK, "tls-guide": QUICK, "rfc8996": QUICK, "tls13": QUICK, "tls-rpt": QUICK,
     "null-mx": QUICK, "spf": HOURS, "dmarc": HOURS, "dkim": HOURS, "mta-sts": HOURS, "dnssec": HOURS,
     "rfc9325": HOURS, "starttls": HOURS, "dane": HOURS, "csp": PROJECT, "cookies": PROJECT, "sri": PROJECT,
-    "corp": HOURS, "coop": HOURS, "coep": PROJECT,
+    "eol": HOURS, "corp": HOURS, "coop": HOURS, "coep": PROJECT,
 }
 
 # What the problem means for the business, by finding source
@@ -59,6 +59,7 @@ RISKS = {
     "rdap": "The domain can expire: website and email down, and the name can be taken by someone else.",
     "transfer-lock": "With a stolen registrar password, the domain can be moved elsewhere.",
     "ct": "A forgotten subdomain can be taken over to publish content in the company's name.",
+    "eol": "Outdated software on the site has known flaws that attackers exploit automatically.",
 }
 
 

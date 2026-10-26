@@ -21,6 +21,8 @@ from .hosting import add_fixes, detect
 from .i18n import M
 from .models import CollectedData, Result
 from .scoring import category_grades, overall_grade
+from .software import check_software
+from .software import detect as detect_software
 from .tls_checks import check_certificate, check_tls_scan
 from .web_checks import check_security_txt, check_website
 
@@ -83,6 +85,7 @@ def analyze(data: CollectedData, tested_selectors: list[str], now: datetime | No
         if data.tls_scan is not None:
             findings += check_tls_scan(data.tls_scan, data.certificate)
         findings += check_website(data.http, data.domain)
+        findings += check_software(data.software, data.lifecycles, now)
     findings += check_mx(data.mx)
     enforced = effective_dmarc_policy(data.dmarc_txt, data.dmarc_inherited_from) in ("quarantine", "reject")
     findings += check_spf(data.root_txt, dmarc_enforced=enforced)
@@ -179,6 +182,9 @@ def run_audit(text: str, collector=None, ct_logs: bool = True, mail_servers: boo
         data.tls_scan = collector.tls_scan(domain)
     if mail_servers and hasattr(collector, "mail_servers"):
         data.mail_servers = collector.mail_servers(data.mx)
+    data.software = detect_software(data.http.headers, data.http.body)
+    if data.software and hasattr(collector, "lifecycles"):
+        data.lifecycles = collector.lifecycles([s.product for s in data.software if s.version])
     if hasattr(collector, "ns"):
         data.ns = collector.ns(domain)
     if subdomains is not None:

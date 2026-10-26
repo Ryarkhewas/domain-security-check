@@ -196,6 +196,8 @@ class CollectedData:
     tls_scan: TLSScanInfo | None = None
     subdomains: SubdomainInfo | None = None
     mail_servers: list[MailServerInfo] | None = None
+    software: list = field(default_factory=list)  # software.Software recognised on the home page
+    lifecycles: dict = field(default_factory=dict)  # product -> list of software.Cycle, None if unavailable
     ns: list[str] = field(default_factory=list)  # name servers of the domain (to recognise the DNS host)
 
 

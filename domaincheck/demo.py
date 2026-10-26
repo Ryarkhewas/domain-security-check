@@ -6,7 +6,7 @@ a typical setup: HTTPS in place, but poorly protected email.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from .models import (
     CAAInfo,
@@ -47,6 +47,13 @@ class DemoCollector:
             key_type="RSA",
             key_bits=2048,
         )
+
+    def lifecycles(self, products: list[str]) -> dict:
+        # Fixed data, so the demo works without network access (PHP 7.4: end of support on 28 November 2022)
+        from .software import Cycle
+
+        return {"php": [Cycle("8.3", False, "8.3.12"), Cycle("8.2", False, "8.2.24"),
+                        Cycle("7.4", date(2022, 11, 28), "7.4.33")]} if "php" in products else {}
 
     def mail_servers(self, mx: list[str]) -> list[MailServerInfo]:
         return [MailServerInfo(host, reachable=True, starttls=True, tls_version="TLSv1.3", cert_valid=True,
