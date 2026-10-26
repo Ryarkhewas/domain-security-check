@@ -92,6 +92,9 @@ def main(argv: list[str] | None = None) -> int:
                         "(default: the <domain>.json saved next to the report by the previous run)")
     p.add_argument("--no-ct-logs", action="store_true",
                    help="Skip the subdomains published in Certificate Transparency logs (faster)")
+    p.add_argument("--subdomains", action="store_true",
+                   help="Also check every subdomain in use found in the CT logs (HTTPS, certificate, old TLS, "
+                        "outdated software); slower")
     p.add_argument("--no-mail-servers", action="store_true",
                    help="Do not connect to the mail servers on port 25 (STARTTLS, certificates)")
     p.add_argument("--demo", action="store_true", help="Demo on a fictitious domain, without network access")
@@ -119,7 +122,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     if args.demo:
-        result = run_audit(DEMO_DOMAIN, collector=DemoCollector())
+        result = run_audit(DEMO_DOMAIN, collector=DemoCollector(), **_skip(args))
         return _single(result, args)
     if not domains:
         p.error("give a domain, a --file, or --demo")
@@ -228,12 +231,14 @@ def _several(domains: list[str], args) -> int:
 
 
 def _skip(args) -> dict[str, bool]:
-    """Checks turned off on the command line (only passed when used, so the defaults stay in one place)."""
+    """Checks turned on or off on the command line (only passed when used, so the defaults stay in one place)."""
     skip = {}
     if args.no_ct_logs:
         skip["ct_logs"] = False
     if args.no_mail_servers:
         skip["mail_servers"] = False
+    if args.subdomains:
+        skip["subdomains"] = True
     return skip
 
 

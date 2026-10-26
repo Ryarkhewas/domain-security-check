@@ -17,6 +17,7 @@ from .models import (
     MTASTSInfo,
     RDAPInfo,
     SecurityTxtInfo,
+    SubdomainAudit,
     SubdomainInfo,
     TLSScanInfo,
 )
@@ -61,6 +62,21 @@ class DemoCollector:
 
     def ns(self, domain: str) -> list[str]:
         return ["dns110.ovh.net", "ns110.ovh.net"]
+
+    def audit_subdomains(self, hosts: list[str]) -> list[SubdomainAudit]:
+        # The shop still accepts TLS 1.0, does not redirect to HTTPS and runs PHP 7.4; mail has no website
+        from .software import Software
+
+        audits = []
+        for host in hosts:
+            if host.startswith("shop."):
+                audits.append(SubdomainAudit(host, https=True, cert_valid=True, http=True, redirects=False,
+                                             old_tls=["TLSv1"], software=[Software("php", "7.4.3", "X-Powered-By")]))
+            elif host.startswith("www."):
+                audits.append(SubdomainAudit(host, https=True, cert_valid=True, http=True, redirects=True))
+            else:
+                audits.append(SubdomainAudit(host))
+        return audits
 
     def subdomains(self, domain: str) -> SubdomainInfo:
         # The shop moved in 2021, the old Azure app was deleted, its DNS record was forgotten

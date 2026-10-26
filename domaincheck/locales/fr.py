@@ -648,6 +648,28 @@ FR: dict[str, str] = {
         "d'indices aux attaquants).",
     "Outdated software on the site has known flaws that attackers exploit automatically.":
         "Des logiciels obsolètes sur le site ont des failles connues que les attaquants exploitent automatiquement.",
+    # --- Subdomains in use ---------------------------------------------------------------
+    "Subdomains: HTTPS certificates": "Sous-domaines : certificats HTTPS",
+    "Subdomains: no HTTPS": "Sous-domaines : pas de HTTPS",
+    "Subdomains: HTTP to HTTPS redirect": "Sous-domaines : redirection HTTP vers HTTPS",
+    "Subdomains: obsolete TLS versions": "Sous-domaines : versions de TLS obsolètes",
+    "{count} subdomain(s) in use checked, {web} with a website.":
+        "{count} sous-domaine(s) en service vérifié(s), dont {web} avec un site web.",
+    "{seen} Certificate not valid: {hosts}. Visitors get a security warning.":
+        "{seen} Certificat non valide : {hosts}. Les visiteurs voient une alerte de sécurité.",
+    "{seen} Every certificate is valid.": "{seen} Tous les certificats sont valides.",
+    "Renew or replace these certificates, or delete the subdomains no longer used.":
+        "Renouvelez ou remplacez ces certificats, ou supprimez les sous-domaines qui ne servent plus.",
+    "These subdomains only answer over unencrypted HTTP: {hosts}.":
+        "Ces sous-domaines ne répondent qu'en HTTP non chiffré : {hosts}.",
+    "Enable HTTPS on these subdomains (a free Let's Encrypt certificate is enough).":
+        "Activez le HTTPS sur ces sous-domaines (un certificat Let's Encrypt gratuit suffit).",
+    "These subdomains are still reachable over HTTP without a redirect to HTTPS: {hosts}.":
+        "Ces sous-domaines restent accessibles en HTTP sans redirection vers HTTPS : {hosts}.",
+    "Redirect HTTP to HTTPS (301) on these subdomains too.":
+        "Redirigez aussi HTTP vers HTTPS (301) sur ces sous-domaines.",
+    "These subdomains still accept TLS 1.0 or 1.1: {hosts}.": "Ces sous-domaines acceptent encore TLS 1.0 ou 1.1 : {hosts}.",
+    "Only allow TLS 1.2 and 1.3 on these subdomains too.": "N'autorisez que TLS 1.2 et 1.3 sur ces sous-domaines aussi.",
     # --- Summary for decision makers -----------------------------------------------------
     "Summary for decision makers": "Synthèse pour la direction",
     "Main risks": "Principaux risques",

@@ -228,3 +228,8 @@ def test_support_dates_are_read(product):
     cycles = load_cycles(product)
     assert len(cycles) > 3 and any(c.eol is False or not isinstance(c.eol, bool) for c in cycles)
     assert any(c.latest for c in cycles)
+
+
+def test_subdomain_audit_of_a_real_site():
+    (audit,) = Collector().audit_subdomains(["docs.github.com"])
+    assert audit.https and audit.cert_valid and audit.redirects and not audit.old_tls

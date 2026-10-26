@@ -102,6 +102,22 @@ class MailServerInfo:
 
 
 @dataclass
+class SubdomainAudit:
+    """Light check of a subdomain in use: HTTPS, certificate, redirect, old TLS, outdated software."""
+
+    host: str
+    https: bool = False  # something answers on port 443
+    cert_valid: bool | None = None
+    cert_error: str = ""
+    cert_expires: datetime | None = None
+    http: bool = False  # something answers on port 80
+    redirects: bool | None = None  # http:// ends on https:// (None: no answer on port 80)
+    old_tls: list[str] = field(default_factory=list)  # TLS 1.0 / 1.1 accepted
+    software: list = field(default_factory=list)  # software.Software
+    error: str = ""
+
+
+@dataclass
 class CookieInfo:
     name: str
     secure: bool
@@ -198,6 +214,7 @@ class CollectedData:
     mail_servers: list[MailServerInfo] | None = None
     software: list = field(default_factory=list)  # software.Software recognised on the home page
     lifecycles: dict = field(default_factory=dict)  # product -> list of software.Cycle, None if unavailable
+    subdomain_audits: list[SubdomainAudit] | None = None  # with --subdomains
     ns: list[str] = field(default_factory=list)  # name servers of the domain (to recognise the DNS host)
 
 

@@ -12,9 +12,10 @@ from __future__ import annotations
 from datetime import datetime
 
 from .ct import takeover_provider
-from .i18n import Date, M
-from .models import CAAInfo, Category, DNSSECInfo, Finding, RDAPInfo, Status, SubdomainInfo
+from .i18n import Date, Joined, M
+from .models import CAAInfo, Category, DNSSECInfo, Finding, RDAPInfo, Status, SubdomainAudit, SubdomainInfo
 from .rdap import TRANSFER_LOCKS
+from .software import check_software
 
 D = Category.DNS
 KNOWN_CAA_TAGS = {"issue", "issuewild", "iodef", "issuemail", "issuevmc", "contactemail", "contactphone"}
@@ -188,4 +189,58 @@ def _subdomain_findings(info: SubdomainInfo, title: str, src: str) -> list[Findi
         findings.append(_f(title, Status.OK,
                            M("{seen} None points to a resource that no longer exists.{active}",
                              seen=seen, active=active), source=src))
+    return findings
+
+
+# --- Subdomains in use (with --subdomains) -------------------------------------------
+def check_subdomain_audits(audits: list[SubdomainAudit], lifecycles: dict, now: datetime) -> list[Finding]:
+    """HTTPS, certificates, redirects, old TLS and outdated software of the subdomains in use.
+
+    Not scored: the grades describe the domain itself. Problems still appear among the priority actions.
+    """
+    if not audits:
+        return []
+    tls = Category.TLS
+    websites = [a for a in audits if a.https or a.http]
+    findings = []
+    title = "Subdomains: HTTPS certificates"
+    seen = M("{count} subdomain(s) in use checked, {web} with a website.", count=len(audits), web=len(websites))
+    bad = []
+    for a in audits:
+        if a.cert_valid is False:
+            bad.append(f"{a.host} ({a.cert_error})")
+        elif a.cert_expires and a.cert_expires < now:
+            bad.append(M("{host} (expired on {date})", host=a.host, date=Date(a.cert_expires)))
+    if bad:
+        findings.append(Finding(tls, title, Status.WARNING,
+                                M("{seen} Certificate not valid: {hosts}. Visitors get a security warning.",
+                                  seen=seen, hosts=Joined(bad)),
+                                "Renew or replace these certificates, or delete the subdomains no longer used.", None,
+                                "tls-guide"))
+    else:
+        findings.append(Finding(tls, title, Status.OK if websites else Status.INFO,
+                                M("{seen} Every certificate is valid.", seen=seen) if websites else seen,
+                                points=None, source="tls-guide"))
+    plain = [a.host for a in audits if a.http and not a.https]
+    no_redirect = [a.host for a in audits if a.https and a.redirects is False]
+    if plain:
+        findings.append(Finding(tls, "Subdomains: no HTTPS", Status.WARNING,
+                                M("These subdomains only answer over unencrypted HTTP: {hosts}.",
+                                  hosts=", ".join(plain)),
+                                "Enable HTTPS on these subdomains (a free Let's Encrypt certificate is enough).", None,
+                                "redirection"))
+    if no_redirect:
+        findings.append(Finding(tls, "Subdomains: HTTP to HTTPS redirect", Status.WARNING,
+                                M("These subdomains are still reachable over HTTP without a redirect to HTTPS: "
+                                  "{hosts}.", hosts=", ".join(no_redirect)),
+                                "Redirect HTTP to HTTPS (301) on these subdomains too.", None, "redirection"))
+    labels = {"TLSv1": "TLS 1.0", "TLSv1.1": "TLS 1.1"}
+    old = [f"{a.host} ({', '.join(labels[v] for v in a.old_tls)})" for a in audits if a.old_tls]
+    if old:
+        findings.append(Finding(tls, "Subdomains: obsolete TLS versions", Status.WARNING,
+                                M("These subdomains still accept TLS 1.0 or 1.1: {hosts}.", hosts=", ".join(old)),
+                                "Only allow TLS 1.2 and 1.3 on these subdomains too.", None, "rfc8996"))
+    for a in audits:
+        findings += [f for f in check_software(a.software, lifecycles, now, host=a.host)
+                     if f.status in (Status.CRITICAL, Status.WARNING)]
     return findings

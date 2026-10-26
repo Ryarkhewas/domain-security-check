@@ -39,6 +39,7 @@ from .models import (
     MTASTSInfo,
     RDAPInfo,
     SecurityTxtInfo,
+    SubdomainAudit,
     SubdomainInfo,
     TLSScanInfo,
 )
@@ -324,6 +325,42 @@ class Collector:
             elif state == "unknown":
                 info.unknown += 1
         return info
+
+    def audit_subdomains(self, hosts: list[str]) -> list[SubdomainAudit]:
+        """Light check of each subdomain in use, as a visitor would see it (a few requests each)."""
+        if not hosts:
+            return []
+        with ThreadPoolExecutor(max_workers=min(16, len(hosts))) as pool:
+            return list(pool.map(self._audit_subdomain, hosts))
+
+    def _audit_subdomain(self, host: str) -> SubdomainAudit:
+        audit = SubdomainAudit(host)
+        cert = self.certificate(host)
+        if cert is not None:
+            audit.https, audit.cert_valid, audit.cert_error = True, cert.valid, cert.error
+            audit.cert_expires = cert.expires_at
+            for version, name in ((scan.TLS10, "TLSv1"), (scan.TLS11, "TLSv1.1")):
+                try:
+                    hello = scan.probe(host, version, scan.VERSION_PROBE_SUITES, timeout=self.timeout)
+                except OSError:
+                    continue
+                if hello.accepted and hello.version == version:
+                    audit.old_tls.append(name)
+            if cert.valid:
+                try:
+                    r = requests.get(f"https://{host}", headers=dict(BROWSER_HEADERS), timeout=self.timeout)
+                    content_type = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+                    audit.software = software.detect(dict(r.headers), _page_text(r, content_type))
+                except requests.RequestException:
+                    pass
+        try:
+            r = requests.get(f"http://{host}", headers=dict(BROWSER_HEADERS), timeout=self.timeout)
+            audit.http, audit.redirects = True, r.url.startswith("https://")
+        except requests.exceptions.SSLError:
+            audit.http, audit.redirects = True, True  # redirected to HTTPS, where the certificate is a problem
+        except requests.RequestException:
+            pass
+        return audit
 
     def _cert_spotter(self, domain: str) -> list[str]:
         names: list[str] = []

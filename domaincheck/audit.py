@@ -7,7 +7,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
-from .dns_checks import check_caa, check_dnssec, check_registration, check_subdomains
+from .dns_checks import check_caa, check_dnssec, check_registration, check_subdomain_audits, check_subdomains
 from .email_checks import (
     check_dkim,
     check_dmarc,
@@ -105,6 +105,8 @@ def analyze(data: CollectedData, tested_selectors: list[str], now: datetime | No
     if data.subdomains is not None:
         findings += check_subdomains(data.subdomains)
     add_fixes(findings, detect(data.http.headers, data.ns, data.mx, data.domain))
+    if data.subdomain_audits is not None:  # after the fixes: those describe the main site's platform
+        findings += check_subdomain_audits(data.subdomain_audits, data.lifecycles, now)
 
     cap_reason = broken_https_reason(data, now)
     grades = category_grades(findings, exists, cap_reason)
@@ -142,11 +144,13 @@ def find_dmarc(collector, domain: str) -> tuple[list[str], str]:
     return records, ""
 
 
-def run_audit(text: str, collector=None, ct_logs: bool = True, mail_servers: bool = True) -> Result:
+def run_audit(text: str, collector=None, ct_logs: bool = True, mail_servers: bool = True,
+              subdomains: bool = False) -> Result:
     """Collect everything about a domain and analyse it.
 
     ct_logs=False skips the subdomains published in Certificate Transparency logs (the slowest part).
     mail_servers=False skips the connections to the mail servers on port 25.
+    subdomains=True also checks each subdomain in use found in the CT logs (HTTPS, certificate, old TLS, software).
     """
     from .collector import DKIM_SELECTORS, Collector
 
@@ -159,8 +163,8 @@ def run_audit(text: str, collector=None, ct_logs: bool = True, mail_servers: boo
 
     # CT logs answer slowly: they are read while the rest is collected
     ct_pool = ThreadPoolExecutor(max_workers=1)
-    subdomains = (ct_pool.submit(collector.subdomains, mail_domain)
-                  if ct_logs and hasattr(collector, "subdomains") else None)
+    ct_future = (ct_pool.submit(collector.subdomains, mail_domain)
+                 if (ct_logs or subdomains) and hasattr(collector, "subdomains") else None)
     ct_pool.shutdown(wait=False)
     dmarc_records, dmarc_parent = find_dmarc(collector, mail_domain)
     data = CollectedData(
@@ -187,14 +191,22 @@ def run_audit(text: str, collector=None, ct_logs: bool = True, mail_servers: boo
         data.lifecycles = collector.lifecycles([s.product for s in data.software if s.version])
     if hasattr(collector, "ns"):
         data.ns = collector.ns(domain)
-    if subdomains is not None:
-        data.subdomains = subdomains.result()
+    if ct_future is not None:
+        data.subdomains = ct_future.result()
+    if subdomains and data.subdomains is not None and hasattr(collector, "audit_subdomains"):
+        hosts = [h for h in data.subdomains.resolving if h != domain]
+        data.subdomain_audits = collector.audit_subdomains(hosts)
+        found = [s.product for a in data.subdomain_audits for s in a.software if s.version]
+        missing = [p for p in found if p not in data.lifecycles]
+        if missing and hasattr(collector, "lifecycles"):
+            data.lifecycles.update(collector.lifecycles(missing))
     return analyze(data, DKIM_SELECTORS)
 
 
 def audit_many(domains: list[str], workers: int = 6,
                on_done: Callable[[str, Result | Exception], None] | None = None,
-               ct_logs: bool = True, mail_servers: bool = True) -> dict[str, Result | Exception]:
+               ct_logs: bool = True, mail_servers: bool = True,
+               subdomains: bool = False) -> dict[str, Result | Exception]:
     """Audit several domains at the same time (most of an audit is spent waiting for the network).
 
     Returns {domain: Result, or the exception that stopped its audit}, in the order given.
@@ -205,7 +217,8 @@ def audit_many(domains: list[str], workers: int = 6,
     Collector().preload_list()  # downloaded once, before the threads share it
     outcomes: dict[str, Result | Exception] = {}
     with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
-        options = ({} if ct_logs else {"ct_logs": False}) | ({} if mail_servers else {"mail_servers": False})
+        options = (({} if ct_logs else {"ct_logs": False}) | ({} if mail_servers else {"mail_servers": False})
+                   | ({"subdomains": True} if subdomains else {}))
         futures = {pool.submit(run_audit, d, **options): d for d in domains}
         for future in as_completed(futures):
             domain = futures[future]
