@@ -13,6 +13,9 @@ from xml.sax.saxutils import escape
 from .branding import Branding
 from .i18n import date
 from .models import Category, Result, Status
+from .nis2 import DIRECTIVE_URL as NIS2_URL
+from .nis2 import HEADING as NIS2_HEADING
+from .nis2 import INTRO as NIS2_INTRO
 from .report import (
     CATEGORY_LABELS,
     CATEGORY_METHOD,
@@ -28,6 +31,7 @@ from .report import (
     changes_heading,
     executive_lines,
     letter,
+    nis2_rows,
     reference_groups,
 )
 from .sources import references
@@ -51,7 +55,8 @@ GRADE_COLORS = {"A": STATUS_COLORS[Status.OK], "B": STATUS_COLORS[Status.OK], "C
 TEXT, MUTED, BORDER = "#1d2330", "#5d6677", "#e3e6eb"
 
 
-def render_pdf(r: Result, author: str = "", lang: str = "en", branding: Branding | None = None) -> bytes:
+def render_pdf(r: Result, author: str = "", lang: str = "en", branding: Branding | None = None,
+               nis2: bool = False) -> bytes:
     """The report as PDF bytes. Raise PDFUnavailable if ReportLab is missing.
 
     With a branding (company, contact, client, logo or colour), the report starts with a cover page.
@@ -172,6 +177,18 @@ def render_pdf(r: Result, author: str = "", lang: str = "en", branding: Branding
             item = (f'{i}. <b>{t(L(f.title))}</b> <font color="{fg}" size="8">({t(tags)})</font>'
                     f"<br/>{t(L(f.recommendation))}")
             story.append(Paragraph(item, style(f"p{i}", 9.5, spaceAfter=4, leftIndent=10, firstLineIndent=-10)))
+
+    if nis2:
+        story.append(Paragraph(t(L(NIS2_HEADING)), h2))
+        story.append(Paragraph(f'{t(L(NIS2_INTRO))} <a href="{escape(NIS2_URL)}">{t(L("Read the directive"))}</a>',
+                               body))
+        cells = [[Paragraph(f"<b>{t(L(h))}</b>", small) for h in ("Measure", "In this audit", "Result")]]
+        cells += [[Paragraph(t(a), small), Paragraph(t(b), small), Paragraph(t(c), small)]
+                  for a, b, c in nis2_rows(r, L)]
+        nis2_table = Table(cells, colWidths=[70 * mm, 25 * mm, 85 * mm], repeatRows=1)
+        nis2_table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"),
+                                        ("LINEBELOW", (0, 0), (-1, -1), 0.4, colors.HexColor(BORDER))]))
+        story += [Spacer(1, 2 * mm), nis2_table]
 
     for cat in Category:
         group = [f for f in r.findings if f.category == cat]

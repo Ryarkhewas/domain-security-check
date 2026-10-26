@@ -12,12 +12,13 @@ from pathlib import Path
 
 PACKAGE = Path(__file__).resolve().parent.parent / "domaincheck"
 MODULES = ["web_checks", "tls_checks", "email_checks", "dns_checks", "audit", "scoring", "report", "pdf_report",
-           "models", "collector", "cli", "sources", "hosting", "summary", "software"]
+           "models", "collector", "cli", "sources", "hosting", "summary", "software", "nis2"]
 # positions of title, detail and recommendation in each helper
 TEXT_ARGS = {"Finding": (1, 3, 4), "M": (0,), "t": (0,), "L": (0,), "tr": (0,), "say": (0,)}
 F_ARGS = {"web_checks": (0, 2, 3), "email_checks": (0, 2, 3), "dns_checks": (0, 2, 3)}
+NIS2_TEXTS = {"HEADING", "INTRO", "NOT_VISIBLE", "NO_PROBLEM"}
 LABEL_DICTS = {"LABELS", "CATEGORY_LABELS", "CATEGORY_METHOD", "GRADE_SUMMARY", "RISKS", "EFFORT_LABELS",
-               "IMPACT_LABELS"}
+               "IMPACT_LABELS", "NIS2_MEASURES"}
 
 
 def _text(node) -> str | None:
@@ -50,7 +51,7 @@ def translatable_texts() -> dict[str, set[str]]:
                 values = [node.value] if isinstance(targets, ast.Name) else getattr(node.value, "elts", [])
                 for target, value in zip(names, values, strict=False):
                     name = getattr(target, "id", "")
-                    if name == "title" or name.endswith(("_title", "_TEXT")):
+                    if name == "title" or name.endswith(("_title", "_TEXT")) or name in NIS2_TEXTS:
                         add(value, module)
                 if getattr(targets, "id", "") in LABEL_DICTS and isinstance(node.value, ast.Dict):
                     for value in node.value.values:

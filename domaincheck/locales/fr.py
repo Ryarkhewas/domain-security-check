@@ -670,6 +670,42 @@ FR: dict[str, str] = {
         "Redirigez aussi HTTP vers HTTPS (301) sur ces sous-domaines.",
     "These subdomains still accept TLS 1.0 or 1.1: {hosts}.": "Ces sous-domaines acceptent encore TLS 1.0 ou 1.1 : {hosts}.",
     "Only allow TLS 1.2 and 1.3 on these subdomains too.": "N'autorisez que TLS 1.2 et 1.3 sur ces sous-domaines aussi.",
+    # --- NIS 2 view (summaries of article 21(2), not quotations) -------------------------
+    "NIS 2 view (article 21)": "Lecture NIS 2 (article 21)",
+    "Directive (EU) 2022/2555 (NIS 2) lists in its article 21(2) the cybersecurity measures that essential and "
+    "important entities must take. From the Internet, this audit gives evidence for some of them only: this table "
+    "links each check to a measure, it is not a compliance assessment.":
+        "La directive (UE) 2022/2555 (NIS 2) liste dans son article 21(2) les mesures de cybersécurité que les entités "
+        "essentielles et importantes doivent prendre. Depuis Internet, cet audit n'apporte des éléments que pour "
+        "certaines d'entre elles : ce tableau relie chaque contrôle à une mesure, ce n'est pas une évaluation de "
+        "conformité.",
+    "Read the directive": "Lire la directive",
+    "Measure": "Mesure",
+    "In this audit": "Dans cet audit",
+    "Result": "Résultat",
+    "{count} check(s)": "{count} contrôle(s)",
+    "{count} problem(s): {names}": "{count} problème(s) : {names}",
+    "No problem seen in the related checks.": "Aucun problème relevé dans les contrôles liés.",
+    "Not visible from outside: depends on internal organisation and documents.":
+        "Invisible depuis l'extérieur : dépend de l'organisation et des documents internes.",
+    "Risk analysis and information system security policies":
+        "Politiques d'analyse des risques et de sécurité des systèmes d'information",
+    "Incident handling": "Gestion des incidents",
+    "Business continuity (backups, disaster recovery, crisis management)":
+        "Continuité des activités (sauvegardes, reprise après sinistre, gestion de crise)",
+    "Supply chain security": "Sécurité de la chaîne d'approvisionnement",
+    "Security in acquisition, development and maintenance, including vulnerability handling and disclosure":
+        "Sécurité de l'acquisition, du développement et de la maintenance, dont le traitement et la divulgation des "
+        "vulnérabilités",
+    "Assessing the effectiveness of the risk-management measures":
+        "Évaluation de l'efficacité des mesures de gestion des risques",
+    "Basic cyber hygiene practices and cybersecurity training":
+        "Pratiques de base de cyberhygiène et formation à la cybersécurité",
+    "Use of cryptography and encryption": "Utilisation de la cryptographie et du chiffrement",
+    "Human resources security, access control and asset management":
+        "Sécurité des ressources humaines, contrôle d'accès et gestion des actifs",
+    "Multi-factor authentication and secured communications":
+        "Authentification à plusieurs facteurs et communications sécurisées",
     # --- Summary for decision makers -----------------------------------------------------
     "Summary for decision makers": "Synthèse pour la direction",
     "Main risks": "Principaux risques",

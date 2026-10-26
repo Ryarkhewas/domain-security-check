@@ -9,6 +9,12 @@ from html import escape
 
 from .i18n import M, date, tr
 from .models import Category, Result, Status
+from .nis2 import DIRECTIVE_URL as NIS2_URL
+from .nis2 import HEADING as NIS2_HEADING
+from .nis2 import INTRO as NIS2_INTRO
+from .nis2 import NO_PROBLEM as NIS2_NO_PROBLEM
+from .nis2 import NOT_VISIBLE as NIS2_NOT_VISIBLE
+from .nis2 import view as nis2_view
 from .scoring import GRADE_ORDER
 from .sources import SOURCES, references
 from .summary import EFFORT_LABELS, IMPACT_LABELS, actions, effort_line, grade_after_quick_fixes, main_risks
@@ -95,6 +101,9 @@ white-space:nowrap}
 .tag.impact-high{border-color:var(--crit);color:var(--crit)}.tag.impact-medium{border-color:var(--warn);color:var(--warn)}
 .exec{margin:24px 0;padding:4px 20px 12px;background:var(--card);border:1px solid var(--border);border-radius:14px}
 .exec ul{padding-left:20px}.exec li{margin-bottom:6px}
+.nis2 table{width:100%;border-collapse:collapse;font-size:14px;background:var(--card)}
+.nis2 th,.nis2 td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--border)}
+.nis2 td:nth-child(2){white-space:nowrap;color:var(--muted)}
 footer{margin-top:40px;color:var(--muted);font-size:13px;border-top:1px solid var(--border);padding-top:16px}
 table.list{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--border);border-radius:12px;
 overflow:hidden;font-size:14px}
@@ -152,7 +161,7 @@ def _linked(t, template: str, link: str, **params) -> str:
     return escape(t(template, link=marker, **params)).replace(marker, link)
 
 
-def render_html(r: Result, author: str = "", lang: str = "en", branding=None) -> str:
+def render_html(r: Result, author: str = "", lang: str = "en", branding=None, nis2: bool = False) -> str:
     e = escape
     t = _translator(lang)
     counts = {s: sum(1 for f in r.findings if f.status == s) for s in Status}
@@ -230,6 +239,7 @@ def render_html(r: Result, author: str = "", lang: str = "en", branding=None) ->
 {_executive_html(r, t)}
 {_changes_html(r.changes, t, lang)}
 {priority_block}
+{_nis2_html(r, t) if nis2 else ""}
 {sections}
 <footer>
 <p><b>{e(t("Method."))}</b> {e(t(METHOD_TEXT, by=by))}</p>
@@ -239,6 +249,32 @@ def render_html(r: Result, author: str = "", lang: str = "en", branding=None) ->
 </footer>
 </main></body></html>
 """
+
+
+def nis2_rows(r: Result, t) -> list[tuple[str, str, str]]:
+    """[(measure, checks, result)] translated, for the HTML and PDF NIS 2 tables."""
+    rows = []
+    for m in nis2_view(r):
+        measure = f"({m.letter}) {t(m.label)}"
+        if not m.checks:
+            rows.append((measure, "–", t(NIS2_NOT_VISIBLE)))
+            continue
+        checks = t("{count} check(s)", count=m.checks)
+        if m.problems:
+            names = ", ".join(dict.fromkeys(str(t(f.title)) for f in m.problems))
+            rows.append((measure, checks, t("{count} problem(s): {names}", count=len(m.problems), names=names)))
+        else:
+            rows.append((measure, checks, t(NIS2_NO_PROBLEM)))
+    return rows
+
+
+def _nis2_html(r: Result, t) -> str:
+    e = escape
+    body = "".join(f"<tr><td>{e(a)}</td><td>{e(b)}</td><td>{e(c)}</td></tr>" for a, b, c in nis2_rows(r, t))
+    intro = f'{e(t(NIS2_INTRO))} <a href="{e(NIS2_URL)}">{e(t("Read the directive"))}</a>'
+    return (f'<section class="nis2"><h2>{e(t(NIS2_HEADING))}</h2><p>{intro}</p><table><thead><tr>'
+            f'<th>{e(t("Measure"))}</th><th>{e(t("In this audit"))}</th><th>{e(t("Result"))}</th></tr></thead>'
+            f"<tbody>{body}</tbody></table></section>")
 
 
 def _branding_html(branding, t) -> str:

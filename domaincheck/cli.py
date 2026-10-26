@@ -92,6 +92,8 @@ def main(argv: list[str] | None = None) -> int:
                         "(default: the <domain>.json saved next to the report by the previous run)")
     p.add_argument("--no-ct-logs", action="store_true",
                    help="Skip the subdomains published in Certificate Transparency logs (faster)")
+    p.add_argument("--nis2", action="store_true",
+                   help="Add a NIS 2 view: how the checks relate to the measures of article 21 of the directive")
     p.add_argument("--subdomains", action="store_true",
                    help="Also check every subdomain in use found in the CT logs (HTTPS, certificate, old TLS, "
                         "outdated software); slower")
@@ -151,13 +153,13 @@ def _single(result: Result, args) -> int:
     output = args.output or args.output_dir / f"{result.domain}.html"
     output.parent.mkdir(parents=True, exist_ok=True)
     _compare_and_save(result, output.with_suffix(".json"), args.previous)
-    output.write_text(render_html(result, args.author, args.lang, args.branding), encoding="utf-8")
+    output.write_text(render_html(result, args.author, args.lang, args.branding, args.nis2), encoding="utf-8")
     print(render_json(result) if args.json else console_summary(result, args.lang))
     say = _translator(args.lang)
     print(say("HTML report: {path}", path=str(output)), file=sys.stderr)
     if args.pdf:
         pdf = output.with_suffix(".pdf")
-        pdf.write_bytes(render_pdf(result, args.author, args.lang, args.branding))
+        pdf.write_bytes(render_pdf(result, args.author, args.lang, args.branding, args.nis2))
         print(say("PDF report: {path}", path=str(pdf)), file=sys.stderr)
     return 0
 
@@ -204,10 +206,11 @@ def _several(domains: list[str], args) -> int:
             raise outcome
         results.append(outcome)
         _compare_and_save(outcome, out / f"{outcome.domain}.json")
-        html = render_html(outcome, args.author, args.lang, args.branding)
+        html = render_html(outcome, args.author, args.lang, args.branding, args.nis2)
         (out / f"{outcome.domain}.html").write_text(html, encoding="utf-8")
         if args.pdf:
-            (out / f"{outcome.domain}.pdf").write_bytes(render_pdf(outcome, args.author, args.lang, args.branding))
+            pdf = render_pdf(outcome, args.author, args.lang, args.branding, args.nis2)
+            (out / f"{outcome.domain}.pdf").write_bytes(pdf)
 
     (out / "index.html").write_text(render_index(results, errors, args.author, args.lang), encoding="utf-8")
     if args.json:
