@@ -6,6 +6,8 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-10-26
+
 ### Added
 - Outdated software: WordPress, Joomla, Drupal, TYPO3, PrestaShop and PHP are recognised on the home page (generator tag, X-Generator and X-Powered-By headers, WordPress file addresses), and their support status is read from endoflife.date (cached for three days): unsupported version critical, update available warning. Not scored, so that the website grade stays the Observatory's, but listed among the priority actions.
 - `--subdomains`: every subdomain in use found in the CT logs is checked like a visitor would see it: HTTPS, certificate, HTTP to HTTPS redirect, TLS 1.0/1.1 still accepted, outdated software. Not scored; listed among the priority actions.
@@ -100,6 +102,7 @@ First release.
 - 201 unit tests on Python 3.10 to 3.13, lint (ruff) and type check (mypy) in CI, and a build test of the package.
 - Weekly Live check against real domains, including a test-by-test comparison with the Mozilla HTTP Observatory API.
 
+[1.6.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.6.0
 [1.5.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.5.0
 [1.4.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.4.0
 [1.3.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.3.0
