@@ -8,18 +8,22 @@ In a single command, the tool checks what anyone can see from the Internet about
 
 ![Report preview](examples/preview.png)
 
-Example reports: [HTML](examples/demo_report.html) and [PDF](examples/demo_report.pdf), the same in French: [PDF](examples/demo_report_fr.pdf), and a branded French PDF with a cover page: [PDF](examples/demo_report_branded_fr.pdf).
+Example reports: [HTML](examples/demo_report.html) and [PDF](examples/demo_report.pdf), the same in French: [PDF](examples/demo_report_fr.pdf), and a branded French PDF with a cover page, the subdomain checks and the NIS 2 view: [PDF](examples/demo_report_branded_fr.pdf).
 
 ## What is checked
 
 | Area | Checks |
 |---|---|
-| **Website** | HTTP to HTTPS redirect, HSTS (including the browsers' preload list), Content-Security-Policy, cookies (Secure, HttpOnly, SameSite), Subresource Integrity of external scripts, clickjacking protection, X-Content-Type-Options, Referrer-Policy, Cross-Origin-Resource/Opener/Embedder-Policy; not scored: Permissions-Policy, software version disclosure, security.txt (how to report a vulnerability) |
+| **Website** | HTTP to HTTPS redirect, HSTS (including the browsers' preload list), Content-Security-Policy, cookies (Secure, HttpOnly, SameSite), Subresource Integrity of external scripts, clickjacking protection, X-Content-Type-Options, Referrer-Policy, Cross-Origin-Resource/Opener/Embedder-Policy; not scored: Permissions-Policy, software version disclosure, security.txt (how to report a vulnerability), outdated software (WordPress, Joomla, Drupal, TYPO3, PrestaShop and PHP recognised on the home page, with their support status) |
 | **Certificate & TLS** | Valid certificate, expiry date, key strength; protocol versions accepted (SSL 3.0 to TLS 1.3), broken cipher suites (RC4, 3DES, export, no encryption), forward secrecy |
 | **Email** | MX servers, SPF (presence, `all` rule, 10 DNS lookup limit), DMARC (policy, coverage, reports, inheritance from the parent domain for subdomains), DKIM (common selectors), MTA-STS (record, policy file, mode, coverage of the mail servers), the mail servers themselves (STARTTLS offered, TLS version, certificate, as a sending server sees them); not scored: TLS reporting (TLS-RPT), DANE records |
 | **Domain & DNS** | DNSSEC (enabled, and consistent between the parent zone and the domain's keys), CAA (which certificate authorities may issue certificates), expiry date of the domain and transfer lock (from the registry, through RDAP), forgotten subdomains: names published in Certificate Transparency logs whose DNS record points to a resource that no longer exists (subdomain takeover) |
 
 Each item is rated **Critical**, **To improve**, **Compliant** or **Info**, shows the points it weighs in the grade, cites the standard it is based on (and the matching ANSSI or CNIL recommendation, when there is one), and comes with a plain-language recommendation.
+
+**Optional, for a deeper audit:**
+- `--subdomains` also checks every subdomain in use found in the Certificate Transparency logs: HTTPS available, valid certificate, HTTP to HTTPS redirect, TLS 1.0/1.1 still accepted, outdated software. It takes a few requests per subdomain, so it is off by default. These items are not scored (the grades describe the domain itself) but appear among the priority actions.
+- `--nis2` adds a **NIS 2 view**: for each of the ten measures of article 21(2) of [Directive (EU) 2022/2555](https://eur-lex.europa.eu/eli/dir/2022/2555/oj) (encryption, maintenance and vulnerability handling, cyber hygiene, asset management…), the related checks of the audit and the problems found. Measures that cannot be seen from the Internet (risk analysis, incident handling, supply chain, training…) are shown as such: the table links checks to measures, it is not a compliance assessment.
 
 **Summary for decision makers.** The report opens with the main risks in business terms ("anyone can send emails in the company's name"), the effort needed (quick fixes under 30 minutes, a few hours, or a project needing a developer or a provider) and the overall grade the quick fixes alone would give. Each priority action shows its impact and its effort, and the list starts with what pays off most for the least work.
 
@@ -27,7 +31,7 @@ Each item is rated **Critical**, **To improve**, **Compliant** or **Info**, show
 
 ## A strictly passive audit
 
-The tool only does what any visitor or mail server does: public DNS lookups, HTTPS connections, and requests to the home page (over HTTPS and HTTP) and to `robots.txt`, like Mozilla HTTP Observatory. **No port scanning, no intrusion testing.** It also reads the site's public `security.txt` file and, for email, the MTA-STS policy file when the domain announces one, as any sending mail server does. To check the mail servers, it connects to them on port 25 like a sending server, asks for encryption (STARTTLS), completes the TLS handshake and says goodbye (QUIT): no email is ever sent. Port 25 is blocked by many networks (home connections, cloud providers); the report then says nothing could be concluded, and `--no-mail-servers` skips this step. The registration data of the domain (expiry date, status) comes from the registry's public RDAP service, the successor of WHOIS. The other downloads are public lists, each cached for a week: the [HSTS preload list](https://hstspreload.org/) and the [IANA list of RDAP servers](https://data.iana.org/rdap/dns.json). To see which TLS versions and cipher suites the server accepts, it sends a few times the first message of a TLS connection (the ClientHello an old or a current browser would send), reads the server's answer and closes: no key exchange, no data. Subdomains are read from public Certificate Transparency logs ([crt.sh](https://crt.sh/), or [Cert Spotter](https://sslmate.com/certspotter/) when crt.sh does not answer); each one is only looked up in DNS, never contacted. If the local DNS resolver refuses DNSSEC queries (some routers and Linux setups do), those queries are retried through public resolvers (Cloudflare, Quad9, Google).
+The tool only does what any visitor or mail server does: public DNS lookups, HTTPS connections, and requests to the home page (over HTTPS and HTTP) and to `robots.txt`, like Mozilla HTTP Observatory. **No port scanning, no intrusion testing.** It also reads the site's public `security.txt` file and, for email, the MTA-STS policy file when the domain announces one, as any sending mail server does. To check the mail servers, it connects to them on port 25 like a sending server, asks for encryption (STARTTLS), completes the TLS handshake and says goodbye (QUIT): no email is ever sent. Port 25 is blocked by many networks (home connections, cloud providers); the report then says nothing could be concluded, and `--no-mail-servers` skips this step. The registration data of the domain (expiry date, status) comes from the registry's public RDAP service, the successor of WHOIS. The support dates of software versions come from [endoflife.date](https://endoflife.date/) (cached for three days). The other downloads are public lists, each cached for a week: the [HSTS preload list](https://hstspreload.org/) and the [IANA list of RDAP servers](https://data.iana.org/rdap/dns.json). To see which TLS versions and cipher suites the server accepts, it sends a few times the first message of a TLS connection (the ClientHello an old or a current browser would send), reads the server's answer and closes: no key exchange, no data. Subdomains are read from public Certificate Transparency logs ([crt.sh](https://crt.sh/), or [Cert Spotter](https://sslmate.com/certspotter/) when crt.sh does not answer); each one is only looked up in DNS, never contacted. If the local DNS resolver refuses DNSSEC queries (some routers and Linux setups do), those queries are retried through public resolvers (Cloudflare, Quad9, Google).
 
 Requests identify themselves as a current desktop browser, with `domain-security-check` appended to the User-Agent. Some sites answer differently to bots (no HTTPS redirect, missing headers): this way the report shows what real visitors get, while the tool stays identifiable in server logs.
 
@@ -79,6 +83,9 @@ domain-security-check client.fr --pdf --company "Your company" --logo logo.png -
 
 # Skip the Certificate Transparency logs (faster: crt.sh can take a minute on large domains)
 domain-security-check my-domain.com --no-ct-logs
+
+# Deeper audit: subdomains in use, and the NIS 2 view
+domain-security-check client.fr --subdomains --nis2 --pdf --lang fr
 
 # Skip the connections to the mail servers on port 25
 domain-security-check my-domain.com --no-mail-servers
@@ -161,6 +168,7 @@ Every check is based on a published standard or guide, cited under each item of 
 | CAA | [RFC 8659](https://www.rfc-editor.org/rfc/rfc8659) |
 | Domain registration data (expiry, status) | [RFC 9083](https://www.rfc-editor.org/rfc/rfc9083) (RDAP), [RFC 9224](https://www.rfc-editor.org/rfc/rfc9224) (finding the RDAP server), [RFC 5731](https://www.rfc-editor.org/rfc/rfc5731#section-2.3) (transfer lock status) |
 | Forgotten subdomains | [RFC 9162](https://www.rfc-editor.org/rfc/rfc9162) (Certificate Transparency); ANSSI PA-009 R3 recommends watching CT logs |
+| Outdated software (not scored) | Support dates from [endoflife.date](https://endoflife.date/); the CNIL website sheet asks to keep components updated |
 | security.txt (not scored) | [RFC 9116](https://www.rfc-editor.org/rfc/rfc9116) |
 | Website scoring | [Mozilla HTTP Observatory](https://github.com/mdn/mdn-http-observatory) (MPL 2.0) |
 
@@ -195,6 +203,8 @@ domaincheck/
   smtp_scan.py              Mail servers: STARTTLS, TLS and certificate on port 25
   summary.py                Summary for decision makers: risks, effort, impact
   branding.py               Branded reports (logo, company, contact, client, colour)
+  software.py               Outdated software: CMS and PHP recognition, support dates
+  nis2.py                   NIS 2 view: checks related to the measures of article 21(2)
   email_checks.py           MX / SPF / DMARC / DKIM / MTA-STS analysis
   dns_checks.py             DNSSEC, CAA, registration and subdomain analysis
   web_checks.py             Website checks (Mozilla HTTP Observatory tests)
@@ -210,7 +220,7 @@ domaincheck/
   hsts_preload.py           HSTS preload list (download, cache, lookups)
   rdap.py                   Domain registration data (RDAP servers, answers)
   observatory.py            Test-by-test comparison with the Observatory API
-tests/                      894 unit tests + live tests (tests/live)
+tests/                      973 unit tests + live tests (tests/live)
 scripts/live_summary.py     Audits a list of domains for the Live check workflow
 scripts/observatory_compare.py  Compares the website grades with the Observatory
 ```
@@ -220,7 +230,7 @@ Collection is kept separate from analysis: every rule can be tested on fixed dat
 ## Tests
 
 ```bash
-python -m pytest -q          # 894 unit tests, no network needed
+python -m pytest -q          # 973 unit tests, no network needed
 ruff check .                 # lint
 mypy                         # type check
 python -m pytest -m live -v  # live tests against real domains (Internet required)
@@ -237,6 +247,7 @@ Three GitHub Actions workflows keep the tool honest:
   - DNSSEC must match an independent resolver, and CAA (google.com) and MTA-STS (gmail.com) must be found where they are published;
   - registration data and security.txt must be found on known domains (including a .fr domain);
   - TLS 1.0 (tls-v1-0.badssl.com), 3DES (3des.badssl.com) and the RSA key exchange (static-rsa.badssl.com) must be detected, and github.com must pass the TLS checks;
+  - the support dates of PHP, WordPress, Drupal, Joomla and TYPO3 must be read from endoflife.date, and docs.github.com must pass the subdomain checks;
   - gmail.com's mail server must offer STARTTLS with a valid certificate (skipped when port 25 is blocked from the network running the tests);
   - subdomains of afnic.fr must be read from the Certificate Transparency logs (the test is skipped when crt.sh and Cert Spotter are both down), and the DNS host and email provider of known domains must be recognised;
   - the website grade of each domain is compared with Mozilla HTTP Observatory, test by test, and a warning is raised if the Observatory moves to another version of its scoring algorithm (this tool reproduces version 6).

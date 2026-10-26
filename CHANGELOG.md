@@ -6,6 +6,11 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Outdated software: WordPress, Joomla, Drupal, TYPO3, PrestaShop and PHP are recognised on the home page (generator tag, X-Generator and X-Powered-By headers, WordPress file addresses), and their support status is read from endoflife.date (cached for three days): unsupported version critical, update available warning. Not scored, so that the website grade stays the Observatory's, but listed among the priority actions.
+- `--subdomains`: every subdomain in use found in the CT logs is checked like a visitor would see it: HTTPS, certificate, HTTP to HTTPS redirect, TLS 1.0/1.1 still accepted, outdated software. Not scored; listed among the priority actions.
+- `--nis2`: a NIS 2 view in the HTML and PDF reports, linking each check to the measures of article 21(2) of Directive (EU) 2022/2555, with the problems found, and the measures that cannot be seen from outside. Presented as a reading grid, not a compliance assessment.
+
 ## [1.5.0] - 2026-10-18
 
 ### Added
