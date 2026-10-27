@@ -14,15 +14,16 @@ Example reports: [HTML](examples/demo_report.html) and [PDF](examples/demo_repor
 
 | Area | Checks |
 |---|---|
-| **Website** | HTTP to HTTPS redirect, HSTS (including the browsers' preload list), Content-Security-Policy, cookies (Secure, HttpOnly, SameSite), Subresource Integrity of external scripts, clickjacking protection, X-Content-Type-Options, Referrer-Policy, Cross-Origin-Resource/Opener/Embedder-Policy; not scored: Permissions-Policy, software version disclosure, security.txt (how to report a vulnerability), outdated software (WordPress, Joomla, Drupal, TYPO3, PrestaShop and PHP recognised on the home page, with their support status) |
+| **Website** | HTTP to HTTPS redirect, HSTS (including the browsers' preload list), Content-Security-Policy, cookies (Secure, HttpOnly, SameSite), Subresource Integrity of external scripts, clickjacking protection, X-Content-Type-Options, Referrer-Policy, Cross-Origin-Resource/Opener/Embedder-Policy; not scored: Permissions-Policy, software version disclosure, security.txt (how to report a vulnerability), outdated software (WordPress, Joomla, Drupal, TYPO3, PrestaShop and PHP recognised on the home page, with their support status), advertising and analytics trackers loaded before consent (Google Analytics, Meta Pixel, Hotjar…) |
 | **Certificate & TLS** | Valid certificate, expiry date, key strength; protocol versions accepted (SSL 3.0 to TLS 1.3), broken cipher suites (RC4, 3DES, export, no encryption), forward secrecy |
-| **Email** | MX servers, SPF (presence, `all` rule, 10 DNS lookup limit), DMARC (policy, coverage, reports, inheritance from the parent domain for subdomains), DKIM (common selectors), MTA-STS (record, policy file, mode, coverage of the mail servers), the mail servers themselves (STARTTLS offered, TLS version, certificate, as a sending server sees them); not scored: TLS reporting (TLS-RPT), DANE records |
-| **Domain & DNS** | DNSSEC (enabled, and consistent between the parent zone and the domain's keys), CAA (which certificate authorities may issue certificates), expiry date of the domain and transfer lock (from the registry, through RDAP), forgotten subdomains: names published in Certificate Transparency logs whose DNS record points to a resource that no longer exists (subdomain takeover) |
+| **Email** | MX servers, SPF (presence, `all` rule, 10 DNS lookup limit), DMARC (policy, coverage, reports, inheritance from the parent domain for subdomains), DKIM (about 50 common selectors, including those of the sending services named in SPF; key strength: RSA under 2048 bits flagged), MTA-STS (record, policy file, mode, coverage of the mail servers), the mail servers themselves (STARTTLS offered, TLS version, certificate, as a sending server sees them); not scored: TLS reporting (TLS-RPT), DANE records |
+| **Domain & DNS** | DNSSEC (enabled, and consistent between the parent zone and the domain's keys), CAA (which certificate authorities may issue certificates, and whether the authority of the certificate in use is one of them), expiry date of the domain and transfer lock (from the registry, through RDAP), forgotten subdomains: names published in Certificate Transparency logs whose DNS record points to a resource that no longer exists (subdomain takeover) |
 
 Each item is rated **Critical**, **To improve**, **Compliant** or **Info**, shows the points it weighs in the grade, cites the standard it is based on (and the matching ANSSI or CNIL recommendation, when there is one), and comes with a plain-language recommendation.
 
 **Optional, for a deeper audit:**
 - `--subdomains` also checks every subdomain in use found in the Certificate Transparency logs: HTTPS available, valid certificate, HTTP to HTTPS redirect, TLS 1.0/1.1 still accepted, outdated software. It takes a few requests per subdomain, so it is off by default. These items are not scored (the grades describe the domain itself) but appear among the priority actions.
+- `--browser` loads the home page in a real browser (headless Chromium), without clicking anything, to see the trackers that are contacted or set cookies before consent, including those a tag manager adds in JavaScript. Without it, trackers are looked for in the page received only. It needs Playwright: `pip install "domain-security-check[browser]"`, then `playwright install chromium`.
 - `--nis2` adds a **NIS 2 view**: for each of the ten measures of article 21(2) of [Directive (EU) 2022/2555](https://eur-lex.europa.eu/eli/dir/2022/2555/oj) (encryption, maintenance and vulnerability handling, cyber hygiene, asset management…), the related checks of the audit and the problems found. Measures that cannot be seen from the Internet (risk analysis, incident handling, supply chain, training…) are shown as such: the table links checks to measures, it is not a compliance assessment.
 
 **Summary for decision makers.** The report opens with the main risks in business terms ("anyone can send emails in the company's name"), the effort needed (quick fixes under 30 minutes, a few hours, or a project needing a developer or a provider) and the overall grade the quick fixes alone would give. Each priority action shows its impact and its effort, and the list starts with what pays off most for the least work.
@@ -45,7 +46,7 @@ Requires Python 3.10 or later.
 # Latest release, straight from GitHub
 pip install "git+https://github.com/Ryarkhewas/domain-security-check@v1.6.0"
 
-# With PDF output
+# With PDF output (add ,browser for --browser)
 pip install "domain-security-check[pdf] @ git+https://github.com/Ryarkhewas/domain-security-check@v1.6.0"
 
 # Or from a clone, to work on the code
@@ -84,8 +85,8 @@ domain-security-check client.fr --pdf --company "Your company" --logo logo.png -
 # Skip the Certificate Transparency logs (faster: crt.sh can take a minute on large domains)
 domain-security-check my-domain.com --no-ct-logs
 
-# Deeper audit: subdomains in use, and the NIS 2 view
-domain-security-check client.fr --subdomains --nis2 --pdf --lang fr
+# Deeper audit: subdomains in use, trackers in a real browser, and the NIS 2 view
+domain-security-check client.fr --subdomains --browser --nis2 --pdf --lang fr
 
 # Skip the connections to the mail servers on port 25
 domain-security-check my-domain.com --no-mail-servers
@@ -121,7 +122,7 @@ Each report is saved with its result in JSON (`<domain>.json`, next to the HTML 
 
 If a DNS query fails (network outage, timeout), the audit **stops without producing a report** rather than wrongly concluding "no SPF" or "no DMARC". A missing record and a check that could not be performed are two different things.
 
-For DKIM, there is no way to list all of a domain's keys: the tool tests the most common selectors. Finding nothing is reported as information, not as a flaw.
+For DKIM, there is no way to list all of a domain's keys: the tool tests about 50 common selectors, including the usual ones of the sending services named in the SPF record (Google Workspace, Microsoft 365, SendGrid, Mailchimp…). Finding nothing is reported as information, not as a flaw; when a service named in SPF has none of its usual keys, the report says DKIM is probably not enabled there.
 
 ## Grades
 
@@ -160,12 +161,13 @@ Every check is based on a published standard or guide, cited under each item of 
 | Cipher suites, forward secrecy, key size | [RFC 9325](https://www.rfc-editor.org/rfc/rfc9325) (recommendations for the secure use of TLS) |
 | SPF | [RFC 7208](https://www.rfc-editor.org/rfc/rfc7208) |
 | DMARC, including subdomain inheritance | [RFC 7489](https://www.rfc-editor.org/rfc/rfc7489) |
-| DKIM | [RFC 6376](https://www.rfc-editor.org/rfc/rfc6376) |
+| DKIM | [RFC 6376](https://www.rfc-editor.org/rfc/rfc6376), [RFC 8301](https://www.rfc-editor.org/rfc/rfc8301) (RSA keys of at least 1024 bits, 2048 recommended) |
 | Domains that receive no email | [RFC 7505](https://www.rfc-editor.org/rfc/rfc7505) (null MX) |
 | MTA-STS, TLS reporting | [RFC 8461](https://www.rfc-editor.org/rfc/rfc8461), [RFC 8460](https://www.rfc-editor.org/rfc/rfc8460) |
 | Mail servers: STARTTLS, DANE | [RFC 3207](https://www.rfc-editor.org/rfc/rfc3207), [RFC 7672](https://www.rfc-editor.org/rfc/rfc7672); ANSSI PA-066 R42 (STARTTLS on SMTP servers) |
 | DNSSEC | [RFC 4033](https://www.rfc-editor.org/rfc/rfc4033) to 4035 |
-| CAA | [RFC 8659](https://www.rfc-editor.org/rfc/rfc8659) |
+| CAA | [RFC 8659](https://www.rfc-editor.org/rfc/rfc8659); CAA identifiers published by each authority |
+| Trackers before consent (not scored) | [CNIL rules on cookies and other trackers](https://www.cnil.fr/fr/cookies-et-autres-traceurs/regles/cookies) (ePrivacy directive, article 5(3)) |
 | Domain registration data (expiry, status) | [RFC 9083](https://www.rfc-editor.org/rfc/rfc9083) (RDAP), [RFC 9224](https://www.rfc-editor.org/rfc/rfc9224) (finding the RDAP server), [RFC 5731](https://www.rfc-editor.org/rfc/rfc5731#section-2.3) (transfer lock status) |
 | Forgotten subdomains | [RFC 9162](https://www.rfc-editor.org/rfc/rfc9162) (Certificate Transparency); ANSSI PA-009 R3 recommends watching CT logs |
 | Outdated software (not scored) | Support dates from [endoflife.date](https://endoflife.date/); the CNIL website sheet asks to keep components updated |
@@ -204,6 +206,7 @@ domaincheck/
   summary.py                Summary for decision makers: risks, effort, impact
   branding.py               Branded reports (logo, company, contact, client, colour)
   software.py               Outdated software: CMS and PHP recognition, support dates
+  trackers.py               Trackers before consent (page received, or real browser)
   nis2.py                   NIS 2 view: checks related to the measures of article 21(2)
   email_checks.py           MX / SPF / DMARC / DKIM / MTA-STS analysis
   dns_checks.py             DNSSEC, CAA, registration and subdomain analysis
@@ -220,7 +223,7 @@ domaincheck/
   hsts_preload.py           HSTS preload list (download, cache, lookups)
   rdap.py                   Domain registration data (RDAP servers, answers)
   observatory.py            Test-by-test comparison with the Observatory API
-tests/                      973 unit tests + live tests (tests/live)
+tests/                      1023 unit tests + live tests (tests/live)
 scripts/live_summary.py     Audits a list of domains for the Live check workflow
 scripts/observatory_compare.py  Compares the website grades with the Observatory
 ```
@@ -230,7 +233,7 @@ Collection is kept separate from analysis: every rule can be tested on fixed dat
 ## Tests
 
 ```bash
-python -m pytest -q          # 973 unit tests, no network needed
+python -m pytest -q          # 1023 unit tests, no network needed
 ruff check .                 # lint
 mypy                         # type check
 python -m pytest -m live -v  # live tests against real domains (Internet required)
@@ -249,6 +252,7 @@ Three GitHub Actions workflows keep the tool honest:
   - TLS 1.0 (tls-v1-0.badssl.com), 3DES (3des.badssl.com) and the RSA key exchange (static-rsa.badssl.com) must be detected, and github.com must pass the TLS checks;
   - the support dates of PHP, WordPress, Drupal, Joomla and TYPO3 must be read from endoflife.date, and docs.github.com must pass the subdomain checks;
   - gmail.com's mail server must offer STARTTLS with a valid certificate (skipped when port 25 is blocked from the network running the tests);
+  - google.com's CAA must allow the authority of its certificate, gmail.com's DKIM keys must be read, and www.wikipedia.org loaded in a real browser must show no tracker;
   - subdomains of afnic.fr must be read from the Certificate Transparency logs (the test is skipped when crt.sh and Cert Spotter are both down), and the DNS host and email provider of known domains must be recognised;
   - the website grade of each domain is compared with Mozilla HTTP Observatory, test by test, and a warning is raised if the Observatory moves to another version of its scoring algorithm (this tool reproduces version 6).
 

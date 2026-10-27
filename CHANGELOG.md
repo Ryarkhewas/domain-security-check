@@ -6,6 +6,14 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- CAA and the certificate in use: when CAA does not allow the authority that issued the current certificate, its renewal will be refused (−10, Domain & DNS). Wildcard certificates are compared with `issuewild` when present.
+- DKIM: about 50 selectors (looked up in parallel), including the usual ones of the sending services named in SPF (Google Workspace, Microsoft 365, SendGrid, Mailgun, Mailchimp, Zoho, Proton Mail…); key strength (RSA under 1024 bits −20, 1024 bits −5); services named in SPF without their usual key are listed.
+- Trackers before consent (not scored): advertising and analytics services (Google Analytics, Google Ads, Meta, LinkedIn, TikTok, Hotjar, Clarity…) loaded by the page without waiting for consent, tracker cookies set at the first visit, and the consent banner service recognised. `--browser` loads the page in headless Chromium without clicking anything, to see what is really contacted (optional dependency: `pip install "domain-security-check[browser]"`, then `playwright install chromium`).
+
+### Changed
+- The Email grade can be lower than with 1.6 for domains with short DKIM keys, and the Domain & DNS grade when CAA would block the renewal of the certificate.
+
 ## [1.6.0] - 2026-10-26
 
 ### Added
