@@ -237,3 +237,4 @@ class Result:
     grade: str = ""  # overall grade: the weakest category
     cap_reason: str = ""  # why the website / TLS grades were capped, if they were
     changes: Changes | None = None  # compared with the previous audit of the domain, if there was one
+    history: list[dict] | None = None  # grades of the earlier audits and of this one, oldest first (timeline.py)

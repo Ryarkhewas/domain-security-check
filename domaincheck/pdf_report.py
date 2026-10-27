@@ -33,9 +33,11 @@ from .report import (
     letter,
     nis2_rows,
     reference_groups,
+    timeline_rows,
 )
 from .sources import references
 from .summary import EFFORT_LABELS, IMPACT_LABELS, actions
+from .timeline import day as timeline_day
 
 
 class PDFUnavailable(RuntimeError):
@@ -149,6 +151,16 @@ def render_pdf(r: Result, author: str = "", lang: str = "en", branding: Branding
             story.append(Paragraph(f"<b>{t(heading)}</b>", body))
             for line in lines:
                 story.append(Paragraph(f"• {t(line)}", style("change", 9.5, leftIndent=10)))
+
+    if r.history and len(r.history) >= 2:
+        story.append(Paragraph(t(L("Grades over time")), h2))
+        story.append(_timeline_drawing(r.history, L, font, mm))
+        header, rows = timeline_rows(r.history, L)
+        cells = [[Paragraph(f"<b>{t(h)}</b>", small) for h in header]]
+        cells += [[Paragraph(t(c), small) for c in row] for row in reversed(rows[-8:])]  # the last eight audits
+        history_table = Table(cells, colWidths=[24 * mm, 18 * mm] + [34.5 * mm] * 4, repeatRows=1)
+        history_table.setStyle(TableStyle([("LINEBELOW", (0, 0), (-1, -1), 0.4, colors.HexColor(BORDER))]))
+        story += [Spacer(1, 2 * mm), history_table]
 
     # Summary for decision makers
     risks, effort, grade_line = executive_lines(r, L)
@@ -279,6 +291,58 @@ def _cover(r, brand: Branding, L, t, style, grade_cell, lang, bold, flowables, m
                            "in charge of fixing them.")), style("cover_conf", 8, MUTED)),
              PageBreak()]
     return page
+
+
+SERIES_COLORS = {"WEB": "#2a78d6", "TLS": "#eb6834", "EMAIL": "#1baf7a", "DNS": "#eda100"}
+
+
+def _timeline_drawing(points: list[dict], L, font: str, mm: float):  # noqa: N803 - L: translator
+    """Line chart of the area scores over the audits, with the end grade written next to each line.
+
+    Drawing strings are plain text (no markup), so they are not escaped like Paragraph texts.
+    """
+    from reportlab.graphics.shapes import Circle, Drawing, Line, PolyLine, String
+    from reportlab.lib import colors
+
+    width, height, left, right, top, bottom = 180 * mm, 55 * mm, 10 * mm, 42 * mm, 4 * mm, 7 * mm
+    plot_w, plot_h = width - left - right, height - top - bottom
+    top_score = max([100] + [v for p in points for v in p.get("scores", {}).values() if isinstance(v, int)])
+    d = Drawing(width, height)
+
+    def x(i: int) -> float:
+        return left + plot_w * i / (len(points) - 1)
+
+    def y(v: int) -> float:
+        return bottom + plot_h * max(v, 0) / top_score
+
+    for v in range(0, top_score + 1, 25):
+        d.add(Line(left, y(v), left + plot_w, y(v), strokeColor=colors.HexColor(BORDER), strokeWidth=0.5))
+        d.add(String(left - 3, y(v) - 2.5, str(v), fontName=font, fontSize=7, fillColor=colors.HexColor(MUTED),
+                     textAnchor="end"))
+    step = max(1, len(points) // 6)
+    for i, p in enumerate(points):
+        if i % step == 0 or i == len(points) - 1:
+            d.add(String(x(i), 2, timeline_day(p)[5:], fontName=font, fontSize=7,
+                         fillColor=colors.HexColor(MUTED), textAnchor="middle"))
+    ends = []
+    for key, hex_color in SERIES_COLORS.items():
+        pts = [(i, p["scores"][key]) for i, p in enumerate(points) if isinstance(p.get("scores", {}).get(key), int)]
+        if not pts:
+            continue
+        colour = colors.HexColor(hex_color)
+        d.add(PolyLine([c for i, v in pts for c in (x(i), y(v))], strokeColor=colour, strokeWidth=1.5))
+        for i, v in pts:
+            d.add(Circle(x(i), y(v), 2.2, fillColor=colour, strokeColor=colors.white, strokeWidth=1))
+        last_i, last_v = pts[-1]
+        ends.append([y(last_v), key, points[last_i]["grades"].get(key, ""), colour])
+    ends.sort(reverse=True)
+    for n in range(1, len(ends)):  # keep the end labels apart
+        ends[n][0] = min(ends[n][0], ends[n - 1][0] - 9)
+    for ly, key, grade, colour in ends:
+        d.add(Circle(left + plot_w + 6, ly + 2, 2.5, fillColor=colour, strokeColor=colour))
+        d.add(String(left + plot_w + 11, ly, f"{L(CATEGORY_LABELS[key])} {grade}", fontName=font, fontSize=7.5,
+                     fillColor=colors.HexColor(TEXT)))
+    return d
 
 
 def colors_hex(value: str):

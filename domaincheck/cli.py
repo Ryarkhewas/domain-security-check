@@ -36,6 +36,7 @@ from .i18n import LANGUAGES, message_of
 from .models import Result
 from .pdf_report import INSTALL_HINT, render_pdf
 from .report import _translator, console_summary, render_html, render_index, render_json
+from .timeline import update as update_timeline
 
 REMINDER = (
     "Reminder: only audit domains you own or for which you have the owner's permission."
@@ -172,6 +173,7 @@ def _compare_and_save(result: Result, saved: Path, previous: Path | None = None)
     earlier = load_previous(previous or saved)
     if earlier and earlier.get("domain") == result.domain:
         result.changes = compare(earlier, result)
+    result.history = update_timeline(saved.with_suffix(".history.json"), result, earlier)
     saved.write_text(render_json(result), encoding="utf-8")
 
 

@@ -46,7 +46,8 @@ def test_several_domains_get_reports_and_an_index(fake_audit, tmp_path, capsys):
     assert code == 3  # one domain could not be audited
     out = tmp_path / "out"
     assert sorted(p.name for p in out.iterdir()) == [
-        "example.com.html", "example.com.json", "example.org.html", "example.org.json", "index.html"]
+        "example.com.history.json", "example.com.html", "example.com.json", "example.org.history.json",
+        "example.org.html", "example.org.json", "index.html"]
     index = (out / "index.html").read_text(encoding="utf-8")
     assert 'href="example.com.html"' in index and "Not audited: DNS resolution failed" in index
     printed = capsys.readouterr().out

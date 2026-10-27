@@ -733,6 +733,10 @@ FR: dict[str, str] = {
         "balises en mode consentement) ; la mesure d'audience peut être exemptée aux conditions de la CNIL.",
     "Trackers placed without consent expose the company to sanctions from the CNIL.":
         "Des traceurs déposés sans consentement exposent l'entreprise à des sanctions de la CNIL.",
+    # --- Grades over time --------------------------------------------------------------------
+    "Grades over time": "Évolution des notes",
+    "Values per audit": "Valeurs par audit",
+    "Date": "Date",
     # --- Summary for decision makers -----------------------------------------------------
     "Summary for decision makers": "Synthèse pour la direction",
     "Main risks": "Principaux risques",

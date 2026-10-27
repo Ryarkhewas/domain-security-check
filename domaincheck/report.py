@@ -18,6 +18,7 @@ from .nis2 import view as nis2_view
 from .scoring import GRADE_ORDER
 from .sources import SOURCES, references
 from .summary import EFFORT_LABELS, IMPACT_LABELS, actions, effort_line, grade_after_quick_fixes, main_risks
+from .timeline import day as timeline_day
 
 LABELS = {
     Status.CRITICAL: "Critical",
@@ -51,10 +52,12 @@ GRADE_SUMMARY = {
 CSS = """
 :root{--bg:#f6f7f9;--card:#fff;--text:#1d2330;--muted:#5d6677;--border:#e3e6eb;
 --ok:#1f7a4d;--ok-bg:#e3f4ea;--warn:#9a5b00;--warn-bg:#fdf0d9;--crit:#b3261e;--crit-bg:#fbe4e2;
---info:#2f5d9e;--info-bg:#e5edf8;--accent:#1f4e78}
+--info:#2f5d9e;--info-bg:#e5edf8;--accent:#1f4e78;
+--s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100}
 @media (prefers-color-scheme:dark){:root{--bg:#14171c;--card:#1c2027;--text:#e7e9ee;--muted:#a0a8b6;
 --border:#2c323c;--ok:#6fd19b;--ok-bg:#16301f;--warn:#f2b552;--warn-bg:#33270f;--crit:#ff8a80;--crit-bg:#3a1a18;
---info:#8ab4f8;--info-bg:#18243a;--accent:#8ab4f8}}
+--info:#8ab4f8;--info-bg:#18243a;--accent:#8ab4f8;
+--s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);
 font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
@@ -101,6 +104,13 @@ white-space:nowrap}
 .tag.impact-high{border-color:var(--crit);color:var(--crit)}.tag.impact-medium{border-color:var(--warn);color:var(--warn)}
 .exec{margin:24px 0;padding:4px 20px 12px;background:var(--card);border:1px solid var(--border);border-radius:14px}
 .exec ul{padding-left:20px}.exec li{margin-bottom:6px}
+.timeline svg{width:100%;height:auto;display:block;background:var(--card);border:1px solid var(--border);
+border-radius:14px}
+.timeline .legend{display:flex;flex-wrap:wrap;gap:14px;margin:0 0 8px;font-size:13px;color:var(--muted)}
+.timeline .key{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+.timeline table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}
+.timeline th,.timeline td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--border)}
+.timeline details summary{cursor:pointer;color:var(--muted);font-size:13px;margin-top:8px}
 .nis2 table{width:100%;border-collapse:collapse;font-size:14px;background:var(--card)}
 .nis2 th,.nis2 td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--border)}
 .nis2 td:nth-child(2){white-space:nowrap;color:var(--muted)}
@@ -238,6 +248,7 @@ def render_html(r: Result, author: str = "", lang: str = "en", branding=None, ni
 <section class="counters">{counters}</section>
 {_executive_html(r, t)}
 {_changes_html(r.changes, t, lang)}
+{_timeline_html(r.history, t)}
 {priority_block}
 {_nis2_html(r, t) if nis2 else ""}
 {sections}
@@ -275,6 +286,78 @@ def _nis2_html(r: Result, t) -> str:
     return (f'<section class="nis2"><h2>{e(t(NIS2_HEADING))}</h2><p>{intro}</p><table><thead><tr>'
             f'<th>{e(t("Measure"))}</th><th>{e(t("In this audit"))}</th><th>{e(t("Result"))}</th></tr></thead>'
             f"<tbody>{body}</tbody></table></section>")
+
+
+SERIES = {"WEB": "--s1", "TLS": "--s2", "EMAIL": "--s3", "DNS": "--s4"}
+
+
+def timeline_rows(points: list[dict], t) -> tuple[list[str], list[list[str]]]:
+    """(header, rows) of the grades over time, translated; shared by the HTML and PDF outputs."""
+    header = [t("Date"), t("Overall")] + [t(CATEGORY_LABELS[k]) for k in SERIES]
+    rows = []
+    for p in points:
+        cells = []
+        for k in SERIES:
+            grade, score = p.get("grades", {}).get(k, "–"), p.get("scores", {}).get(k)
+            cells.append(f"{grade} ({score})" if score is not None else str(grade))
+        rows.append([timeline_day(p), str(p.get("grade", "–"))] + cells)
+    return header, rows
+
+
+def _timeline_html(points: list[dict] | None, t) -> str:
+    """Line chart of the area scores over the audits (from two audits on), with a table of the same values."""
+    if not points or len(points) < 2:
+        return ""
+    e = escape
+    width, height, left, right, top, bottom = 720, 240, 40, 150, 16, 30
+    top_score = max([100] + [s for p in points for s in p.get("scores", {}).values() if isinstance(s, int)])
+    plot_w, plot_h = width - left - right, height - top - bottom
+
+    def x(i: int) -> float:
+        return left + (plot_w * i / (len(points) - 1))
+
+    def y(score: int) -> float:
+        return top + plot_h * (1 - max(score, 0) / top_score)
+
+    grid = "".join(
+        f'<line x1="{left}" x2="{left + plot_w}" y1="{y(v):.1f}" y2="{y(v):.1f}" stroke="var(--border)" '
+        f'stroke-width="1"/><text x="{left - 8}" y="{y(v) + 4:.1f}" text-anchor="end" font-size="11" '
+        f'fill="var(--muted)">{v}</text>' for v in range(0, top_score + 1, 25))
+    step = max(1, len(points) // 6)  # at most about six date labels
+    dates = "".join(f'<text x="{x(i):.1f}" y="{height - 10}" text-anchor="middle" font-size="11" '
+                    f'fill="var(--muted)">{e(timeline_day(p)[5:])}</text>'
+                    for i, p in enumerate(points) if i % step == 0 or i == len(points) - 1)
+    lines, dots, ends = "", "", []
+    for key, var in SERIES.items():
+        pts = [(i, p["scores"].get(key)) for i, p in enumerate(points) if isinstance(p.get("scores", {}).get(key), int)]
+        if not pts:
+            continue
+        path = " ".join(f"{x(i):.1f},{y(v):.1f}" for i, v in pts)
+        lines += (f'<polyline points="{path}" fill="none" stroke="var({var})" stroke-width="2" '
+                  'stroke-linejoin="round" stroke-linecap="round"/>')
+        for i, v in pts:
+            grade = points[i]["grades"].get(key, "")
+            tip = f"{t(CATEGORY_LABELS[key])} · {timeline_day(points[i])} · {grade} ({v})"
+            dots += (f'<circle cx="{x(i):.1f}" cy="{y(v):.1f}" r="4" fill="var({var})" stroke="var(--card)" '
+                     f'stroke-width="2"><title>{e(tip)}</title></circle>')
+        last_i, last_v = pts[-1]
+        ends.append([y(last_v), key, points[last_i]["grades"].get(key, ""), var])
+    ends.sort()
+    for n in range(1, len(ends)):  # keep the end labels at least 14px apart
+        ends[n][0] = max(ends[n][0], ends[n - 1][0] + 14)
+    labels = "".join(f'<text x="{left + plot_w + 10}" y="{ly + 4:.1f}" font-size="12" fill="var(--text)">'
+                     f'<tspan fill="var({var})">●</tspan> {e(t(CATEGORY_LABELS[key]))} {e(grade)}</text>'
+                     for ly, key, grade, var in ends)
+    legend = "".join(f'<span><span class="key" style="background:var({var})"></span>{e(t(CATEGORY_LABELS[k]))}'
+                     "</span>" for k, var in SERIES.items())
+    header, rows = timeline_rows(points, t)
+    table = ("<table><thead><tr>" + "".join(f"<th>{e(h)}</th>" for h in header) + "</tr></thead><tbody>"
+             + "".join("<tr>" + "".join(f"<td>{e(c)}</td>" for c in row) + "</tr>" for row in reversed(rows))
+             + "</tbody></table>")
+    title = t("Grades over time")
+    return (f'<section class="timeline"><h2>{e(title)}</h2><p class="legend">{legend}</p>'
+            f'<svg viewBox="0 0 {width} {height}" role="img" aria-label="{e(title)}">{grid}{dates}{lines}{dots}'
+            f"{labels}</svg><details><summary>{e(t('Values per audit'))}</summary>{table}</details></section>")
 
 
 def _branding_html(branding, t) -> str:
@@ -476,4 +559,6 @@ def _jsonable(o):
 
 
 def render_json(r: Result) -> str:
-    return json.dumps(asdict(r), default=_jsonable, ensure_ascii=False, indent=2)
+    data = asdict(r)
+    data.pop("history", None)  # kept in <report>.history.json
+    return json.dumps(data, default=_jsonable, ensure_ascii=False, indent=2)
