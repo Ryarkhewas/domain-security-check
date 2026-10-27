@@ -76,5 +76,5 @@ warn_redundant_casts = true
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["reportlab", "reportlab.*"]
+module = ["reportlab", "reportlab.*", "playwright", "playwright.*"]
 ignore_missing_imports = true
