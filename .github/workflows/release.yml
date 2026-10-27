@@ -3,6 +3,12 @@ name: Release
 # Publishes a GitHub release with the wheel and the source archive attached.
 # The release notes are the matching section of CHANGELOG.md.
 #
+# Then, from the same files:
+# - the Docker images go to the GitHub Container Registry
+#   (ghcr.io/ryarkhewas/domain-security-check: <version>, latest, <version>-browser, browser);
+# - the package goes to PyPI, once publishing is set up (see "Publishing on PyPI" in README.md):
+#   it runs only when the repository variable PUBLISH_TO_PYPI is "true".
+#
 # Two ways to start it:
 # - push a tag such as v1.0.0 (it must match the package version);
 # - or click "Run workflow" on the Actions tab: the tag is created from the
@@ -18,6 +24,8 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -57,3 +65,49 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
         run: gh release create "$TAG" dist/* --title "$TAG" --notes-file notes.md --target "$GITHUB_SHA"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+
+  docker:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/ryarkhewas/domain-security-check
+      VERSION: ${{ needs.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Log in to the GitHub Container Registry
+        run: echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Build and push the standard image
+        run: |
+          docker build --target standard -t "$IMAGE:$VERSION" -t "$IMAGE:latest" .
+          docker run --rm "$IMAGE:$VERSION" --version
+          docker push "$IMAGE:$VERSION"
+          docker push "$IMAGE:latest"
+      - name: Build and push the image with a browser (for --browser)
+        run: |
+          docker build --target browser -t "$IMAGE:$VERSION-browser" -t "$IMAGE:browser" .
+          docker push "$IMAGE:$VERSION-browser"
+          docker push "$IMAGE:browser"
+
+  pypi:
+    needs: release
+    if: vars.PUBLISH_TO_PYPI == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/domain-security-check/
+    permissions:
+      id-token: write  # trusted publishing: no PyPI token stored in the repository
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: dist
+          path: dist/
+      - name: Publish on PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

@@ -67,7 +67,26 @@ jobs:
           /tmp/clean/bin/domain-security-check --demo --lang fr -o demo_fr.html
           grep -q "Actions prioritaires" demo_fr.html
           grep -q "Guide ANSSI" demo_fr.html
+      - name: Check the package for PyPI
+        run: |
+          pip install twine
+          twine check --strict dist/*
       - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
+
+  docker:
+    # Builds the Docker image and runs the demo in it, as a user would
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the image
+        run: docker build -t domain-security-check:test .
+      - name: Run the demo in the image
+        run: |
+          mkdir -p out && chmod 777 out
+          docker run --rm domain-security-check:test --version
+          docker run --rm -v "$PWD/out:/reports" domain-security-check:test --demo --pdf --lang fr
+          ls out/bakery-example.com.html out/bakery-example.com.pdf
+          grep -q "Actions prioritaires" out/bakery-example.com.html

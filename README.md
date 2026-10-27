@@ -6,9 +6,9 @@
 
 In a single command, the tool checks what anyone can see from the Internet about a domain: is the website properly protected with HTTPS, does the server send the right security headers, and above all, **can someone send emails pretending to be the company?** It produces an HTML report (and, if you want, a PDF) with a grade per area (website, certificate, email, DNS), the points behind each grade, the standard each check relies on, and concrete actions to take. Several domains can be audited at once, with a summary page. Reports exist in English and French, and each new audit of a domain shows what changed since the previous one.
 
-![Report preview](examples/preview.png)
+![Report preview](https://raw.githubusercontent.com/Ryarkhewas/domain-security-check/main/examples/preview.png)
 
-Example reports: [HTML](examples/demo_report.html) and [PDF](examples/demo_report.pdf), the same in French: [PDF](examples/demo_report_fr.pdf), and a branded French PDF with a cover page, the subdomain checks and the NIS 2 view: [PDF](examples/demo_report_branded_fr.pdf).
+Example reports: [HTML](https://github.com/Ryarkhewas/domain-security-check/blob/main/examples/demo_report.html) and [PDF](https://github.com/Ryarkhewas/domain-security-check/blob/main/examples/demo_report.pdf), the same in French: [PDF](https://github.com/Ryarkhewas/domain-security-check/blob/main/examples/demo_report_fr.pdf), and a branded French PDF with a cover page, the subdomain checks and the NIS 2 view: [PDF](https://github.com/Ryarkhewas/domain-security-check/blob/main/examples/demo_report_branded_fr.pdf).
 
 ## What is checked
 
@@ -43,6 +43,9 @@ Even passive, an audit should only be run **on your own domains or with the owne
 Requires Python 3.10 or later.
 
 ```bash
+# From PyPI (once published there, see "Publishing" below)
+pip install domain-security-check            # add [pdf], [browser] or [pdf,browser] for the options
+
 # Latest release, straight from GitHub
 pip install "git+https://github.com/Ryarkhewas/domain-security-check@v1.6.0"
 
@@ -58,6 +61,16 @@ pip install -e ".[dev]"
 ```
 
 The wheel and source archive of each version are also attached to the [GitHub releases](https://github.com/Ryarkhewas/domain-security-check/releases).
+
+**With Docker**, nothing to install but Docker. Reports (and the history of each domain) are written to the folder mounted on `/reports`:
+
+```bash
+docker run --rm -v "$PWD/reports:/reports" ghcr.io/ryarkhewas/domain-security-check example.com --pdf --lang fr
+# With a real browser for --browser (larger image)
+docker run --rm -v "$PWD/reports:/reports" ghcr.io/ryarkhewas/domain-security-check:browser example.com --browser
+```
+
+The images are published with each release (`latest` and the version number, plus `browser` and `<version>-browser`), and can be built from the repository with `docker build -t domain-security-check .` (add `--target browser` for the larger one).
 
 ## Usage
 
@@ -106,13 +119,15 @@ A full URL is accepted (`https://www.my-domain.com/contact`): the tool extracts 
 
 ## Branded reports
 
-With `--company`, `--contact`, `--client`, `--logo` (PNG or JPEG) or `--color`, the PDF starts with a cover page: your logo, the domain, "Prepared for" the client, the date, the overall grade, your name, company and contact, and a confidentiality note. The accent colour is used for the headings, and your company appears in the footer of every page. The HTML report ends with the same details. To avoid typing them each time, put them in a JSON file and pass it with `--brand` ([example](examples/branding.example.json)); command-line values take precedence over the file.
+With `--company`, `--contact`, `--client`, `--logo` (PNG or JPEG) or `--color`, the PDF starts with a cover page: your logo, the domain, "Prepared for" the client, the date, the overall grade, your name, company and contact, and a confidentiality note. The accent colour is used for the headings, and your company appears in the footer of every page. The HTML report ends with the same details. To avoid typing them each time, put them in a JSON file and pass it with `--brand` ([example](https://github.com/Ryarkhewas/domain-security-check/blob/main/examples/branding.example.json)); command-line values take precedence over the file.
 
 ## Changes since the previous audit
 
 Each report is saved with its result in JSON (`<domain>.json`, next to the HTML report). When the same domain is audited again into the same folder, the new report starts with what changed since then: grades that went up or down, problems fixed, new problems, and problems that got worse or better. The summary page of several domains shows it in one column. This is meant for a regular follow-up, for instance a weekly audit of a client's domains.
 
 `--previous FILE` compares a single domain with any earlier JSON result.
+
+**Grades over time.** Every audit also adds a line to `<domain>.history.json` (date, overall grade, grade and score of each area). From the second audit on, the HTML and PDF reports show a chart of the four scores over time, with the values in a table.
 
 ## Languages
 
@@ -196,6 +211,7 @@ A citation says which recommendation a check relates to. It does not mean the do
 ```
 domain_check.py             Runs the tool from a clone, without installing
 pyproject.toml              Package definition, dependencies, tool settings
+Dockerfile                  Docker images (standard and with a browser)
 domaincheck/
   cli.py                    Command line (domain-security-check)
   collector.py              Network access (DNS, TLS, HTTP, CT logs), nothing else
@@ -207,6 +223,7 @@ domaincheck/
   branding.py               Branded reports (logo, company, contact, client, colour)
   software.py               Outdated software: CMS and PHP recognition, support dates
   trackers.py               Trackers before consent (page received, or real browser)
+  timeline.py               Grades over time (history file of each domain)
   nis2.py                   NIS 2 view: checks related to the measures of article 21(2)
   email_checks.py           MX / SPF / DMARC / DKIM / MTA-STS analysis
   dns_checks.py             DNSSEC, CAA, registration and subdomain analysis
@@ -223,7 +240,7 @@ domaincheck/
   hsts_preload.py           HSTS preload list (download, cache, lookups)
   rdap.py                   Domain registration data (RDAP servers, answers)
   observatory.py            Test-by-test comparison with the Observatory API
-tests/                      1023 unit tests + live tests (tests/live)
+tests/                      1034 unit tests + live tests (tests/live)
 scripts/live_summary.py     Audits a list of domains for the Live check workflow
 scripts/observatory_compare.py  Compares the website grades with the Observatory
 ```
@@ -233,7 +250,7 @@ Collection is kept separate from analysis: every rule can be tested on fixed dat
 ## Tests
 
 ```bash
-python -m pytest -q          # 1023 unit tests, no network needed
+python -m pytest -q          # 1034 unit tests, no network needed
 ruff check .                 # lint
 mypy                         # type check
 python -m pytest -m live -v  # live tests against real domains (Internet required)
@@ -241,8 +258,8 @@ python -m pytest -m live -v  # live tests against real domains (Internet require
 
 Three GitHub Actions workflows keep the tool honest:
 
-- **Tests** runs on every push: the unit tests on Python 3.10 to 3.13, the lint and type checks, and a build of the package installed in a clean environment.
-- **Release** publishes a GitHub release, with the package attached, when a version tag is pushed.
+- **Tests** runs on every push: the unit tests on Python 3.10 to 3.13, the lint and type checks, a build of the package installed in a clean environment and checked for PyPI (`twine check`), and a build of the Docker image that runs the demo.
+- **Release** publishes a GitHub release with the package attached, the Docker images on the GitHub Container Registry and, once set up, the package on PyPI.
 - **Live check** runs every Monday (and on demand) against real domains:
   - hosts from [badssl.com](https://badssl.com), deliberately misconfigured for testing (expired, self-signed and wrong-host certificates), must be flagged as critical;
   - for github.com, google.com, cloudflare.com and wikipedia.org, the SPF and DMARC records read by the tool must match those returned by an independent resolver (Google DNS-over-HTTPS);
@@ -258,13 +275,25 @@ Three GitHub Actions workflows keep the tool honest:
 
   The results table is published in the workflow summary and the HTML reports are kept as artifacts.
 
+## Publishing
+
+**Docker images** need nothing more: the Release workflow pushes them to `ghcr.io/ryarkhewas/domain-security-check`. The first time, make the package public on GitHub (profile → Packages → domain-security-check → Package settings → Change visibility).
+
+**PyPI** uses trusted publishing: GitHub proves to PyPI which workflow is publishing, so no PyPI password or token is stored in the repository. To set it up once:
+
+1. Create an account on [pypi.org](https://pypi.org/account/register/) (with two-factor authentication).
+2. In your PyPI account, Publishing → add a pending publisher: project `domain-security-check`, owner `Ryarkhewas`, repository `domain-security-check`, workflow `release.yml`, environment `pypi`.
+3. In the GitHub repository, Settings → Environments → create `pypi`, then Settings → Secrets and variables → Actions → Variables → add `PUBLISH_TO_PYPI` with the value `true`.
+
+The next release then publishes the package on PyPI too. Before that, the PyPI step is simply skipped.
+
 ## Limits
 
 The audit does not cover the site's applications (forms, CMS, plugins), workstations or user accounts. It gives an overview of the exposure visible from the Internet at a given date, not a security guarantee. The subdomain check only sees names that appeared in a public certificate: a subdomain that never had one (or only a wildcard certificate) stays invisible. When crt.sh does not answer, the names come from Cert Spotter, which may list fewer old certificates; the report then says so. The platform-specific fixes are starting points to adapt, checked against each provider's documentation at the time of writing; provider menus change over time.
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md).
+See [CHANGELOG.md](https://github.com/Ryarkhewas/domain-security-check/blob/main/CHANGELOG.md).
 
 ## License
 
