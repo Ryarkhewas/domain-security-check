@@ -7,7 +7,14 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
-from .dns_checks import check_caa, check_dnssec, check_registration, check_subdomain_audits, check_subdomains
+from .dns_checks import (
+    check_caa,
+    check_caa_certificate,
+    check_dnssec,
+    check_registration,
+    check_subdomain_audits,
+    check_subdomains,
+)
 from .email_checks import (
     check_dkim,
     check_dmarc,
@@ -98,6 +105,9 @@ def analyze(data: CollectedData, tested_selectors: list[str], now: datetime | No
         findings.append(check_dnssec(data.dnssec))
     if data.caa is not None:
         findings.append(check_caa(data.caa, exists))
+        consistency = check_caa_certificate(data.caa, data.certificate)
+        if consistency is not None:
+            findings.append(consistency)
     if data.rdap is not None:
         findings += check_registration(data.rdap, now)
     if exists and data.security_txt is not None:

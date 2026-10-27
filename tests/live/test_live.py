@@ -233,3 +233,9 @@ def test_support_dates_are_read(product):
 def test_subdomain_audit_of_a_real_site():
     (audit,) = Collector().audit_subdomains(["docs.github.com"])
     assert audit.https and audit.cert_valid and audit.redirects and not audit.old_tls
+
+
+def test_caa_matches_the_certificate_on_google():
+    r = audit("google.com")
+    f = next(f for f in r.findings if str(f.title) == "CAA and the current certificate")
+    assert f.status == Status.OK, f.detail

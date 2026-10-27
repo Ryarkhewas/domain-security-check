@@ -880,6 +880,22 @@ FR: dict[str, str] = {
     "{names} and {count} more": "{names} et {count} autres",
     "{seen} None points to a resource that no longer exists.{active}":
         "{seen} Aucun ne pointe vers une ressource qui n'existe plus.{active}",
+    "CAA and the current certificate": "CAA et certificat actuel",
+    "none": "aucune",
+    "no authority": "aucune autorité",
+    "The authority of the current certificate ({issuer}) is not in this tool's list, so whether CAA allows it was not "
+    "checked. Allowed: {allowed}.":
+        "L'autorité du certificat actuel ({issuer}) ne figure pas dans la liste de l'outil : sa compatibilité avec la "
+        "CAA n'a pas été vérifiée. Autorisées : {allowed}.",
+    "The current certificate comes from {issuer}, which CAA allows: renewals will be accepted.":
+        "Le certificat actuel vient de {issuer}, que la CAA autorise : les renouvellements seront acceptés.",
+    "The current certificate comes from {issuer}, but CAA only allows {allowed}: the certificate stays valid, but its "
+    "renewal by the same authority will be refused, and the site will show an error when it expires.":
+        "Le certificat actuel vient de {issuer}, mais la CAA n'autorise que {allowed} : le certificat reste valide, "
+        "mais son renouvellement par la même autorité sera refusé, et le site affichera une erreur à son expiration.",
+    "Add \"{id}\" to the CAA records ({tag}), or switch to an allowed authority before the certificate expires.":
+        "Ajoutez « {id} » aux enregistrements CAA ({tag}), ou passez à une autorité autorisée avant l'expiration du "
+        "certificat.",
     "Domain expiry date": "Date d'expiration du domaine",
     "Transfer lock": "Verrou de transfert",
     "no RDAP server for this extension": "aucun serveur RDAP pour cette extension",

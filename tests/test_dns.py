@@ -132,3 +132,53 @@ def test_dnssec_reports_the_first_error_when_everything_fails(monkeypatch):
     c = make_collector({})
     c.resolver = object()
     assert c.dnssec("example.com").error == "local failure"
+
+
+# --- CAA and the certificate in use ------------------------------------------------------
+def _cert(issuer, names=("example.com",)):
+    from domaincheck.models import CertificateInfo
+
+    return CertificateInfo(valid=True, issuer=issuer, names=list(names))
+
+
+def test_caa_allows_the_current_authority():
+    from domaincheck.dns_checks import check_caa_certificate
+
+    f = check_caa_certificate(CAAInfo([(0, "issue", "letsencrypt.org")], "example.com"), _cert("Let's Encrypt"))
+    assert f.status == Status.OK and f.points == 0
+
+
+def test_caa_refuses_the_current_authority():
+    from domaincheck.dns_checks import check_caa_certificate
+
+    f = check_caa_certificate(CAAInfo([(0, "issue", "letsencrypt.org")], "example.com"),
+                              _cert("Google Trust Services"))
+    assert (f.status, f.points) == (Status.WARNING, -10)
+    assert '"pki.goog"' in f.recommendation and "letsencrypt.org" in f.detail
+
+
+def test_caa_wildcard_uses_issuewild():
+    from domaincheck.dns_checks import check_caa_certificate
+
+    caa = CAAInfo([(0, "issue", "letsencrypt.org"), (0, "issuewild", "digicert.com")], "example.com")
+    f = check_caa_certificate(caa, _cert("Let's Encrypt", ["*.example.com", "example.com"]))
+    assert f.status == Status.WARNING and "issuewild" in f.recommendation
+    assert check_caa_certificate(caa, _cert("DigiCert Inc", ["*.example.com"])).status == Status.OK
+
+
+def test_caa_aliases_and_unknown_authorities():
+    from domaincheck.dns_checks import caa_identifiers, check_caa_certificate
+
+    assert "sectigo.com" in caa_identifiers("ZeroSSL")
+    assert check_caa_certificate(CAAInfo([(0, "issue", "comodoca.com")], "x"), _cert("Sectigo Limited")).status == \
+        Status.OK
+    f = check_caa_certificate(CAAInfo([(0, "issue", "letsencrypt.org")], "x"), _cert("Some Local CA"))
+    assert f.status == Status.INFO and f.points is None
+
+
+def test_caa_nothing_to_compare():
+    from domaincheck.dns_checks import check_caa_certificate
+
+    assert check_caa_certificate(CAAInfo(), _cert("Let's Encrypt")) is None
+    assert check_caa_certificate(CAAInfo([(0, "issue", "letsencrypt.org")], "x"), None) is None
+    assert check_caa_certificate(CAAInfo([(0, "iodef", "mailto:a@b.c")], "x"), _cert("Let's Encrypt")) is None

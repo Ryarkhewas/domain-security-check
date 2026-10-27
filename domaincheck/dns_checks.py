@@ -13,7 +13,17 @@ from datetime import datetime
 
 from .ct import takeover_provider
 from .i18n import Date, Joined, M
-from .models import CAAInfo, Category, DNSSECInfo, Finding, RDAPInfo, Status, SubdomainAudit, SubdomainInfo
+from .models import (
+    CAAInfo,
+    Category,
+    CertificateInfo,
+    DNSSECInfo,
+    Finding,
+    RDAPInfo,
+    Status,
+    SubdomainAudit,
+    SubdomainInfo,
+)
 from .rdap import TRANSFER_LOCKS
 from .software import check_software
 
@@ -83,6 +93,67 @@ def check_caa(info: CAAInfo, has_website: bool) -> Finding:
                                       "a website).", where=where), source=src)
     return _f(title, Status.OK, M("Only these authorities may issue certificates{where}: {names}.", where=where,
                                   names=", ".join(named)), source=src)
+
+
+# --- CAA and the certificate actually in use -----------------------------------------
+# Issuer organisation (as written in certificates) -> identifiers the authority accepts in CAA records,
+# as published by each authority (CCADB "CAA identifiers" and the authorities' documentation)
+CAA_IDENTIFIERS = [
+    ("let's encrypt", ["letsencrypt.org"]),
+    ("google trust services", ["pki.goog"]),
+    ("digicert", ["digicert.com", "symantec.com", "thawte.com", "geotrust.com", "rapidssl.com",
+                  "digitalcertvalidation.com"]),
+    ("zerossl", ["sectigo.com"]),
+    ("sectigo", ["sectigo.com", "comodoca.com", "comodo.com", "usertrust.com", "trust-provider.com"]),
+    ("comodo", ["sectigo.com", "comodoca.com", "comodo.com", "usertrust.com", "trust-provider.com"]),
+    ("amazon", ["amazon.com", "amazontrust.com", "awstrust.com", "amazonaws.com"]),
+    ("globalsign", ["globalsign.com"]),
+    ("godaddy", ["godaddy.com", "starfieldtech.com"]),
+    ("starfield", ["godaddy.com", "starfieldtech.com"]),
+    ("entrust", ["entrust.net"]),
+    ("ssl corporation", ["ssl.com"]),
+    ("ssl.com", ["ssl.com"]),
+    ("buypass", ["buypass.com"]),
+    ("actalis", ["actalis.it"]),
+    ("certigna", ["certigna.fr", "certigna.com"]),
+    ("harica", ["harica.gr"]),
+]
+
+
+def caa_identifiers(issuer: str) -> list[str]:
+    """CAA identifiers of a certificate issuer, [] if the authority is not in the table."""
+    name = issuer.lower()
+    return next((ids for word, ids in CAA_IDENTIFIERS if word in name), [])
+
+
+def check_caa_certificate(info: CAAInfo, cert: CertificateInfo | None) -> Finding | None:
+    """Does CAA allow the authority that issued the certificate in use? If not, its renewal will be refused."""
+    if info.error or not info.records or cert is None or not cert.valid or not cert.issuer:
+        return None
+    title, src = "CAA and the current certificate", "caa"
+    wildcard = any(n.startswith("*.") for n in cert.names)
+    tags = {tag.lower() for _, tag, _ in info.records}
+    tag = "issuewild" if wildcard and "issuewild" in tags else "issue"
+    if tag not in tags:
+        return None  # no restriction for this kind of certificate (reported by the CAA check)
+    allowed = {value.split(";")[0].strip().lower() for _, t, value in info.records if t.lower() == tag}
+    allowed.discard("")
+    ids = caa_identifiers(cert.issuer)
+    if not ids:
+        return _f(title, Status.INFO,
+                  M("The authority of the current certificate ({issuer}) is not in this tool's list, so whether CAA "
+                    "allows it was not checked. Allowed: {allowed}.", issuer=cert.issuer,
+                    allowed=", ".join(sorted(allowed)) or M("none")), points=None, source=src)
+    if allowed & set(ids):
+        return _f(title, Status.OK,
+                  M("The current certificate comes from {issuer}, which CAA allows: renewals will be accepted.",
+                    issuer=cert.issuer), source=src)
+    return _f(title, Status.WARNING,
+              M("The current certificate comes from {issuer}, but CAA only allows {allowed}: the certificate stays "
+                "valid, but its renewal by the same authority will be refused, and the site will show an error when "
+                "it expires.", issuer=cert.issuer, allowed=", ".join(sorted(allowed)) or M("no authority")),
+              M("Add \"{id}\" to the CAA records ({tag}), or switch to an allowed authority before the certificate "
+                "expires.", id=ids[0], tag=tag), -10, src)
 
 
 # --- Registration (RDAP) -----------------------------------------------------------
