@@ -21,7 +21,9 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - name: Install dependencies
-        run: pip install -e ".[dev]" pytest-github-actions-annotate-failures
+        run: |
+          pip install -e ".[dev,browser]" pytest-github-actions-annotate-failures
+          python -m playwright install --with-deps chromium
       - name: Audit real domains
         run: |
           {

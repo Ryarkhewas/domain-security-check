@@ -24,7 +24,7 @@ import dns.name
 import dns.resolver
 import requests
 
-from . import ct, smtp_scan, software
+from . import ct, smtp_scan, software, trackers
 from . import tls_scan as scan
 from ._version import __version__
 from .hsts_preload import PreloadList
@@ -44,6 +44,7 @@ from .models import (
     TLSScanInfo,
 )
 from .rdap import load_bootstrap, read_answer, server_for
+from .trackers import TrackerInfo
 from .web_checks import registrable_domain
 
 DKIM_SELECTORS = [
@@ -258,6 +259,36 @@ class Collector:
         except ValueError:
             info.error = M("unreadable answer")
         return info
+
+    # --- Trackers, in a real browser (optional) ---------------------------------
+    def browser_trackers(self, url: str, wait: float = 4) -> TrackerInfo:
+        """Load the page in headless Chromium without clicking anything, and record requests and cookies.
+
+        Needs Playwright (pip install "domain-security-check[browser]", then: playwright install chromium).
+        """
+        try:
+            from playwright.sync_api import Error as PlaywrightError
+            from playwright.sync_api import sync_playwright
+        except ImportError:
+            return TrackerInfo(mode="browser", error=M("Playwright is not installed"))
+        urls: list[str] = []
+        try:
+            with sync_playwright() as pw:
+                browser = pw.chromium.launch()
+                try:
+                    context = browser.new_context(user_agent=USER_AGENT, locale="fr-FR")
+                    page = context.new_page()
+                    page.on("request", lambda request: urls.append(request.url))
+                    page.goto(url if "://" in url else f"https://{url}", wait_until="load",
+                              timeout=int(max(self.timeout, 30) * 1000))
+                    page.wait_for_timeout(int(wait * 1000))  # scripts that start a little later
+                    cookies = [str(c.get("name", "")) for c in context.cookies()]
+                    body = page.content()
+                finally:
+                    browser.close()
+        except PlaywrightError as e:
+            return TrackerInfo(mode="browser", error=_short(e))
+        return trackers.from_browser(urls, cookies, body)
 
     # --- Software support dates ------------------------------------------------
     def lifecycles(self, products: list[str]) -> dict[str, list | None]:

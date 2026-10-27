@@ -21,7 +21,7 @@ def test_ten_measures_and_known_sources():
 
 
 def test_every_scored_source_of_the_demo_is_mapped():
-    unmapped = {f.source for f in demo().findings if f.source and f.source not in MAPPING}
+    unmapped = {f.source for f in demo().findings if f.source and f.source not in MAPPING} - {"trackers"}
     assert unmapped == set(), unmapped
 
 

@@ -57,7 +57,7 @@ def test_cover_page_only_when_branded(logo):
     from domaincheck.pdf_report import render_pdf
 
     r = run_audit("bakery-example.com", collector=DemoCollector())
-    plain = render_pdf(r, "Author")
+    plain = render_pdf(r, "Author", lang="fr")
     branded = render_pdf(r, lang="fr", branding=Branding("Author", "Co", "c@example.com", "Client", logo, "#0f766e"))
     assert pages(branded) == pages(plain) + 1
     assert not Branding(author="Only an author").custom

@@ -94,6 +94,9 @@ def main(argv: list[str] | None = None) -> int:
                    help="Skip the subdomains published in Certificate Transparency logs (faster)")
     p.add_argument("--nis2", action="store_true",
                    help="Add a NIS 2 view: how the checks relate to the measures of article 21 of the directive")
+    p.add_argument("--browser", action="store_true",
+                   help="Load the home page in a real browser to see the trackers set before consent "
+                        "(needs the [browser] extra and: playwright install chromium)")
     p.add_argument("--subdomains", action="store_true",
                    help="Also check every subdomain in use found in the CT logs (HTTPS, certificate, old TLS, "
                         "outdated software); slower")
@@ -242,6 +245,8 @@ def _skip(args) -> dict[str, bool]:
         skip["mail_servers"] = False
     if args.subdomains:
         skip["subdomains"] = True
+    if args.browser:
+        skip["browser"] = True
     return skip
 
 

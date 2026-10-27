@@ -100,6 +100,12 @@ class DemoCollector:
                 "Content-Type": "text/html; charset=UTF-8",
                 "X-Content-Type-Options": "nosniff",
             },
+            content_type="text/html",
+            # Analytics and an advertising pixel pasted into the page, with no consent banner
+            body=("<html><head><script>(function(){var s=document.createElement('script');"
+                  "s.src='https://www.googletagmanager.com/gtag/js?id=G-DEMO';document.head.appendChild(s);})();"
+                  "</script></head><body><noscript><img height='1' width='1' "
+                  "src='https://www.facebook.com/tr?id=0&ev=PageView&noscript=1'/></noscript></body></html>"),
         )
 
     def dnssec(self, domain: str) -> DNSSECInfo:

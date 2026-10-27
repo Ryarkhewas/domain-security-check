@@ -33,6 +33,7 @@ classifiers = [
 
 [project.optional-dependencies]
 pdf = ["reportlab>=4.0"]
+browser = ["playwright>=1.40"]
 dev = ["pytest>=8.0", "ruff>=0.6", "mypy>=1.10", "types-requests", "build", "reportlab>=4.0"]
 
 [project.scripts]

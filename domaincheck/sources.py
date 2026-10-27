@@ -35,6 +35,8 @@ SOURCES: dict[str, tuple[str, str]] = {
              "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cross-Origin-Embedder-Policy"),
     "permissions": ("W3C Permissions Policy", "https://www.w3.org/TR/permissions-policy/"),
     "security-txt": ("RFC 9116 (security.txt)", "https://www.rfc-editor.org/rfc/rfc9116"),
+    "trackers": ("CNIL: rules for cookies and other trackers (ePrivacy directive, article 5(3))",
+                 "https://www.cnil.fr/fr/cookies-et-autres-traceurs/regles/cookies"),
     "eol": ("endoflife.date (end of support dates of software versions)", "https://endoflife.date/"),
     "owasp-headers": ("OWASP Secure Headers Project", "https://owasp.org/www-project-secure-headers/"),
     # Certificate & TLS

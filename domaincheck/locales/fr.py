@@ -706,6 +706,33 @@ FR: dict[str, str] = {
         "Sécurité des ressources humaines, contrôle d'accès et gestion des actifs",
     "Multi-factor authentication and secured communications":
         "Authentification à plusieurs facteurs et communications sécurisées",
+    # --- Trackers before consent ---------------------------------------------------------
+    "Trackers before consent": "Traceurs avant consentement",
+    "Playwright is not installed": "Playwright n'est pas installé",
+    " Consent banner: {cmp}.": " Bannière de consentement : {cmp}.",
+    " No known consent banner found.": " Aucune bannière de consentement connue trouvée.",
+    " Waiting for consent: {names}.": " En attente du consentement : {names}.",
+    "{scope}{held}{banner}": "{scope}{held}{banner}",
+    "No tracker loaded or cookie set by a known advertising or analytics service when the page opens, before any "
+    "click.":
+        "Aucun service publicitaire ou de mesure d'audience connu n'est contacté et aucun de leurs cookies n'est "
+        "déposé à l'ouverture de la page, avant tout clic.",
+    "No known tracker in the page's HTML, and no tracker cookie set by the server. Trackers added later by a tag "
+    "manager are only seen with --browser.":
+        "Aucun traceur connu dans le HTML de la page, et aucun cookie traceur déposé par le serveur. Les traceurs "
+        "ajoutés ensuite par un gestionnaire de balises ne sont visibles qu'avec --browser.",
+    "As soon as the page opens, before any click on a banner, these services are contacted or set cookies: "
+    "{listed}.{held}{banner}":
+        "Dès l'ouverture de la page, avant tout clic sur une bannière, ces services sont contactés ou déposent des "
+        "cookies : {listed}.{held}{banner}",
+    "The page loads these services directly, without holding them back for consent: {listed}.{held}{banner}":
+        "La page charge directement ces services, sans attendre le consentement : {listed}.{held}{banner}",
+    "Load these services only after the visitor agrees, through the consent banner (or a tag manager in consent "
+    "mode); audience measurement may be exempt under the CNIL's conditions.":
+        "Ne chargez ces services qu'après l'accord du visiteur, via la bannière de consentement (ou un gestionnaire de "
+        "balises en mode consentement) ; la mesure d'audience peut être exemptée aux conditions de la CNIL.",
+    "Trackers placed without consent expose the company to sanctions from the CNIL.":
+        "Des traceurs déposés sans consentement exposent l'entreprise à des sanctions de la CNIL.",
     # --- Summary for decision makers -----------------------------------------------------
     "Summary for decision makers": "Synthèse pour la direction",
     "Main risks": "Principaux risques",
@@ -961,6 +988,8 @@ FR: dict[str, str] = {
     "RFC 7672 (DANE for SMTP)": "RFC 7672 (DANE pour SMTP)",
     "endoflife.date (end of support dates of software versions)":
         "endoflife.date (dates de fin de support des versions de logiciels)",
+    "CNIL: rules for cookies and other trackers (ePrivacy directive, article 5(3))":
+        "CNIL : règles pour les cookies et autres traceurs (directive ePrivacy, article 5(3))",
     "RFC 8446 (TLS 1.3)": "RFC 8446 (TLS 1.3)",
     "RFC 9325 (recommendations for the secure use of TLS)": "RFC 9325 (recommandations pour un usage sûr de TLS)",
     "CNIL personal data security guide (2024): securing websites":

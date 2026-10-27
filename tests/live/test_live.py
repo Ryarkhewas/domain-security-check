@@ -248,3 +248,9 @@ def test_dkim_keys_of_gmail_are_read():
     from domaincheck.email_checks import dkim_key_bits
 
     assert all((dkim_key_bits(r) or 2048) >= 2048 for r in keys.values())
+
+
+def test_trackers_in_a_real_browser():
+    info = Collector().browser_trackers("www.wikipedia.org")
+    assert not info.error, info.error
+    assert info.found == {}  # Wikipedia uses no advertising or analytics tracker

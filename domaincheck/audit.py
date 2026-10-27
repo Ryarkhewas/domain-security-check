@@ -32,6 +32,8 @@ from .scoring import category_grades, overall_grade
 from .software import check_software
 from .software import detect as detect_software
 from .tls_checks import check_certificate, check_tls_scan
+from .trackers import check_trackers
+from .trackers import from_page as trackers_from_page
 from .web_checks import check_security_txt, check_website
 
 _VALID_DOMAIN = re.compile(r"^(?=.{1,253}$)(?!-)([a-z0-9-]{1,63}(?<!-)\.)+[a-z]{2,63}$")
@@ -94,6 +96,7 @@ def analyze(data: CollectedData, tested_selectors: list[str], now: datetime | No
             findings += check_tls_scan(data.tls_scan, data.certificate)
         findings += check_website(data.http, data.domain)
         findings += check_software(data.software, data.lifecycles, now)
+        findings += check_trackers(data.trackers)
     findings += check_mx(data.mx)
     enforced = effective_dmarc_policy(data.dmarc_txt, data.dmarc_inherited_from) in ("quarantine", "reject")
     findings += check_spf(data.root_txt, dmarc_enforced=enforced)
@@ -156,12 +159,13 @@ def find_dmarc(collector, domain: str) -> tuple[list[str], str]:
 
 
 def run_audit(text: str, collector=None, ct_logs: bool = True, mail_servers: bool = True,
-              subdomains: bool = False) -> Result:
+              subdomains: bool = False, browser: bool = False) -> Result:
     """Collect everything about a domain and analyse it.
 
     ct_logs=False skips the subdomains published in Certificate Transparency logs (the slowest part).
     mail_servers=False skips the connections to the mail servers on port 25.
     subdomains=True also checks each subdomain in use found in the CT logs (HTTPS, certificate, old TLS, software).
+    browser=True loads the home page in a real browser to see the trackers set before consent (needs Playwright).
     """
     from .collector import DKIM_SELECTORS, Collector
 
@@ -202,6 +206,10 @@ def run_audit(text: str, collector=None, ct_logs: bool = True, mail_servers: boo
         data.dkim_selectors = list(data.dkim_records)
     else:
         data.dkim_selectors = collector.dkim_selectors(mail_domain)
+    if browser and hasattr(collector, "browser_trackers") and data.http.https_reachable:
+        data.trackers = collector.browser_trackers(domain)
+    elif data.http.https_reachable:
+        data.trackers = trackers_from_page(data.http.body, [c.name for c in data.http.cookies])
     data.software = detect_software(data.http.headers, data.http.body)
     if data.software and hasattr(collector, "lifecycles"):
         data.lifecycles = collector.lifecycles([s.product for s in data.software if s.version])
@@ -222,7 +230,7 @@ def run_audit(text: str, collector=None, ct_logs: bool = True, mail_servers: boo
 def audit_many(domains: list[str], workers: int = 6,
                on_done: Callable[[str, Result | Exception], None] | None = None,
                ct_logs: bool = True, mail_servers: bool = True,
-               subdomains: bool = False) -> dict[str, Result | Exception]:
+               subdomains: bool = False, browser: bool = False) -> dict[str, Result | Exception]:
     """Audit several domains at the same time (most of an audit is spent waiting for the network).
 
     Returns {domain: Result, or the exception that stopped its audit}, in the order given.
@@ -234,7 +242,7 @@ def audit_many(domains: list[str], workers: int = 6,
     outcomes: dict[str, Result | Exception] = {}
     with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
         options = (({} if ct_logs else {"ct_logs": False}) | ({} if mail_servers else {"mail_servers": False})
-                   | ({"subdomains": True} if subdomains else {}))
+                   | ({"subdomains": True} if subdomains else {}) | ({"browser": True} if browser else {}))
         futures = {pool.submit(run_audit, d, **options): d for d in domains}
         for future in as_completed(futures):
             domain = futures[future]
