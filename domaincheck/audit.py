@@ -23,6 +23,7 @@ from .email_checks import (
     check_mx,
     check_spf,
     effective_dmarc_policy,
+    spf_senders,
 )
 from .hosting import add_fixes, detect
 from .i18n import M
@@ -97,7 +98,7 @@ def analyze(data: CollectedData, tested_selectors: list[str], now: datetime | No
     enforced = effective_dmarc_policy(data.dmarc_txt, data.dmarc_inherited_from) in ("quarantine", "reject")
     findings += check_spf(data.root_txt, dmarc_enforced=enforced)
     findings += check_dmarc(data.dmarc_txt, data.dmarc_inherited_from)
-    findings += check_dkim(data.dkim_selectors, tested_selectors)
+    findings += check_dkim(data.dkim_selectors, tested_selectors, data.dkim_records, spf_senders(data.root_txt))
     findings += check_mta_sts(data.mta_sts, data.mx)
     if data.mail_servers is not None:
         findings += check_mail_servers(data.mail_servers, data.mta_sts, now)
@@ -183,7 +184,7 @@ def run_audit(text: str, collector=None, ct_logs: bool = True, mail_servers: boo
         dmarc_txt=dmarc_records,
         dmarc_inherited_from=dmarc_parent,
         mx=collector.mx(mail_domain),
-        dkim_selectors=collector.dkim_selectors(mail_domain),
+        dkim_selectors=[],
         certificate=collector.certificate(domain),
         http=collector.http(domain),
         dnssec=collector.dnssec(domain),
@@ -196,6 +197,11 @@ def run_audit(text: str, collector=None, ct_logs: bool = True, mail_servers: boo
         data.tls_scan = collector.tls_scan(domain)
     if mail_servers and hasattr(collector, "mail_servers"):
         data.mail_servers = collector.mail_servers(data.mx)
+    if hasattr(collector, "dkim_keys"):
+        data.dkim_records = collector.dkim_keys(mail_domain)
+        data.dkim_selectors = list(data.dkim_records)
+    else:
+        data.dkim_selectors = collector.dkim_selectors(mail_domain)
     data.software = detect_software(data.http.headers, data.http.body)
     if data.software and hasattr(collector, "lifecycles"):
         data.lifecycles = collector.lifecycles([s.product for s in data.software if s.version])

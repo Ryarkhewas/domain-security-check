@@ -239,3 +239,12 @@ def test_caa_matches_the_certificate_on_google():
     r = audit("google.com")
     f = next(f for f in r.findings if str(f.title) == "CAA and the current certificate")
     assert f.status == Status.OK, f.detail
+
+
+def test_dkim_keys_of_gmail_are_read():
+    keys = Collector().dkim_keys("gmail.com", ["20230601", "20210112", "20161025"])
+    if not keys:
+        pytest.skip("gmail.com changed its DKIM selectors")
+    from domaincheck.email_checks import dkim_key_bits
+
+    assert all((dkim_key_bits(r) or 2048) >= 2048 for r in keys.values())

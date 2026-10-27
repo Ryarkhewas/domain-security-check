@@ -753,6 +753,31 @@ FR: dict[str, str] = {
         "Avec un mot de passe volé chez le bureau d'enregistrement, le domaine peut être transféré ailleurs.",
     "A forgotten subdomain can be taken over to publish content in the company's name.":
         "Un sous-domaine oublié peut être détourné pour publier du contenu au nom de l'entreprise.",
+    # --- DKIM: keys and sending services -------------------------------------------------
+    "DKIM for each sending service": "DKIM pour chaque service d'envoi",
+    "{found} Keys under 1024 bits can be broken: someone could then sign emails in your name: {weak}.":
+        "{found} Les clés de moins de 1024 bits peuvent être cassées : quelqu'un pourrait alors signer des emails à "
+        "votre nom : {weak}.",
+    "Generate a new 2048-bit DKIM key in your email service and delete the old record.":
+        "Générez une nouvelle clé DKIM de 2048 bits dans votre service de messagerie et supprimez l'ancien "
+        "enregistrement.",
+    "{found} 1024-bit keys are still accepted but now considered too short; 2048 bits is the current recommendation: "
+    "{short}.":
+        "{found} Les clés de 1024 bits sont encore acceptées mais jugées trop courtes aujourd'hui ; 2048 bits est la "
+        "recommandation actuelle : {short}.",
+    "Switch to a 2048-bit DKIM key when your email service allows it (key rotation).":
+        "Passez à une clé DKIM de 2048 bits dès que votre service de messagerie le permet (rotation de clé).",
+    "No DKIM key found among the common selectors tested ({count}), including the usual ones of the services named "
+    "in SPF ({senders}): DKIM signing is probably not enabled for them.":
+        "Aucune clé DKIM trouvée parmi les sélecteurs courants testés ({count}), y compris ceux habituels des services "
+        "cités dans SPF ({senders}) : la signature DKIM n'est probablement pas activée chez eux.",
+    "SPF allows these services to send for the domain, but their usual DKIM keys were not found: {senders}. Their "
+    "emails may be signed with their own domain, which DMARC does not count as yours.":
+        "SPF autorise ces services à envoyer pour le domaine, mais leurs clés DKIM habituelles sont introuvables : "
+        "{senders}. Leurs emails sont peut-être signés avec leur propre domaine, que DMARC ne compte pas comme le "
+        "vôtre.",
+    "Enable DKIM with your own domain in each of these services.":
+        "Activez DKIM avec votre propre domaine dans chacun de ces services.",
     # --- Mail servers ----------------------------------------------------------------
     "Mail servers: encryption": "Serveurs de mail : chiffrement",
     "Encryption of incoming email (STARTTLS)": "Chiffrement des emails reçus (STARTTLS)",

@@ -47,8 +47,13 @@ from .rdap import load_bootstrap, read_answer, server_for
 from .web_checks import registrable_domain
 
 DKIM_SELECTORS = [
-    "default", "google", "selector1", "selector2", "k1", "k2", "mail", "dkim",
+    "default", "google", "selector1", "selector2", "k1", "k2", "k3", "mail", "dkim",
     "s1", "s2", "smtp", "mandrill", "mxvault", "zoho", "protonmail", "sib",
+    # usual selectors of common sending services (see email_checks.SENDERS)
+    "mte1", "mte2", "mx", "krs", "pic", "mailjet", "zmail", "protonmail2", "protonmail3", "fm1", "fm2", "fm3",
+    "zendesk1", "zendesk2",
+    # other frequent names
+    "dkim1", "key1", "key2", "sel1", "sel2", "selector", "everlytickey1", "everlytickey2", "s1024", "s2048", "sig1",
 ]
 TIMEOUT = 8
 # crt.sh answers 502 when one address sends it many queries at once (several domains audited together)
@@ -137,11 +142,18 @@ class Collector:
         return sorted(str(r.target).rstrip(".") for r in answer) if answer is not None else []
 
     def dkim_selectors(self, domain: str) -> list[str]:
-        found = []
-        for sel in DKIM_SELECTORS:
-            if any("p=" in t for t in self.txt(f"{sel}._domainkey.{domain}")):
-                found.append(sel)
-        return found
+        return list(self.dkim_keys(domain))
+
+    def dkim_keys(self, domain: str, selectors: list[str] | None = None) -> dict[str, str]:
+        """{selector: DKIM record} for the tested selectors that have a key (looked up in parallel)."""
+        names = list(dict.fromkeys(selectors or DKIM_SELECTORS))
+
+        def key(sel: str) -> str:
+            return next((t for t in self.txt(f"{sel}._domainkey.{domain}") if "p=" in t), "")
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            found = dict(zip(names, pool.map(key, names), strict=True))
+        return {sel: record for sel, record in found.items() if record}
 
     def dnssec(self, domain: str) -> DNSSECInfo:
         """DS (in the parent zone) and DNSKEY records of the zone containing the domain.

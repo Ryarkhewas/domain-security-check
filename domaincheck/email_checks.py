@@ -179,16 +179,113 @@ def check_dmarc(dmarc_txt: list[str], inherited_from: str = "") -> list[Finding]
     return findings
 
 
-def check_dkim(found_selectors: list[str], tested_selectors: list[str]) -> list[Finding]:
+# Services that send email for a domain, recognised by the SPF include they ask for, with the DKIM
+# selectors they publish (from their documentation). Empty: selectors chosen per account, cannot be guessed.
+SENDERS = [
+    ("_spf.google.com", "Google Workspace", ["google"]),
+    ("spf.protection.outlook.com", "Microsoft 365", ["selector1", "selector2"]),
+    ("sendgrid.net", "SendGrid", ["s1", "s2"]),
+    ("mailgun.org", "Mailgun", ["mx", "smtp", "k1", "krs", "pic"]),
+    ("servers.mcsv.net", "Mailchimp", ["k1", "k2", "k3"]),
+    ("spf.mandrillapp.com", "Mailchimp Transactional", ["mandrill", "mte1", "mte2"]),
+    ("spf.mailjet.com", "Mailjet", ["mailjet"]),
+    ("zoho.com", "Zoho Mail", ["zoho", "zmail"]),
+    ("zoho.eu", "Zoho Mail", ["zoho", "zmail"]),
+    ("_spf.protonmail.ch", "Proton Mail", ["protonmail", "protonmail2", "protonmail3"]),
+    ("spf.messagingengine.com", "Fastmail", ["fm1", "fm2", "fm3"]),
+    ("mail.zendesk.com", "Zendesk", ["zendesk1", "zendesk2"]),
+    ("spf.sendinblue.com", "Brevo", []),
+    ("spf.brevo.com", "Brevo", []),
+    ("amazonses.com", "Amazon SES", []),
+    ("spf.mtasv.net", "Postmark", []),
+    ("mx.ovh.com", "OVHcloud", []),
+]
+
+
+def spf_senders(root_txt: list[str]) -> list[tuple[str, list[str]]]:
+    """[(service, its usual DKIM selectors)] for the services named in the SPF record's includes."""
+    found: dict[str, list[str]] = {}
+    for record in root_txt:
+        if not record.lower().startswith("v=spf1"):
+            continue
+        for term in record.split():
+            domain = term.lower().lstrip("+-~?")
+            if not domain.startswith("include:"):
+                continue
+            domain = domain[len("include:"):].rstrip(".")
+            for suffix, name, selectors in SENDERS:
+                if domain == suffix or domain.endswith("." + suffix):
+                    found.setdefault(name, selectors)
+    return list(found.items())
+
+
+def dkim_key_bits(record: str) -> int | None:
+    """Size of the RSA key of a DKIM record, 0 for a revoked key (empty p=), None when it cannot be read."""
+    tags = dict(part.strip().split("=", 1) for part in record.split(";") if "=" in part)
+    if tags.get("k", "rsa").strip().lower() != "rsa":
+        return None  # ed25519: fixed size, always strong
+    key = "".join(tags.get("p", "").split())
+    if not key:
+        return 0
+    try:
+        import base64
+
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.hazmat.primitives.serialization import load_der_public_key
+
+        public = load_der_public_key(base64.b64decode(key + "=" * (-len(key) % 4)))
+    except (ImportError, ValueError, TypeError):
+        return None
+    return public.key_size if isinstance(public, rsa.RSAPublicKey) else None
+
+
+def check_dkim(found_selectors: list[str], tested_selectors: list[str], records: dict[str, str] | None = None,
+               senders: list[tuple[str, list[str]]] | None = None) -> list[Finding]:
+    """DKIM keys found among the tested selectors, their strength, and the senders of the SPF record without one."""
     title = "DKIM (email signing)"
+    records = records or {}
+    senders = senders or []
+    findings = []
     if found_selectors:
-        found = M("DKIM key(s) found: {selectors}.", selectors=", ".join(found_selectors))
-        return [_f(title, Status.OK, found, source="dkim")]
-    return [_f(title, Status.INFO,
-               M("No DKIM key found among the common selectors tested ({count}). "
-                 "This is not necessarily a problem: the selector may have another name.", count=len(tested_selectors)),
-               "Check in your email service (Google Workspace, Microsoft 365...) that DKIM signing is enabled.",
-               None, "dkim")]
+        sizes = {sel: dkim_key_bits(records[sel]) for sel in found_selectors if sel in records}
+        described = [f"{sel} (RSA {sizes[sel]})" if sizes.get(sel) else sel for sel in found_selectors]
+        weak = [sel for sel, bits in sizes.items() if bits and bits < 1024]
+        short = [sel for sel, bits in sizes.items() if bits and 1024 <= bits < 2048]
+        found = M("DKIM key(s) found: {selectors}.", selectors=", ".join(described))
+        if weak:
+            findings.append(_f(title, Status.CRITICAL,
+                               M("{found} Keys under 1024 bits can be broken: someone could then sign emails in your "
+                                 "name: {weak}.", found=found, weak=", ".join(weak)),
+                               "Generate a new 2048-bit DKIM key in your email service and delete the old record.",
+                               -20, "dkim"))
+        elif short:
+            findings.append(_f(title, Status.WARNING,
+                               M("{found} 1024-bit keys are still accepted but now considered too short; 2048 bits "
+                                 "is the current recommendation: {short}.", found=found, short=", ".join(short)),
+                               "Switch to a 2048-bit DKIM key when your email service allows it (key rotation).",
+                               -5, "dkim"))
+        else:
+            findings.append(_f(title, Status.OK, found, source="dkim"))
+    else:
+        with_selectors = [name for name, sels in senders if sels]
+        detail = M("No DKIM key found among the common selectors tested ({count}). "
+                   "This is not necessarily a problem: the selector may have another name.",
+                   count=len(tested_selectors))
+        if with_selectors:
+            detail = M("No DKIM key found among the common selectors tested ({count}), including the usual ones of "
+                       "the services named in SPF ({senders}): DKIM signing is probably not enabled for them.",
+                       count=len(tested_selectors), senders=", ".join(with_selectors))
+        findings.append(_f(title, Status.INFO, detail,
+                           "Check in your email service (Google Workspace, Microsoft 365...) that DKIM signing is "
+                           "enabled.", None, "dkim"))
+    missing = [name for name, sels in senders if sels and not set(sels) & set(found_selectors)]
+    if found_selectors and missing:
+        findings.append(_f("DKIM for each sending service", Status.INFO,
+                           M("SPF allows these services to send for the domain, but their usual DKIM keys were not "
+                             "found: {senders}. Their emails may be signed with their own domain, which DMARC does not "
+                             "count as yours.", senders=", ".join(missing)),
+                           "Enable DKIM with your own domain in each of these services.", None, "dkim"))
+    return findings
 
 
 # --- MTA-STS (RFC 8461) and SMTP TLS reporting (RFC 8460) ----------------------

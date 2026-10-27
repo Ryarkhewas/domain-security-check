@@ -215,6 +215,7 @@ class CollectedData:
     software: list = field(default_factory=list)  # software.Software recognised on the home page
     lifecycles: dict = field(default_factory=dict)  # product -> list of software.Cycle, None if unavailable
     subdomain_audits: list[SubdomainAudit] | None = None  # with --subdomains
+    dkim_records: dict[str, str] = field(default_factory=dict)  # selector -> DKIM record, when collected
     ns: list[str] = field(default_factory=list)  # name servers of the domain (to recognise the DNS host)
 
 
