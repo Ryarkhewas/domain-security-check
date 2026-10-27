@@ -6,6 +6,8 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-10-27
+
 ### Added
 - Grades over time: each audit adds a line to `<domain>.history.json`, and from the second audit on the HTML and PDF reports show a chart of the four scores, with a table of the values (started from the previous `<domain>.json` when there is one).
 - Docker images (`ghcr.io/ryarkhewas/domain-security-check`, and a `browser` variant with Chromium for `--browser`), built and tested on every push, published with each release.
@@ -113,6 +115,7 @@ First release.
 - 201 unit tests on Python 3.10 to 3.13, lint (ruff) and type check (mypy) in CI, and a build test of the package.
 - Weekly Live check against real domains, including a test-by-test comparison with the Mozilla HTTP Observatory API.
 
+[1.7.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.7.0
 [1.6.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.6.0
 [1.5.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.5.0
 [1.4.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.4.0

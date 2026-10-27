@@ -47,10 +47,10 @@ Requires Python 3.10 or later.
 pip install domain-security-check            # add [pdf], [browser] or [pdf,browser] for the options
 
 # Latest release, straight from GitHub
-pip install "git+https://github.com/Ryarkhewas/domain-security-check@v1.6.0"
+pip install "git+https://github.com/Ryarkhewas/domain-security-check@v1.7.0"
 
 # With PDF output (add ,browser for --browser)
-pip install "domain-security-check[pdf] @ git+https://github.com/Ryarkhewas/domain-security-check@v1.6.0"
+pip install "domain-security-check[pdf] @ git+https://github.com/Ryarkhewas/domain-security-check@v1.7.0"
 
 # Or from a clone, to work on the code
 git clone https://github.com/Ryarkhewas/domain-security-check.git
