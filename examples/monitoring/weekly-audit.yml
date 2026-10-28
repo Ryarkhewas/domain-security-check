@@ -1,0 +1,55 @@
+# Weekly audit of your clients' domains, with alerts.
+#
+# Copy this file to .github/workflows/ in a PRIVATE repository, next to a
+# domains.txt file (one domain per line). Every Monday it audits the domains,
+# compares each one with the previous week, and:
+# - sends the alerts to a chat webhook if the DSC_WEBHOOK_URL secret is set
+#   (Slack, Discord, Mattermost, Google Chat);
+# - sends them by email if the DSC_SMTP_* / DSC_ALERT_* secrets are set (and
+#   --email-alert is added to the options below);
+# - marks the run as failed when there is an alert, so GitHub also emails you.
+# The reports are kept as an artifact, and the history of each domain is
+# carried from one run to the next in the Actions cache.
+name: Weekly domain audit
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"  # Mondays, 06:17 UTC
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Previous reports (history of each domain)
+        uses: actions/cache/restore@v4
+        with:
+          path: reports
+          key: domain-audit-${{ github.run_id }}
+          restore-keys: domain-audit-
+      - name: Audit and alerts
+        uses: Ryarkhewas/domain-security-check@v1.8.0
+        env:
+          DSC_WEBHOOK_URL: ${{ secrets.DSC_WEBHOOK_URL }}
+          DSC_SMTP_HOST: ${{ secrets.DSC_SMTP_HOST }}
+          DSC_SMTP_PORT: ${{ secrets.DSC_SMTP_PORT }}
+          DSC_SMTP_USER: ${{ secrets.DSC_SMTP_USER }}
+          DSC_SMTP_PASSWORD: ${{ secrets.DSC_SMTP_PASSWORD }}
+          DSC_ALERT_FROM: ${{ secrets.DSC_ALERT_FROM }}
+          DSC_ALERT_TO: ${{ secrets.DSC_ALERT_TO }}
+        with:
+          file: domains.txt
+          args: --alert --pdf --lang fr
+      - name: Save the reports for next week
+        if: always()  # also when there are alerts (the run is then marked as failed)
+        uses: actions/cache/save@v4
+        with:
+          path: reports
+          key: domain-audit-${{ github.run_id }}
+      - name: Keep the reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports
+          path: reports/

@@ -737,6 +737,17 @@ FR: dict[str, str] = {
     "Grades over time": "Évolution des notes",
     "Values per audit": "Valeurs par audit",
     "Date": "Date",
+    # --- Alerts (follow-up mode) -----------------------------------------------------------
+    "Security audit: {count} alert(s)": "Audit de sécurité : {count} alerte(s)",
+    "{area} grade went down from {old} to {new}.": "{area} : note en baisse, de {old} à {new}.",
+    "New problem: {title}.": "Nouveau problème : {title}.",
+    "Got worse: {title}.": "Aggravé : {title}.",
+    "Critical problem: {title}.": "Problème critique : {title}.",
+    "{title}: {detail}": "{title} : {detail}",
+    "No alert: nothing got worse, and nothing expires soon.":
+        "Aucune alerte : rien ne s'est dégradé et rien n'expire bientôt.",
+    "Alerts sent to the webhook.": "Alertes envoyées au webhook.",
+    "Alerts sent by email.": "Alertes envoyées par email.",
     # --- Summary for decision makers -----------------------------------------------------
     "Summary for decision makers": "Synthèse pour la direction",
     "Main risks": "Principaux risques",

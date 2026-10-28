@@ -1,0 +1,59 @@
+name: Domain security check
+description: Passive security audit of domain names (HTTPS, headers, email, DNS), with HTML/PDF reports and alerts
+author: Loïc Tellier
+branding:
+  icon: shield
+  color: blue
+
+inputs:
+  domains:
+    description: Domains to audit, separated by spaces
+    required: false
+    default: ""
+  file:
+    description: File with one domain per line (instead of, or in addition to, domains)
+    required: false
+    default: ""
+  output-dir:
+    description: Folder for the reports and the history of each domain
+    required: false
+    default: reports
+  args:
+    description: Other options, e.g. "--alert --pdf --lang fr --nis2"
+    required: false
+    default: ""
+  python-version:
+    description: Python version used to run the tool
+    required: false
+    default: "3.12"
+
+outputs:
+  exit-code:
+    description: 0 if fine, 3 if a domain could not be audited, 4 if there are alerts (with --alert)
+    value: ${{ steps.audit.outputs.exit-code }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v7
+      with:
+        python-version: ${{ inputs.python-version }}
+    - name: Install domain-security-check
+      shell: bash
+      run: python -m pip install --quiet "${GITHUB_ACTION_PATH}[pdf]"
+    - name: Audit
+      id: audit
+      shell: bash
+      env:
+        DOMAINS: ${{ inputs.domains }}
+        FILE: ${{ inputs.file }}
+        OUTPUT_DIR: ${{ inputs.output-dir }}
+        ARGS: ${{ inputs.args }}
+      run: |
+        set +e
+        # word splitting of DOMAINS and ARGS is intended: several domains, several options
+        # shellcheck disable=SC2086
+        domain-security-check $DOMAINS ${FILE:+--file "$FILE"} --output-dir "$OUTPUT_DIR" $ARGS
+        code=$?
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        exit $code

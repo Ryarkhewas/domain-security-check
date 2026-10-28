@@ -90,3 +90,19 @@ jobs:
           docker run --rm -v "$PWD/out:/reports" domain-security-check:test --demo --pdf --lang fr
           ls out/bakery-example.com.html out/bakery-example.com.pdf
           grep -q "Actions prioritaires" out/bakery-example.com.html
+
+  action:
+    # The reusable GitHub Action of this repository, as other repositories use it
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Run the action on the demo, with alerts
+        id: audit
+        continue-on-error: true  # exit code 4: the demo has alerts
+        uses: ./
+        with:
+          args: --demo --alert --lang fr --pdf
+      - name: Check the result
+        run: |
+          test "${{ steps.audit.outputs.exit-code }}" = 4
+          ls reports/bakery-example.com.html reports/bakery-example.com.pdf reports/bakery-example.com.history.json

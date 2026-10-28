@@ -21,10 +21,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
 from ._version import __version__
+from .alerts import AlertError, email_settings, send_email, send_webhook
+from .alerts import compute as compute_alerts
+from .alerts import text as alerts_text
 from .audit import InvalidDomain, audit_many, run_audit
 from .branding import Branding, BrandingError
 from .branding import load as load_branding
@@ -93,6 +97,15 @@ def main(argv: list[str] | None = None) -> int:
                         "(default: the <domain>.json saved next to the report by the previous run)")
     p.add_argument("--no-ct-logs", action="store_true",
                    help="Skip the subdomains published in Certificate Transparency logs (faster)")
+    p.add_argument("--alert", action="store_true",
+                   help="Follow-up mode: list what got worse since the previous audit and what expires soon; "
+                        "exit code 4 when there is an alert")
+    p.add_argument("--webhook", metavar="URL", default="",
+                   help="Send the alerts to a chat webhook (Slack, Discord, Mattermost, Google Chat); implies --alert. "
+                        "Better kept secret in the DSC_WEBHOOK_URL environment variable")
+    p.add_argument("--email-alert", action="store_true",
+                   help="Send the alerts by email, with the DSC_SMTP_* and DSC_ALERT_* environment variables; "
+                        "implies --alert")
     p.add_argument("--nis2", action="store_true",
                    help="Add a NIS 2 view: how the checks relate to the measures of article 21 of the directive")
     p.add_argument("--browser", action="store_true",
@@ -165,7 +178,7 @@ def _single(result: Result, args) -> int:
         pdf = output.with_suffix(".pdf")
         pdf.write_bytes(render_pdf(result, args.author, args.lang, args.branding, args.nis2))
         print(say("PDF report: {path}", path=str(pdf)), file=sys.stderr)
-    return 0
+    return _alerts([result], args, 0)
 
 
 def _compare_and_save(result: Result, saved: Path, previous: Path | None = None) -> None:
@@ -235,7 +248,33 @@ def _several(domains: list[str], args) -> int:
     summary = say("Summary: {path} ({audited} audited, {failed} not audited)", path=str(out / "index.html"),
                   audited=len(results), failed=len(errors))
     print(f"\n{summary}", file=sys.stderr)
-    return 0 if not errors else 3
+    return _alerts(results, args, 0 if not errors else 3)
+
+
+def _alerts(results: list[Result], args, code: int) -> int:
+    """Follow-up mode: print and send the alerts. Exit code 4 when there are some (3 if a domain failed)."""
+    webhook = args.webhook or os.environ.get("DSC_WEBHOOK_URL", "")
+    if not (args.alert or args.webhook or args.email_alert):
+        return code
+    say = _translator(args.lang)
+    found = [a for r in results for a in compute_alerts(r)]
+    if not found:
+        print(say("No alert: nothing got worse, and nothing expires soon."), file=sys.stderr)
+        return code
+    body = alerts_text(found, say)
+    print(f"\n{body}", file=sys.stderr)
+    try:
+        if webhook:
+            send_webhook(webhook, body)
+            print(say("Alerts sent to the webhook."), file=sys.stderr)
+        if args.email_alert:
+            subject = say("Security audit: {count} alert(s)", count=len(found))
+            send_email(subject, body, email_settings())
+            print(say("Alerts sent by email."), file=sys.stderr)
+    except AlertError as e:
+        print(say("Error: {message}", message=str(e)), file=sys.stderr)
+        return 1
+    return code or 4
 
 
 def _skip(args) -> dict[str, bool]:
