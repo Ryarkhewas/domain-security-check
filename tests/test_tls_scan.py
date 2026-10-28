@@ -207,3 +207,28 @@ def test_certificate_key():
     assert by_title(check_tls_scan(TLSScanInfo(MODERN), cert(key=("RSA", 1024))))["Certificate key"].points == -30
     assert by_title(check_tls_scan(TLSScanInfo(MODERN), cert(key=("EC", 256))))["Certificate key"].status == Status.OK
     assert "Certificate key" not in by_title(check_tls_scan(TLSScanInfo(MODERN), cert(key=("", 0))))
+
+
+def test_slow_server_is_cut(monkeypatch):
+    import time
+
+    monkeypatch.setattr(scan, "PROBE_DEADLINE", 1)
+    server = socket.socket()
+    server.bind(("127.0.0.1", 0))
+    server.listen(1)
+
+    def drip():
+        conn, _ = server.accept()
+        try:
+            conn.sendall(b"\x16\x03\x03\xff\xff")  # a record header announcing 64 KB, then a byte at a time
+            for _ in range(100):
+                conn.sendall(b"\x02")
+                time.sleep(0.2)
+        except OSError:
+            pass
+
+    threading.Thread(target=drip, daemon=True).start()
+    start = time.monotonic()
+    with pytest.raises(scan.ProbeError, match="too slow|no answer"):
+        scan.probe("127.0.0.1", scan.TLS12, [0xC02F], timeout=5, port=server.getsockname()[1])
+    assert time.monotonic() - start < 4

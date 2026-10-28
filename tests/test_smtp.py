@@ -187,3 +187,50 @@ def test_dane():
 
 def test_no_mx_no_finding():
     assert check_mail_servers([], None, NOW) == []
+
+
+def endless_server(payload_loop):
+    server = socket.socket()
+    server.bind(("127.0.0.1", 0))
+    server.listen(4)
+
+    def serve():
+        while True:
+            conn, _ = server.accept()
+
+            def talk(c=conn):
+                try:
+                    payload_loop(c)
+                except OSError:
+                    pass
+                finally:
+                    c.close()
+            threading.Thread(target=talk, daemon=True).start()
+
+    threading.Thread(target=serve, daemon=True).start()
+    return server.getsockname()[1]
+
+
+def test_endless_reply_is_cut():
+    def flood(conn):
+        while True:
+            conn.sendall(b"220-still talking\r\n")
+
+    info = smtp_scan.probe("localhost", timeout=5, port=endless_server(flood))
+    assert not info.reachable and "reply too long" in info.error
+
+
+def test_slow_server_is_cut(monkeypatch):
+    import time
+
+    monkeypatch.setattr(smtp_scan, "CONNECTION_DEADLINE", 1)
+
+    def drip(conn):
+        while True:
+            conn.sendall(b"2")
+            time.sleep(0.2)
+
+    start = time.monotonic()
+    info = smtp_scan.probe("localhost", timeout=5, port=endless_server(drip))
+    assert time.monotonic() - start < 4 and not info.reachable
+    assert info.error in ("timeout", "the server answers too slowly")

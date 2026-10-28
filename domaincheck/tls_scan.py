@@ -18,6 +18,7 @@ import os
 import socket
 import ssl
 import struct
+import time
 from dataclasses import dataclass
 
 SSL3, TLS10, TLS11, TLS12 = 0x0300, 0x0301, 0x0302, 0x0303
@@ -52,6 +53,9 @@ MODERN_SUITES = [
     0x009E, 0x009F, 0x0033, 0x0039,
 ]
 VERSION_PROBE_SUITES = MODERN_SUITES + list(STATIC_RSA_SUITES) + [0x000A, 0x0005, 0x0004]
+
+
+PROBE_DEADLINE = 20  # seconds for one probe, however slowly the server answers
 
 
 @dataclass
@@ -132,11 +136,16 @@ def read_server_hello(data: bytes) -> Hello | None:
 
 def probe(host: str, version: int, suites: list[int], timeout: float = 8, port: int = 443) -> Hello:
     """Send a ClientHello and read the answer. A closed connection counts as a refusal."""
+    deadline = time.monotonic() + PROBE_DEADLINE
     try:
         with socket.create_connection((host, port), timeout=timeout) as sock:
             sock.sendall(client_hello(host, version, suites))
             data = b""
             while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:  # a server sending its answer a byte at a time
+                    raise ProbeError("answer too slow")
+                sock.settimeout(min(timeout, remaining))
                 chunk = sock.recv(16384)
                 if not chunk:
                     return Hello(False)

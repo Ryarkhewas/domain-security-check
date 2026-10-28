@@ -175,3 +175,18 @@ def test_cert_spotter_note_in_french():
 
     (f,) = check_subdomains(SubdomainInfo([], "Cert Spotter"))
     assert "crt.sh n'a pas répondu" in tr(f.detail, "fr")
+
+
+def test_cert_spotter_pagination_stops_when_stuck(monkeypatch):
+    calls = []
+
+    class Answer:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return [{"id": "5", "dns_names": ["a.example.com"]}]  # always the same page
+
+    monkeypatch.setattr(collector_module.requests, "get", lambda url, params, **kw: calls.append(1) or Answer())
+    assert collector_module.Collector()._cert_spotter("example.com") == ["a.example.com", "a.example.com"]
+    assert len(calls) == 2

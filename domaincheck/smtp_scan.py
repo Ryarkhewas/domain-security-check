@@ -15,6 +15,7 @@ from __future__ import annotations
 import contextlib
 import socket
 import ssl
+import time
 from datetime import datetime, timezone
 
 from .models import MailServerInfo
@@ -22,17 +23,32 @@ from .models import MailServerInfo
 EHLO_NAME = "domain-security-check.localhost"
 
 
+MAX_REPLY_LINES = 100
+CONNECTION_DEADLINE = 30  # seconds for a whole conversation, however slowly the server answers
+
+
 class SMTPError(OSError):
     """The server answered something unexpected."""
 
 
-def _read_reply(sock: socket.socket) -> tuple[int, list[str]]:
+def _recv(sock: socket.socket, deadline: float) -> bytes:
+    """recv() that cannot outlast the conversation's deadline (a server answering a byte at a time)."""
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise SMTPError("the server answers too slowly")
+    sock.settimeout(min(sock.gettimeout() or remaining, remaining))
+    return sock.recv(4096)
+
+
+def _read_reply(sock: socket.socket, deadline: float) -> tuple[int, list[str]]:
     """One SMTP reply (possibly multi-line: "250-..." then "250 ...")."""
     data = b""
     lines: list[str] = []
     while True:
+        if len(lines) >= MAX_REPLY_LINES:
+            raise SMTPError("reply too long")
         while b"\r\n" not in data and b"\n" not in data:
-            chunk = sock.recv(4096)
+            chunk = _recv(sock, deadline)
             if not chunk:
                 raise SMTPError("connection closed")
             data += chunk
@@ -49,33 +65,34 @@ def _read_reply(sock: socket.socket) -> tuple[int, list[str]]:
             return int(text[:3]), lines
 
 
-def _command(sock: socket.socket, line: str) -> tuple[int, list[str]]:
+def _command(sock: socket.socket, line: str, deadline: float) -> tuple[int, list[str]]:
     sock.sendall(line.encode("ascii") + b"\r\n")
-    return _read_reply(sock)
+    return _read_reply(sock, deadline)
 
 
-def _open(host: str, port: int, timeout: float) -> tuple[socket.socket, bool]:
-    """Connect, greet, and return (socket, STARTTLS offered)."""
+def _open(host: str, port: int, timeout: float) -> tuple[socket.socket, bool, float]:
+    """Connect, greet, and return (socket, STARTTLS offered, deadline of the conversation)."""
+    deadline = time.monotonic() + CONNECTION_DEADLINE
     sock = socket.create_connection((host, port), timeout=timeout)
     try:
-        code, _ = _read_reply(sock)
+        code, _ = _read_reply(sock, deadline)
         if code != 220:
             raise SMTPError(f"greeting {code}")
-        code, lines = _command(sock, f"EHLO {EHLO_NAME}")
+        code, lines = _command(sock, f"EHLO {EHLO_NAME}", deadline)
         if code != 250:
             raise SMTPError(f"EHLO refused ({code})")
-        return sock, any(line.upper().split(" ")[0] == "STARTTLS" for line in lines)
+        return sock, any(line.upper().split(" ")[0] == "STARTTLS" for line in lines), deadline
     except BaseException:
         sock.close()
         raise
 
 
 def _starttls(host: str, port: int, timeout: float, verify: bool) -> ssl.SSLSocket:
-    sock, offered = _open(host, port, timeout)
+    sock, offered, deadline = _open(host, port, timeout)
     try:
         if not offered:
             raise SMTPError("STARTTLS not offered")
-        code, _ = _command(sock, "STARTTLS")
+        code, _ = _command(sock, "STARTTLS", deadline)
         if code != 220:
             raise SMTPError(f"STARTTLS refused ({code})")
         ctx = ssl.create_default_context()
@@ -98,7 +115,7 @@ def probe(host: str, timeout: float = 10, port: int = 25) -> MailServerInfo:
     """STARTTLS support, TLS version and certificate of one mail server."""
     info = MailServerInfo(host)
     try:
-        sock, offered = _open(host, port, timeout)
+        sock, offered, _ = _open(host, port, timeout)
     except (OSError, ssl.SSLError) as e:
         info.error = _reason(e)
         return info
