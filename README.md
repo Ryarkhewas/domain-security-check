@@ -38,6 +38,8 @@ Requests identify themselves as a current desktop browser, with `domain-security
 
 Even passive, an audit should only be run **on your own domains or with the owner's permission**.
 
+**Protection of the machine that runs the audit.** The audited domain's owner controls its DNS records, redirects and answers, so the tool refuses by default to connect to private or reserved addresses (127.0.0.1, 10.0.0.0/8, 192.168.0.0/16, cloud metadata at 169.254.169.254…), including through redirects, mail servers and subdomains: a domain cannot make it probe the network it runs in. `--allow-private` lifts this to audit internal domains. Every answer is read up to 2 MB and within a time limit, the reports forbid scripts and remote resources, and nothing a server sends can reach the terminal as a control sequence. See [SECURITY.md](https://github.com/Ryarkhewas/domain-security-check/blob/main/SECURITY.md), which also explains how to report a vulnerability.
+
 ## Installation
 
 Requires Python 3.10 or later.
@@ -100,6 +102,9 @@ domain-security-check my-domain.com --no-ct-logs
 
 # Deeper audit: subdomains in use, trackers in a real browser, and the NIS 2 view
 domain-security-check client.fr --subdomains --browser --nis2 --pdf --lang fr
+
+# Audit an internal domain (connections to private addresses are refused otherwise)
+domain-security-check intranet.example.local --allow-private
 
 # Skip the connections to the mail servers on port 25
 domain-security-check my-domain.com --no-mail-servers
@@ -249,6 +254,7 @@ domaincheck/
   trackers.py               Trackers before consent (page received, or real browser)
   timeline.py               Grades over time (history file of each domain)
   alerts.py                 Follow-up mode: alerts, webhook and email
+  netguard.py               Safety of the tool's own connections (private addresses, size and time limits)
 action.yml                  Reusable GitHub Action
   nis2.py                   NIS 2 view: checks related to the measures of article 21(2)
   email_checks.py           MX / SPF / DMARC / DKIM / MTA-STS analysis
@@ -266,7 +272,7 @@ action.yml                  Reusable GitHub Action
   hsts_preload.py           HSTS preload list (download, cache, lookups)
   rdap.py                   Domain registration data (RDAP servers, answers)
   observatory.py            Test-by-test comparison with the Observatory API
-tests/                      1066 unit tests + live tests (tests/live)
+tests/                      1100 unit tests + live tests (tests/live)
 scripts/live_summary.py     Audits a list of domains for the Live check workflow
 scripts/observatory_compare.py  Compares the website grades with the Observatory
 ```
@@ -276,7 +282,7 @@ Collection is kept separate from analysis: every rule can be tested on fixed dat
 ## Tests
 
 ```bash
-python -m pytest -q          # 1066 unit tests, no network needed
+python -m pytest -q          # 1100 unit tests, no network needed
 ruff check .                 # lint
 mypy                         # type check
 python -m pytest -m live -v  # live tests against real domains (Internet required)
@@ -284,7 +290,7 @@ python -m pytest -m live -v  # live tests against real domains (Internet require
 
 Three GitHub Actions workflows keep the tool honest (the Tests workflow also runs the reusable action of this repository on the demo):
 
-- **Tests** runs on every push: the unit tests on Python 3.10 to 3.13, the lint and type checks, a build of the package installed in a clean environment and checked for PyPI (`twine check`), and a build of the Docker image that runs the demo.
+- **Tests** runs on every push (all workflows use actions pinned to a commit, with a read-only token unless a job publishes; Dependabot keeps them up to date): the unit tests on Python 3.10 to 3.13, the lint and type checks, a build of the package installed in a clean environment and checked for PyPI (`twine check`), and a build of the Docker image that runs the demo.
 - **Release** publishes a GitHub release with the package attached, the Docker images on the GitHub Container Registry and, once set up, the package on PyPI.
 - **Live check** runs every Monday (and on demand) against real domains:
   - hosts from [badssl.com](https://badssl.com), deliberately misconfigured for testing (expired, self-signed and wrong-host certificates), must be flagged as critical;

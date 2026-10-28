@@ -6,6 +6,16 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Security
+- Connections to private or reserved addresses (loopback, private networks, link-local and cloud metadata, carrier-grade NAT…) are refused by default, for the site, its redirects, its mail servers, its subdomains and the optional browser: an audited domain can no longer make the tool probe the network it runs in. `--allow-private` lifts this for internal domains.
+- Answers from the audited servers are read up to 2 MB and within 60 seconds (pages, security.txt, MTA-STS policies, RDAP), TLS and SMTP probes have an overall time limit, SMTP replies a line limit, and the Cert Spotter pagination stops if the API repeats itself: a hostile server can no longer exhaust memory or hold the audit forever.
+- Host names read in CT logs are validated before being looked up or contacted.
+- Control characters (terminal escape sequences) are removed from what is printed and from alerts; the webhook URL, which carries its secret, never appears in an error message.
+- The HTML reports carry a strict Content-Security-Policy (no script, no remote resource, no form) and `no-referrer`; the optional browser refuses downloads.
+- Workflows: actions pinned to a commit, read-only token by default, no git credentials left on disk, Dependabot for actions, Python dependencies and the Docker base image.
+- Minimum versions raised to releases without known vulnerabilities: requests 2.32.4, cryptography 44.0.1, dnspython 2.6.1.
+- SECURITY.md: how to report a vulnerability, and how the tool protects the machine that runs it.
+
 ### Added
 - Follow-up mode: `--alert` compares each domain with its previous audit and lists the grades that went down, new or worse problems (every critical problem on a first audit) and certificates or domain names that expire soon; exit code 4 when there is an alert. `--webhook URL` (or `DSC_WEBHOOK_URL`) sends them to Slack, Discord, Mattermost or Google Chat; `--email-alert` by email, with the `DSC_SMTP_*` and `DSC_ALERT_*` environment variables (STARTTLS or SSL).
 - Reusable GitHub Action (`uses: Ryarkhewas/domain-security-check@<version>`), tested on every push, and a weekly audit template (`examples/monitoring/weekly-audit.yml`) that keeps the history of each domain between runs and sends the alerts.
