@@ -24,6 +24,9 @@ ANSWER = {
 }
 
 
+
+pytestmark = pytest.mark.usefixtures("plain_http")
+
 def test_bootstrap_prefers_https_and_finds_the_longest_suffix():
     servers = rdap.parse_bootstrap(BOOTSTRAP)
     assert servers["fr"] == "https://rdap.nic.fr/"
@@ -86,7 +89,7 @@ class Answer:
 
 def make_collector():
     c = Collector.__new__(Collector)
-    c.timeout = 1
+    c.timeout, c.allow_private = 1, False
     return c
 
 

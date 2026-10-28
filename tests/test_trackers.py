@@ -92,7 +92,7 @@ def site():
 
 def test_real_browser(site):
     pytest.importorskip("playwright")
-    info = Collector(timeout=10).browser_trackers(site, wait=1)
+    info = Collector(timeout=10, allow_private=True).browser_trackers(site, wait=1)
     if info.error and "Executable doesn't exist" in info.error:
         pytest.skip("Chromium is not installed for Playwright")
     assert not info.error, info.error

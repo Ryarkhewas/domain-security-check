@@ -123,7 +123,7 @@ def local_server(cert_files, minimum, maximum, ciphers) -> int:
 
 def test_scan_of_a_modern_server(cert_files):
     port = local_server(cert_files, ssl.TLSVersion.TLSv1_2, ssl.TLSVersion.TLSv1_3, "ECDHE+AESGCM")
-    info = Collector(timeout=5).tls_scan("localhost", port=port)
+    info = Collector(timeout=5, allow_private=True).tls_scan("localhost", port=port)
     assert info.versions == {"SSLv3": False, "TLSv1": False, "TLSv1.1": False, "TLSv1.2": True, "TLSv1.3": True}
     assert (info.weak_ciphers, info.weak_tested, info.static_rsa) == ([], True, False)
 
@@ -131,7 +131,7 @@ def test_scan_of_a_modern_server(cert_files):
 def test_scan_of_an_old_server(cert_files):
     port = local_server(cert_files, ssl.TLSVersion.TLSv1, ssl.TLSVersion.TLSv1_2,
                         "ECDHE-RSA-AES128-SHA:AES128-SHA:AES256-SHA:@SECLEVEL=0")
-    info = Collector(timeout=5).tls_scan("localhost", port=port)
+    info = Collector(timeout=5, allow_private=True).tls_scan("localhost", port=port)
     if info.versions["TLSv1"] is False:
         pytest.skip("the local OpenSSL refuses to serve TLS 1.0")
     assert info.versions["TLSv1.1"] and info.versions["TLSv1.2"] and info.versions["TLSv1.3"] is False
@@ -143,7 +143,7 @@ def test_unreachable_server_is_reported():
     sock.bind(("127.0.0.1", 0))
     port = sock.getsockname()[1]
     sock.close()  # nothing listens on this port
-    info = Collector(timeout=2).tls_scan("localhost", port=port)
+    info = Collector(timeout=2, allow_private=True).tls_scan("localhost", port=port)
     assert info.error
     assert check_tls_scan(info, None)[0].status == Status.INFO
 

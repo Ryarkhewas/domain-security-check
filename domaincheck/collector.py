@@ -17,6 +17,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import cast
+from urllib.parse import urlparse
 
 import dns.dnssec
 import dns.exception
@@ -24,7 +25,7 @@ import dns.name
 import dns.resolver
 import requests
 
-from . import ct, smtp_scan, software, trackers
+from . import ct, netguard, smtp_scan, software, trackers
 from . import tls_scan as scan
 from ._version import __version__
 from .hsts_preload import PreloadList
@@ -87,13 +88,28 @@ class DomainNotFound(RuntimeError):
 
 
 class Collector:
-    def __init__(self, timeout: float = TIMEOUT):
+    def __init__(self, timeout: float = TIMEOUT, allow_private: bool = False):
         self.timeout = timeout
+        # Servers of the audited domain may point to private addresses (see netguard.py)
+        self.allow_private = allow_private
         try:
             self.resolver = dns.resolver.Resolver()
         except dns.resolver.NoResolverConfiguration as e:
             raise CollectionError(M("No DNS server configured on this machine.")) from e
         self.resolver.lifetime = timeout
+
+    # --- Connections to the audited domain's servers ------------------------------
+    def check_public(self, host: str, port: int = 443) -> None:
+        """Raise PrivateAddress if host points to a non-public address (unless private addresses are allowed)."""
+        if not self.allow_private:
+            netguard.check_public(host, port)
+
+    def _get(self, url: str, max_bytes: int = netguard.MAX_ANSWER, session: requests.Session | None = None,
+             **kwargs) -> requests.Response:
+        """GET on a server of the audited domain: address checked at each redirect, size and reading time limited."""
+        s = session or netguard.session(self.allow_private)
+        kwargs.setdefault("timeout", self.timeout)
+        return netguard.read_limited(s.get(url, stream=True, **kwargs), max_bytes)
 
     # --- DNS ---------------------------------------------------------------
     def _resolve(self, name: str, rtype: str, resolver: dns.resolver.Resolver | None = None):
@@ -203,8 +219,8 @@ class Collector:
             return info
         try:
             # RFC 8461: the policy must be served over valid HTTPS, without redirects
-            r = requests.get(f"https://mta-sts.{domain}/.well-known/mta-sts.txt", headers=dict(BROWSER_HEADERS),
-                             timeout=self.timeout, allow_redirects=False)
+            r = self._get(f"https://mta-sts.{domain}/.well-known/mta-sts.txt", 65_536, headers=dict(BROWSER_HEADERS),
+                          allow_redirects=False)
         except requests.RequestException as e:
             info.error = _short(e)
             return info
@@ -220,8 +236,7 @@ class Collector:
         for path in ("/.well-known/security.txt", "/security.txt"):
             url = f"https://{host}{path}"
             try:
-                r = requests.get(url, headers={**BROWSER_HEADERS, "Accept": "text/plain"}, timeout=self.timeout,
-                                 allow_redirects=True)
+                r = self._get(url, 32_768, headers={**BROWSER_HEADERS, "Accept": "text/plain"}, allow_redirects=True)
             except requests.RequestException as e:
                 last_error = _short(e)
                 continue
@@ -245,9 +260,10 @@ class Collector:
             info.error = M("no RDAP server for this extension")
             return info
         try:
-            r = requests.get(f"{base.rstrip('/')}/domain/{registered}", timeout=self.timeout * 2,
-                             headers={"Accept": "application/rdap+json, application/json",
-                                      "User-Agent": BROWSER_HEADERS["User-Agent"]})
+            # The registry's server comes from IANA's list: trusted address, but its answer is still bounded
+            r = self._get(f"{base.rstrip('/')}/domain/{registered}", session=netguard.session(allow_private=True),
+                          timeout=self.timeout * 2, headers={"Accept": "application/rdap+json, application/json",
+                                                             "User-Agent": BROWSER_HEADERS["User-Agent"]})
         except requests.RequestException as e:
             info.error = _short(e)
             return info
@@ -276,7 +292,9 @@ class Collector:
             with sync_playwright() as pw:
                 browser = pw.chromium.launch()
                 try:
-                    context = browser.new_context(user_agent=USER_AGENT, locale="fr-FR")
+                    context = browser.new_context(user_agent=USER_AGENT, locale="fr-FR", accept_downloads=False)
+                    if not self.allow_private:
+                        context.route("**/*", self._browser_guard)
                     page = context.new_page()
                     page.on("request", lambda request: urls.append(request.url))
                     page.goto(url if "://" in url else f"https://{url}", wait_until="load",
@@ -289,6 +307,17 @@ class Collector:
         except PlaywrightError as e:
             return TrackerInfo(mode="browser", error=_short(e))
         return trackers.from_browser(urls, cookies, body)
+
+    def _browser_guard(self, route) -> None:
+        """Requests of the page to private addresses are aborted, like the tool's own connections."""
+        host = urlparse(route.request.url).hostname or ""
+        try:
+            if route.request.url.startswith(("http://", "https://")):
+                netguard.check_public(host)
+        except netguard.PrivateAddress:
+            route.abort("blockedbyclient")
+            return
+        route.continue_()
 
     # --- Software support dates ------------------------------------------------
     def lifecycles(self, products: list[str]) -> dict[str, list | None]:
@@ -309,6 +338,10 @@ class Collector:
         hosts = [h for h in mx if h and h != "."]
 
         def one(host: str) -> MailServerInfo:
+            try:
+                self.check_public(host, port)
+            except netguard.PrivateAddress as e:
+                return MailServerInfo(host, error=e.args[0])
             info = smtp_scan.probe(host, timeout=max(self.timeout, 10), port=port)
             try:
                 answer = self._resolve(f"_25._tcp.{host}", "TLSA")
@@ -378,6 +411,11 @@ class Collector:
 
     def _audit_subdomain(self, host: str) -> SubdomainAudit:
         audit = SubdomainAudit(host)
+        try:
+            self.check_public(host)
+        except netguard.PrivateAddress as e:
+            audit.error = e.args[0]
+            return audit
         cert = self.certificate(host)
         if cert is not None:
             audit.https, audit.cert_valid, audit.cert_error = True, cert.valid, cert.error
@@ -391,13 +429,13 @@ class Collector:
                     audit.old_tls.append(name)
             if cert.valid:
                 try:
-                    r = requests.get(f"https://{host}", headers=dict(BROWSER_HEADERS), timeout=self.timeout)
+                    r = self._get(f"https://{host}", MAX_PAGE_SIZE, headers=dict(BROWSER_HEADERS))
                     content_type = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
                     audit.software = software.detect(dict(r.headers), _page_text(r, content_type))
                 except requests.RequestException:
                     pass
         try:
-            r = requests.get(f"http://{host}", headers=dict(BROWSER_HEADERS), timeout=self.timeout)
+            r = self._get(f"http://{host}", 0, headers=dict(BROWSER_HEADERS))  # only where it ends up
             audit.http, audit.redirects = True, r.url.startswith("https://")
         except requests.exceptions.SSLError:
             audit.http, audit.redirects = True, True  # redirected to HTTPS, where the certificate is a problem
@@ -408,19 +446,25 @@ class Collector:
     def _cert_spotter(self, domain: str) -> list[str]:
         names: list[str] = []
         params = {"domain": domain, "include_subdomains": "true", "expand": "dns_names"}
+        seen: set[str] = set()
         while True:
             r = requests.get(ct.CERT_SPOTTER, params=params, timeout=60, headers={"User-Agent": USER_AGENT})
             r.raise_for_status()
             page = r.json()
-            if not page:
+            if not isinstance(page, list) or not page:
                 return names
             names += ct.names_from_cert_spotter(page)
-            params["after"] = str(page[-1].get("id", ""))
+            after = str(page[-1].get("id", "")) if isinstance(page[-1], dict) else ""
+            if not after or after in seen:  # no way forward: stop instead of asking the same page forever
+                return names
+            seen.add(after)
+            params["after"] = after
 
     # --- TLS ---------------------------------------------------------------
     def certificate(self, host: str) -> CertificateInfo | None:
         ctx = ssl.create_default_context()
         try:
+            self.check_public(host)
             with socket.create_connection((host, 443), timeout=self.timeout) as sock, \
                     ctx.wrap_socket(sock, server_hostname=host) as tls:
                 cert = tls.getpeercert()
@@ -455,6 +499,11 @@ class Collector:
     def tls_scan(self, host: str, port: int = 443) -> TLSScanInfo:
         """Accepted protocol versions and cipher suites (one short connection each)."""
         info = TLSScanInfo()
+        try:
+            self.check_public(host, port)
+        except netguard.PrivateAddress as e:
+            info.error = e.args[0]
+            return info
 
         def version(v: int) -> bool | None:
             try:
@@ -497,23 +546,22 @@ class Collector:
     def http(self, host: str) -> HTTPInfo:
         # Like a browser (and the Observatory), cookies are collected across the
         # redirects and robots.txt, not only from the final page.
-        https = requests.Session()
+        https = netguard.session(self.allow_private)
         try:
-            r = https.get(f"https://{host}", headers=dict(BROWSER_HEADERS), timeout=self.timeout,
+            r = self._get(f"https://{host}", MAX_PAGE_SIZE, session=https, headers=dict(BROWSER_HEADERS),
                           allow_redirects=True)
             content_type = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
             info = HTTPInfo(https_reachable=True, headers=dict(r.headers), content_type=content_type,
                             body=_page_text(r, content_type))
             with contextlib.suppress(requests.RequestException):  # robots.txt is optional
-                https.get(f"https://{host}/robots.txt", headers={**BROWSER_HEADERS, "Accept": "text/plain,*/*;q=0.8"},
-                          timeout=self.timeout, allow_redirects=True)
+                self._get(f"https://{host}/robots.txt", 0, session=https,  # only for its cookies
+                          headers={**BROWSER_HEADERS, "Accept": "text/plain,*/*;q=0.8"}, allow_redirects=True)
             info.cookies = _cookies(https.cookies)
         except requests.RequestException as e:
             info = HTTPInfo(https_reachable=False, error=str(e))
 
         try:
-            r = requests.Session().get(f"http://{host}", headers=dict(BROWSER_HEADERS), timeout=self.timeout,
-                                       allow_redirects=True)
+            r = self._get(f"http://{host}", 0, headers=dict(BROWSER_HEADERS), allow_redirects=True)
             info.redirect_chain = [h.url for h in getattr(r, "history", [])] + [r.url]
             info.http_redirects_to_https = r.url.startswith("https://")
         except requests.exceptions.SSLError:

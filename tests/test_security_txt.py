@@ -15,6 +15,9 @@ GOOD = ("# Our policy\nContact: mailto:security@example.com\nExpires: 2027-06-30
         "Preferred-Languages: fr, en\n")
 
 
+
+pytestmark = pytest.mark.usefixtures("plain_http")
+
 def check(content, url=URL):
     return check_security_txt(SecurityTxtInfo(url, content), NOW)
 
@@ -69,6 +72,6 @@ def test_collection(monkeypatch, answers, found):
 
     monkeypatch.setattr(collector_module.requests, "get", get)
     c = Collector.__new__(Collector)
-    c.timeout = 1
+    c.timeout, c.allow_private = 1, False
     info = c.security_txt("example.com")
     assert info.url == found and (info.content is not None) == bool(found)

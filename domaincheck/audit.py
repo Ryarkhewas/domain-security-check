@@ -159,22 +159,29 @@ def find_dmarc(collector, domain: str) -> tuple[list[str], str]:
 
 
 def run_audit(text: str, collector=None, ct_logs: bool = True, mail_servers: bool = True,
-              subdomains: bool = False, browser: bool = False) -> Result:
+              subdomains: bool = False, browser: bool = False, allow_private: bool = False) -> Result:
     """Collect everything about a domain and analyse it.
 
     ct_logs=False skips the subdomains published in Certificate Transparency logs (the slowest part).
     mail_servers=False skips the connections to the mail servers on port 25.
     subdomains=True also checks each subdomain in use found in the CT logs (HTTPS, certificate, old TLS, software).
     browser=True loads the home page in a real browser to see the trackers set before consent (needs Playwright).
+    allow_private=True lets the tool connect to private addresses (audit of internal domains, see netguard.py).
     """
     from .collector import DKIM_SELECTORS, Collector
+    from .netguard import PrivateAddress
 
     domain = normalize_domain(text)
-    collector = collector or Collector()
+    collector = collector or Collector(allow_private=allow_private)
     mail_domain = email_domain(domain)
 
     if hasattr(collector, "check_exists"):
         collector.check_exists(domain)
+    if hasattr(collector, "check_public"):
+        try:
+            collector.check_public(domain)
+        except PrivateAddress as e:
+            raise InvalidDomain(e.args[0]) from e
 
     # CT logs answer slowly: they are read while the rest is collected
     ct_pool = ThreadPoolExecutor(max_workers=1)
@@ -230,7 +237,8 @@ def run_audit(text: str, collector=None, ct_logs: bool = True, mail_servers: boo
 def audit_many(domains: list[str], workers: int = 6,
                on_done: Callable[[str, Result | Exception], None] | None = None,
                ct_logs: bool = True, mail_servers: bool = True,
-               subdomains: bool = False, browser: bool = False) -> dict[str, Result | Exception]:
+               subdomains: bool = False, browser: bool = False,
+               allow_private: bool = False) -> dict[str, Result | Exception]:
     """Audit several domains at the same time (most of an audit is spent waiting for the network).
 
     Returns {domain: Result, or the exception that stopped its audit}, in the order given.
@@ -242,7 +250,8 @@ def audit_many(domains: list[str], workers: int = 6,
     outcomes: dict[str, Result | Exception] = {}
     with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
         options = (({} if ct_logs else {"ct_logs": False}) | ({} if mail_servers else {"mail_servers": False})
-                   | ({"subdomains": True} if subdomains else {}) | ({"browser": True} if browser else {}))
+                   | ({"subdomains": True} if subdomains else {}) | ({"browser": True} if browser else {})
+                   | ({"allow_private": True} if allow_private else {}))
         futures = {pool.submit(run_audit, d, **options): d for d in domains}
         for future in as_completed(futures):
             domain = futures[future]

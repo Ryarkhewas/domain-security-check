@@ -752,6 +752,10 @@ FR: dict[str, str] = {
     "no effect.":
         "{detail} La politique est déclarée dans une balise <meta> de la page, où frame-ancestors, report-uri et "
         "sandbox n'ont pas d'effet.",
+    "{host} points to a private or reserved address ({addresses}): not contacted (use --allow-private to audit "
+    "internal domains)":
+        "{host} pointe vers une adresse privée ou réservée ({addresses}) : non contacté (utilisez --allow-private pour "
+        "auditer des domaines internes)",
     # --- Summary for decision makers -----------------------------------------------------
     "Summary for decision makers": "Synthèse pour la direction",
     "Main risks": "Principaux risques",

@@ -7,11 +7,18 @@ from domaincheck import collector as collector_module
 from domaincheck.collector import BROWSER_HEADERS, Collector
 from domaincheck.hsts_preload import PreloadList
 
+pytestmark = pytest.mark.usefixtures("plain_http")
 
 class FakeResponse:
     def __init__(self, url, headers=None, content=b"", history=()):
         self.url, self.headers, self.content, self.history = url, headers or {}, content, list(history)
         self.encoding = "utf-8"
+
+    def iter_content(self, chunk_size):
+        yield self.content
+
+    def close(self):
+        pass
 
 
 class FakeCookie:
@@ -28,7 +35,7 @@ class FakeSession:
     def __init__(self):
         self.cookies = []
 
-    def get(self, url, headers, timeout, allow_redirects):
+    def get(self, url, headers, timeout, allow_redirects=True, stream=False):
         FakeSession.calls.append((url, headers))
         response = FakeSession.answer(url)
         if url.endswith("/robots.txt"):
@@ -42,13 +49,14 @@ class FakeSession:
 def fake_http(monkeypatch):
     FakeSession.calls = []
     monkeypatch.setattr(collector_module.requests, "Session", FakeSession)
+    monkeypatch.setattr(collector_module.netguard, "session", lambda allow_private=False: FakeSession())
     monkeypatch.setattr(Collector, "_preload", False)  # no preload list download in unit tests
     return FakeSession
 
 
 def make_collector():
     c = Collector.__new__(Collector)
-    c.timeout = 1
+    c.timeout, c.allow_private = 1, False
     return c
 
 

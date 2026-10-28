@@ -111,6 +111,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--browser", action="store_true",
                    help="Load the home page in a real browser to see the trackers set before consent "
                         "(needs the [browser] extra and: playwright install chromium)")
+    p.add_argument("--allow-private", action="store_true",
+                   help="Allow connections to private addresses (10.x, 192.168.x, 127.0.0.1...), to audit internal "
+                        "domains; refused by default, to protect the network the tool runs in")
     p.add_argument("--subdomains", action="store_true",
                    help="Also check every subdomain in use found in the CT logs (HTTPS, certificate, old TLS, "
                         "outdated software); slower")
@@ -288,6 +291,8 @@ def _skip(args) -> dict[str, bool]:
         skip["subdomains"] = True
     if args.browser:
         skip["browser"] = True
+    if args.allow_private:
+        skip["allow_private"] = True
     return skip
 
 
