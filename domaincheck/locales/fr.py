@@ -748,6 +748,10 @@ FR: dict[str, str] = {
         "Aucune alerte : rien ne s'est dégradé et rien n'expire bientôt.",
     "Alerts sent to the webhook.": "Alertes envoyées au webhook.",
     "Alerts sent by email.": "Alertes envoyées par email.",
+    "{detail} The policy is declared in a <meta> tag of the page, where frame-ancestors, report-uri and sandbox have "
+    "no effect.":
+        "{detail} La politique est déclarée dans une balise <meta> de la page, où frame-ancestors, report-uri et "
+        "sandbox n'ont pas d'effet.",
     # --- Summary for decision makers -----------------------------------------------------
     "Summary for decision makers": "Synthèse pour la direction",
     "Main risks": "Principaux risques",
@@ -884,6 +888,19 @@ FR: dict[str, str] = {
     "On Cloudflare:": "Sur Cloudflare :",
     "On Google Workspace:": "Sur Google Workspace :",
     "On Microsoft 365:": "Sur Microsoft 365 :",
+    "On OVHcloud:": "Chez OVHcloud :",
+    "On Gandi:": "Chez Gandi :",
+    "On IONOS:": "Chez IONOS :",
+    "Web Cloud > Domain names > the domain > Security section > DNSSEC (secure delegation): turn it on.":
+        "Web Cloud > Noms de domaine > le domaine > section Sécurité > Délégation sécurisée - DNSSEC : activez-la.",
+    "Domain > the domain > Nameservers tab > Go to DNSSEC.":
+        "Domaine > le domaine > onglet Nameservers > Go to DNSSEC.",
+    "turn on DNSSEC in the domain's DNS settings (see the IONOS guide).":
+        "activez DNSSEC dans les paramètres DNS du domaine (voir le guide IONOS).",
+    "Web Cloud > Domain names > the domain > DNS zone tab, then add or edit the record.":
+        "Web Cloud > Noms de domaine > le domaine > onglet Zone DNS, puis ajoutez ou modifiez l'enregistrement.",
+    "add or edit the record in the domain's DNS settings (see the IONOS guide).":
+        "ajoutez ou modifiez l'enregistrement dans les paramètres DNS du domaine (voir le guide IONOS).",
     "In web.config (system.webServer > httpProtocol > customHeaders):":
         "Dans web.config (system.webServer > httpProtocol > customHeaders) :",
     "In the _headers file of the site (Netlify):": "Dans le fichier _headers du site (Netlify) :",

@@ -130,7 +130,35 @@ def parse_csp(policy: str) -> dict[str, set[str]]:
     return directives
 
 
-def check_csp(headers: Mapping[str, str]) -> Finding:
+_META_CSP = re.compile(r"<meta\b[^>]*http-equiv\s*=\s*[\"']content-security-policy[\"'][^>]*>", re.I)
+_META_CONTENT = re.compile(r"\bcontent\s*=\s*(\"[^\"]*\"|'[^']*')", re.I)
+IGNORED_IN_META = ("frame-ancestors", "report-uri", "sandbox")  # CSP3 section 3.3: not allowed in <meta>
+
+
+def meta_csp(body: str) -> str:
+    """Policy of a <meta http-equiv="Content-Security-Policy"> tag, without the directives a meta tag cannot set."""
+    tag = _META_CSP.search(body or "")
+    content = _META_CONTENT.search(tag.group(0)) if tag else None
+    if not content:
+        return ""
+    kept = [part for part in content.group(1)[1:-1].split(";")
+            if part.strip() and part.strip().split()[0].lower() not in IGNORED_IN_META]
+    return ";".join(kept)
+
+
+def check_csp(headers: Mapping[str, str], body: str = "") -> Finding:
+    """Content-Security-Policy from the header, or from a <meta> tag of the page when there is no header."""
+    raw = header(headers, "Content-Security-Policy")
+    meta = meta_csp(body) if not raw else ""
+    if meta:
+        f = _check_csp({**dict(headers), "Content-Security-Policy": meta})
+        f.detail = M("{detail} The policy is declared in a <meta> tag of the page, where frame-ancestors, report-uri "
+                     "and sandbox have no effect.", detail=f.detail)
+        return f
+    return _check_csp(headers)
+
+
+def _check_csp(headers: Mapping[str, str]) -> Finding:
     title, src = "Content-Security-Policy", "csp"
     raw = header(headers, "Content-Security-Policy")
     if not raw:
@@ -500,7 +528,7 @@ def check_website(http: HTTPInfo, host: str) -> list[Finding]:
     h = http.headers
     hsts = check_hsts(h, http.hsts_preloaded)
     findings += [
-        check_csp(h), check_cookies(http.cookies, (hsts.points or 0) >= 0), hsts,
+        check_csp(h, http.body), check_cookies(http.cookies, (hsts.points or 0) >= 0), hsts,
         check_referrer(h, meta_referrer(http.body)),
         check_sri(http.body, http.content_type, host),
         check_xcto(h), check_xfo(h), check_corp(h), check_coop(h), check_coep(h),

@@ -95,3 +95,14 @@ def test_demo_report_shows_the_fixes():
     assert "On OVHcloud:" in html  # demo DNS zone at OVHcloud
     fr = render_html(r, lang="fr")
     assert "Chez OVHcloud :" in fr and "Sur Apache (.htaccess) :" in fr
+
+
+def test_provider_menus_for_dns():
+    ovh = Platforms(dns="OVHcloud")
+    assert "DNS zone tab" in fix_for(finding("spf"), ovh).text
+    assert fix_for(finding("dnssec"), ovh).link.endswith("/dns-dnssec")
+    assert "Nameservers tab" in fix_for(finding("dnssec"), Platforms(dns="Gandi")).text
+    ionos = Platforms(dns="IONOS")
+    assert "dmarc" in fix_for(finding("dmarc"), ionos).link
+    assert "enregistrement-caa" in fix_for(finding("caa"), ionos).link
+    assert "enregistrements-txt" in fix_for(finding("mta-sts"), ionos).link

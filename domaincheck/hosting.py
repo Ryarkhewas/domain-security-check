@@ -93,6 +93,20 @@ LINKS = {
     "microsoft-dkim": "https://learn.microsoft.com/en-us/microsoft-365/security/office-365-security/"
                       "email-authentication-dkim-configure",
     "cloudflare-dnssec": "https://developers.cloudflare.com/dns/dnssec/",
+    "ovh-zone": "https://docs.ovhcloud.com/fr/guides/web-cloud/domains/dns-zone-edit",
+    "ovh-dnssec": "https://docs.ovhcloud.com/fr/guides/web-cloud/domains/dns-dnssec",
+    "gandi-dnssec": "https://docs.gandi.net/en/domain_names/advanced_users/dnssec.html",
+    "ionos-dnssec": "https://www.ionos.fr/assistance/domaines/dns-pro/configurer-et-gerer-dnssec/",
+}
+IONOS_HELP = "https://www.ionos.fr/assistance/domaines/"
+IONOS_RECORD_LINKS = {  # IONOS help articles, by finding source
+    "txt": IONOS_HELP + "configurer-des-enregistrements-txt-ou-srv/"
+                        "ajouter-modifier-ou-supprimer-des-enregistrements-txt/",
+    "spf": IONOS_HELP + "configurer-les-serveurs-de-messagerie-et-les-enregistrements-associes/"
+                        "eviter-lenvoi-de-courrier-indesirable-spam-grace-a-un-enregistrement-spf/",
+    "dmarc": IONOS_HELP + "configurer-les-serveurs-de-messagerie-et-les-enregistrements-associes/"
+                          "configurer-un-enregistrement-dmarc-pour-un-domaine/",
+    "caa": IONOS_HELP + "caa-records-konfigurieren/ajouter-modifier-ou-supprimer-un-enregistrement-caa/",
 }
 DNS_RECORD_SOURCES = {"spf", "dmarc", "caa", "mta-sts", "tls-rpt", "null-mx"}
 
@@ -184,10 +198,25 @@ def fix_for(f: Finding, p: Platforms) -> Fix | None:
         if p.dns == "Cloudflare":
             return Fix(M("On Cloudflare:"), M("DNS > Settings > Enable DNSSEC, then copy the DS record to the "
                                               "registrar."), link=LINKS["cloudflare-dnssec"])
+        if p.dns == "OVHcloud":
+            return Fix(M("On OVHcloud:"), M("Web Cloud > Domain names > the domain > Security section > DNSSEC "
+                                            "(secure delegation): turn it on."), link=LINKS["ovh-dnssec"])
+        if p.dns == "Gandi":
+            return Fix(M("On Gandi:"), M("Domain > the domain > Nameservers tab > Go to DNSSEC."),
+                       link=LINKS["gandi-dnssec"])
+        if p.dns == "IONOS":
+            return Fix(M("On IONOS:"), M("turn on DNSSEC in the domain's DNS settings (see the IONOS guide)."),
+                       link=LINKS["ionos-dnssec"])
         if p.dns:
             return Fix(M("On {provider}:", provider=p.dns), M("turn on DNSSEC in the settings of the DNS zone."))
         return None
     if src in DNS_RECORD_SOURCES and p.dns:
+        if p.dns == "OVHcloud":
+            return Fix(M("On OVHcloud:"), M("Web Cloud > Domain names > the domain > DNS zone tab, then add or edit "
+                                            "the record."), link=LINKS["ovh-zone"])
+        if p.dns == "IONOS":
+            return Fix(M("On IONOS:"), M("add or edit the record in the domain's DNS settings (see the IONOS guide)."),
+                       link=IONOS_RECORD_LINKS.get(src, IONOS_RECORD_LINKS["txt"]))
         return Fix(M("On {provider}:", provider=p.dns), M("add or edit the record in the DNS zone of the domain."))
     return None
 

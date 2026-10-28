@@ -255,3 +255,29 @@ def test_meta_referrer_applies_after_the_header():
     assert f.points == -5 and "meta" in f.detail
     assert check_referrer({}, "no-referrer").points == 5
     assert check_referrer({"Referrer-Policy": "unsafe-url"}, None).points == -5
+
+
+# --- CSP declared in a <meta> tag ------------------------------------------------------------
+def test_meta_csp_is_read_when_there_is_no_header():
+    from domaincheck.web_checks import check_csp, meta_csp
+
+    body = ('<head><meta http-equiv="Content-Security-Policy" '
+            "content=\"default-src 'none'; script-src 'self'; frame-ancestors 'none'; report-uri /r\"></head>")
+    assert meta_csp(body) == "default-src 'none'; script-src 'self'"
+    f = check_csp({}, body)
+    assert f.points == 10 and "<meta> tag" in f.detail
+    assert check_csp({}, "<head></head>").points == -25
+
+
+def test_header_csp_wins_over_meta():
+    from domaincheck.web_checks import check_csp
+
+    body = "<meta http-equiv='content-security-policy' content=\"default-src 'none'\">"
+    f = check_csp({"Content-Security-Policy": "default-src 'self'; object-src 'none'"}, body)
+    assert f.points == 5 and "<meta>" not in f.detail
+
+
+def test_meta_csp_does_not_protect_against_framing():
+    from domaincheck.web_checks import check_xfo
+
+    assert check_xfo({}).points == -20  # frame-ancestors has no effect in a meta tag
