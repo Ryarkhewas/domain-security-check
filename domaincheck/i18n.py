@@ -11,6 +11,7 @@ The JSON output always stays in English: it is meant for other programs.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from datetime import datetime
 
@@ -113,3 +114,12 @@ def tr(text: object, lang: str = "en", strict: bool = False) -> str:
 
 def date(d: datetime, lang: str = "en") -> str:
     return f"{d:%d/%m/%Y}" if lang == "fr" else f"{d:%Y-%m-%d}"
+
+
+_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
+
+
+def printable(text: str) -> str:
+    """Text for a terminal, a chat message or an email: control characters removed (a server could put
+    terminal escape sequences in a header or a certificate name, to rewrite what the auditor sees)."""
+    return _CONTROL.sub("", str(text))

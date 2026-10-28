@@ -7,7 +7,7 @@ from dataclasses import asdict
 from enum import Enum
 from html import escape
 
-from .i18n import M, date, tr
+from .i18n import M, date, printable, tr
 from .models import Category, Result, Status
 from .nis2 import DIRECTIVE_URL as NIS2_URL
 from .nis2 import HEADING as NIS2_HEADING
@@ -48,6 +48,12 @@ GRADE_SUMMARY = {
     "F": "High exposure: priority fixes are needed.",
     "N": "No grade could be computed.",
 }
+
+# The reports show text taken from the audited servers (escaped everywhere). As a second line of defence,
+# they forbid any script, remote resource or form, and links do not reveal where the report is hosted.
+REPORT_HEAD = ('<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; style-src \'unsafe-inline\'; '
+               'img-src data:; base-uri \'none\'; form-action \'none\'">'
+               '<meta name="referrer" content="no-referrer">')
 
 CSS = """
 :root{--bg:#f6f7f9;--card:#fff;--text:#1d2330;--muted:#5d6677;--border:#e3e6eb;
@@ -238,6 +244,7 @@ def render_html(r: Result, author: str = "", lang: str = "en", branding=None, ni
     obs_link = f'<a href="{e(obs_url)}">{e(t(obs_label))}</a>'
     return f"""<!doctype html>
 <html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+{REPORT_HEAD}
 <title>{e(t("Security audit"))} — {e(r.domain)}</title><style>{CSS}</style></head>
 <body><main>
 <header><div class="grade {GRADE_COLOR[letter(r.grade)]}">{e(r.grade)}</div>
@@ -473,6 +480,7 @@ def render_index(results: list[Result], errors: dict[str, str], author: str = ""
     title = t("Security audit of 1 domain") if count == 1 else t("Security audit of {count} domains", count=count)
     return f"""<!doctype html>
 <html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+{REPORT_HEAD}
 <title>{e(title)}</title><style>{CSS}</style></head>
 <body><main>
 <header><div><h1>{e(title)}</h1>
@@ -547,7 +555,7 @@ def console_summary(r: Result, lang: str = "en") -> str:
             lines += [f"    [{symbols[f.status]}] {t(f.title)} ({_points(f.points, lang)}) — {capital(t(f.detail))}"
                       for f in _sorted(group)]
             lines.append("")
-    return "\n".join(lines)
+    return "\n".join(printable(line) for line in lines)
 
 
 def _jsonable(o):

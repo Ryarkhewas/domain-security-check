@@ -16,6 +16,8 @@ tested on fixed data.
 
 from __future__ import annotations
 
+import re
+
 CRT_SH = "https://crt.sh/"
 CERT_SPOTTER = "https://api.certspotter.com/v1/issuances"
 
@@ -38,8 +40,15 @@ TAKEOVER_SUFFIXES = {
 }
 
 
+_HOST = re.compile(r"^(?=.{1,253}$)([a-z0-9_]([a-z0-9_-]{0,61}[a-z0-9])?\.)+[a-z0-9-]{2,63}$")
+
+
 def clean_names(raw: list[str], domain: str) -> list[str]:
-    """Subdomains of `domain` among names read in certificates: lower case, no wildcard, no duplicates, sorted."""
+    """Subdomains of `domain` among names read in certificates: lower case, no wildcard, no duplicates, sorted.
+
+    Only well-formed host names are kept: they are later looked up and, with --subdomains, contacted, so a
+    malformed entry ("a/b.example.com", "a@b...") must not turn into an unexpected URL.
+    """
     domain = domain.lower().rstrip(".")
     found = set()
     for value in raw:
@@ -47,7 +56,7 @@ def clean_names(raw: list[str], domain: str) -> list[str]:
             name = name.strip().lower().rstrip(".")
             if name.startswith("*."):
                 name = name[2:]
-            if name != domain and name.endswith("." + domain) and " " not in name and "@" not in name:
+            if name != domain and name.endswith("." + domain) and _HOST.match(name):
                 found.add(name)
     return sorted(found)
 

@@ -27,7 +27,7 @@ from email.message import EmailMessage
 
 import requests
 
-from .i18n import M
+from .i18n import M, printable
 from .models import Category, Result, Status
 from .scoring import GRADE_ORDER
 
@@ -91,7 +91,7 @@ def text(alerts: list[Alert], t) -> str:
         lines.append(domain)
         lines += [f"  {'[!!]' if a.level == 'critical' else '[!]'} {t(a.message)}" for a in alerts
                   if a.domain == domain]
-    return "\n".join(lines)
+    return "\n".join(printable(line) for line in lines)
 
 
 def send_webhook(url: str, body: str, timeout: float = 15) -> None:
@@ -99,8 +99,11 @@ def send_webhook(url: str, body: str, timeout: float = 15) -> None:
     try:
         r = requests.post(url, json={"text": body, "content": body[:1900]}, timeout=timeout)
         r.raise_for_status()
+    except requests.HTTPError as e:
+        # The URL is the secret of the webhook: never in an error message, which may end up in a CI log
+        raise AlertError(f"webhook: HTTP {e.response.status_code if e.response is not None else '?'}") from None
     except requests.RequestException as e:
-        raise AlertError(f"webhook: {e}") from e
+        raise AlertError(f"webhook: {type(e).__name__}") from None
 
 
 def email_settings(env: dict[str, str] | None = None) -> dict[str, str]:
