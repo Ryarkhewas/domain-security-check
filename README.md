@@ -28,7 +28,7 @@ Each item is rated **Critical**, **To improve**, **Compliant** or **Info**, show
 
 **Summary for decision makers.** The report opens with the main risks in business terms ("anyone can send emails in the company's name"), the effort needed (quick fixes under 30 minutes, a few hours, or a project needing a developer or a provider) and the overall grade the quick fixes alone would give. Each priority action shows its impact and its effort, and the list starts with what pays off most for the least work.
 
-**Fixes for the platform in use.** The tool recognises the web server or hosting platform (Apache, nginx, IIS, LiteSpeed, Cloudflare, Netlify, Vercel, GitHub Pages) from the HTTP headers, the DNS host from the NS records (OVHcloud, Cloudflare, Gandi, IONOS, Route 53…) and the email provider from the MX records (Google Workspace, Microsoft 365…). Each problem then comes with the configuration line for that server, or the menu to open at that provider, with a link to its documentation.
+**Fixes for the platform in use.** The tool recognises the web server or hosting platform (Apache, nginx, IIS, LiteSpeed, Cloudflare, Netlify, Vercel, GitHub Pages) from the HTTP headers, the DNS host from the NS records (OVHcloud, Cloudflare, Gandi, IONOS, Route 53…) and the email provider from the MX records (Google Workspace, Microsoft 365…). Each problem then comes with the configuration line for that server, or the menu to open at that provider (including OVHcloud, Gandi and IONOS for DNS records and DNSSEC), with a link to its documentation.
 
 ## A strictly passive audit
 
@@ -117,6 +117,30 @@ A domain file has one domain per line; blank lines and `#` comments are ignored.
 
 A full URL is accepted (`https://www.my-domain.com/contact`): the tool extracts the domain. Email checks run on the main domain, even if you enter `www.`.
 
+## Follow-up and alerts
+
+Audit the same domains on a schedule, into the same folder, with `--alert`: each domain is compared with its previous audit, and the tool lists what needs attention:
+
+- a grade that went down (overall or one area);
+- a new problem, or a problem that got worse;
+- on the first audit of a domain, every critical problem;
+- at every audit, a certificate or a domain name that expires within 30 days.
+
+The command then ends with exit code 4 (3 if a domain could not be audited), so a scheduler can react. The alerts can also be sent:
+
+- to a chat webhook (Slack, Discord, Mattermost, Google Chat): `--webhook URL`, or better the `DSC_WEBHOOK_URL` environment variable, since the URL is a secret;
+- by email: `--email-alert`, with the settings in environment variables (never on the command line): `DSC_SMTP_HOST`, `DSC_SMTP_PORT` (587 with STARTTLS by default, 465 for SSL), `DSC_SMTP_USER`, `DSC_SMTP_PASSWORD`, `DSC_ALERT_FROM`, `DSC_ALERT_TO` (comma-separated).
+
+```bash
+# Every Monday at 7:00 with cron, from a folder that keeps the reports and history
+0 7 * * 1  cd ~/audits && DSC_WEBHOOK_URL=https://hooks.slack.com/... domain-security-check --file domains.txt --alert --pdf --lang fr
+
+# The same with Docker
+docker run --rm -v "$HOME/audits:/reports" -e DSC_WEBHOOK_URL ghcr.io/ryarkhewas/domain-security-check --file /reports/domains.txt --alert
+```
+
+**With GitHub Actions**, nothing to host: this repository is also a reusable action (`uses: Ryarkhewas/domain-security-check@v1.8.0`, inputs `domains`, `file`, `output-dir`, `args`). The [weekly audit template](https://github.com/Ryarkhewas/domain-security-check/blob/main/examples/monitoring/weekly-audit.yml) audits the domains of a `domains.txt` file every Monday, keeps the history of each domain from one week to the next, sends the alerts to your webhook or mailbox (from the repository's secrets), and marks the run as failed when there is an alert, so GitHub emails you as well. Use it in a private repository: the reports describe your clients' weaknesses.
+
 ## Branded reports
 
 With `--company`, `--contact`, `--client`, `--logo` (PNG or JPEG) or `--color`, the PDF starts with a cover page: your logo, the domain, "Prepared for" the client, the date, the overall grade, your name, company and contact, and a confidentiality note. The accent colour is used for the headings, and your company appears in the footer of every page. The HTML report ends with the same details. To avoid typing them each time, put them in a JSON file and pass it with `--brand` ([example](https://github.com/Ryarkhewas/domain-security-check/blob/main/examples/branding.example.json)); command-line values take precedence over the file.
@@ -202,7 +226,7 @@ The [CNIL](https://www.cnil.fr/) (the French data protection authority) is also 
 
 A citation says which recommendation a check relates to. It does not mean the domain complies with ANSSI guidance: most recommendations also cover settings that cannot be seen from outside. This project is not affiliated with ANSSI or CNIL.
 
-**Differences with the Observatory.** One Observatory test is not reproduced: CORS, whose only penalty requires sending a forged `Origin` header. A Content-Security-Policy declared in a `<meta http-equiv>` tag is not read (the `<meta name="referrer">` tag is), and only the first CSP policy is analysed when a site sends several. In these rare cases the website grade can differ from the Observatory's.
+**Differences with the Observatory.** One Observatory test is not reproduced: CORS, whose only penalty requires sending a forged `Origin` header. A Content-Security-Policy declared only in a `<meta http-equiv>` tag is read, without the directives a meta tag cannot set (frame-ancestors, report-uri, sandbox); the Observatory may weigh that case differently. Only the first CSP policy is analysed when a site sends several. In these rare cases the website grade can differ from the Observatory's.
 
 **Checked against the Observatory every week.** The Live check workflow asks the [Observatory API](https://github.com/mdn/mdn-http-observatory) for its result on the same domains and compares it test by test. Any test where the points differ is listed, and a grade gap raises a warning. This is how the HSTS preload, Subresource Integrity, cookie collection and `<meta name="referrer">` rules were found and fixed; on 14 October 2026, all six domains (github.com, google.com, cloudflare.com, wikipedia.org, docs.github.com, badssl.com) got exactly the same score, with the same points on every test.
 
@@ -224,6 +248,8 @@ domaincheck/
   software.py               Outdated software: CMS and PHP recognition, support dates
   trackers.py               Trackers before consent (page received, or real browser)
   timeline.py               Grades over time (history file of each domain)
+  alerts.py                 Follow-up mode: alerts, webhook and email
+action.yml                  Reusable GitHub Action
   nis2.py                   NIS 2 view: checks related to the measures of article 21(2)
   email_checks.py           MX / SPF / DMARC / DKIM / MTA-STS analysis
   dns_checks.py             DNSSEC, CAA, registration and subdomain analysis
@@ -240,7 +266,7 @@ domaincheck/
   hsts_preload.py           HSTS preload list (download, cache, lookups)
   rdap.py                   Domain registration data (RDAP servers, answers)
   observatory.py            Test-by-test comparison with the Observatory API
-tests/                      1034 unit tests + live tests (tests/live)
+tests/                      1066 unit tests + live tests (tests/live)
 scripts/live_summary.py     Audits a list of domains for the Live check workflow
 scripts/observatory_compare.py  Compares the website grades with the Observatory
 ```
@@ -250,13 +276,13 @@ Collection is kept separate from analysis: every rule can be tested on fixed dat
 ## Tests
 
 ```bash
-python -m pytest -q          # 1034 unit tests, no network needed
+python -m pytest -q          # 1066 unit tests, no network needed
 ruff check .                 # lint
 mypy                         # type check
 python -m pytest -m live -v  # live tests against real domains (Internet required)
 ```
 
-Three GitHub Actions workflows keep the tool honest:
+Three GitHub Actions workflows keep the tool honest (the Tests workflow also runs the reusable action of this repository on the demo):
 
 - **Tests** runs on every push: the unit tests on Python 3.10 to 3.13, the lint and type checks, a build of the package installed in a clean environment and checked for PyPI (`twine check`), and a build of the Docker image that runs the demo.
 - **Release** publishes a GitHub release with the package attached, the Docker images on the GitHub Container Registry and, once set up, the package on PyPI.

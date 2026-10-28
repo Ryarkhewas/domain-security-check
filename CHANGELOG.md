@@ -6,6 +6,14 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Follow-up mode: `--alert` compares each domain with its previous audit and lists the grades that went down, new or worse problems (every critical problem on a first audit) and certificates or domain names that expire soon; exit code 4 when there is an alert. `--webhook URL` (or `DSC_WEBHOOK_URL`) sends them to Slack, Discord, Mattermost or Google Chat; `--email-alert` by email, with the `DSC_SMTP_*` and `DSC_ALERT_*` environment variables (STARTTLS or SSL).
+- Reusable GitHub Action (`uses: Ryarkhewas/domain-security-check@<version>`), tested on every push, and a weekly audit template (`examples/monitoring/weekly-audit.yml`) that keeps the history of each domain between runs and sends the alerts.
+- Platform fixes: menus and guides of OVHcloud, Gandi and IONOS for DNS records and DNSSEC.
+
+### Changed
+- A Content-Security-Policy declared only in a `<meta http-equiv>` tag of the page is now read, without frame-ancestors, report-uri and sandbox, which have no effect there.
+
 ## [1.7.0] - 2026-10-27
 
 ### Added
