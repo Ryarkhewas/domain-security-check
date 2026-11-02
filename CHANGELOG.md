@@ -6,6 +6,8 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-11-02
+
 ### Security
 - Connections to private or reserved addresses (loopback, private networks, link-local and cloud metadata, carrier-grade NAT…) are refused by default, for the site, its redirects, its mail servers, its subdomains and the optional browser: an audited domain can no longer make the tool probe the network it runs in. `--allow-private` lifts this for internal domains.
 - Answers from the audited servers are read up to 2 MB and within 60 seconds (pages, security.txt, MTA-STS policies, RDAP), TLS and SMTP probes have an overall time limit, SMTP replies a line limit, and the Cert Spotter pagination stops if the API repeats itself: a hostile server can no longer exhaust memory or hold the audit forever.
@@ -22,6 +24,7 @@ All notable changes to this project are listed here. The format follows
 - Platform fixes: menus and guides of OVHcloud, Gandi and IONOS for DNS records and DNSSEC.
 
 ### Changed
+- The release workflow uses actions/download-artifact v8, which fails on a checksum mismatch.
 - A Content-Security-Policy declared only in a `<meta http-equiv>` tag of the page is now read, without frame-ancestors, report-uri and sandbox, which have no effect there.
 
 ## [1.7.0] - 2026-10-27
@@ -133,6 +136,7 @@ First release.
 - 201 unit tests on Python 3.10 to 3.13, lint (ruff) and type check (mypy) in CI, and a build test of the package.
 - Weekly Live check against real domains, including a test-by-test comparison with the Mozilla HTTP Observatory API.
 
+[1.8.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.8.0
 [1.7.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.7.0
 [1.6.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.6.0
 [1.5.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.5.0
