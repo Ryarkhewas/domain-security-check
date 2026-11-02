@@ -2,7 +2,7 @@
 version: 2
 updates:
   - package-ecosystem: github-actions
-    directories: ["/", "/.github/workflows"]
+    directory: "/"  # covers .github/workflows and the action.yml at the root
     schedule:
       interval: weekly
   - package-ecosystem: pip
