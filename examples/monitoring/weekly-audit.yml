@@ -29,7 +29,7 @@ jobs:
           key: domain-audit-${{ github.run_id }}
           restore-keys: domain-audit-
       - name: Audit and alerts
-        uses: Ryarkhewas/domain-security-check@v1.8.0
+        uses: Ryarkhewas/domain-security-check@v1.9.0
         env:
           DSC_WEBHOOK_URL: ${{ secrets.DSC_WEBHOOK_URL }}
           DSC_SMTP_HOST: ${{ secrets.DSC_SMTP_HOST }}

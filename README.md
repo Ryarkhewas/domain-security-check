@@ -49,10 +49,10 @@ Requires Python 3.10 or later.
 pip install domain-security-check            # add [pdf], [browser] or [pdf,browser] for the options
 
 # Latest release, straight from GitHub
-pip install "git+https://github.com/Ryarkhewas/domain-security-check@v1.8.0"
+pip install "git+https://github.com/Ryarkhewas/domain-security-check@v1.9.0"
 
 # With PDF output (add ,browser for --browser)
-pip install "domain-security-check[pdf] @ git+https://github.com/Ryarkhewas/domain-security-check@v1.8.0"
+pip install "domain-security-check[pdf] @ git+https://github.com/Ryarkhewas/domain-security-check@v1.9.0"
 
 # Or from a clone, to work on the code
 git clone https://github.com/Ryarkhewas/domain-security-check.git
@@ -144,7 +144,7 @@ The command then ends with exit code 4 (3 if a domain could not be audited), so 
 docker run --rm -v "$HOME/audits:/reports" -e DSC_WEBHOOK_URL ghcr.io/ryarkhewas/domain-security-check --file /reports/domains.txt --alert
 ```
 
-**With GitHub Actions**, nothing to host: this repository is also a reusable action (`uses: Ryarkhewas/domain-security-check@v1.8.0`, inputs `domains`, `file`, `output-dir`, `args`). The [weekly audit template](https://github.com/Ryarkhewas/domain-security-check/blob/main/examples/monitoring/weekly-audit.yml) audits the domains of a `domains.txt` file every Monday, keeps the history of each domain from one week to the next, sends the alerts to your webhook or mailbox (from the repository's secrets), and marks the run as failed when there is an alert, so GitHub emails you as well. Use it in a private repository: the reports describe your clients' weaknesses.
+**With GitHub Actions**, nothing to host: this repository is also a reusable action (`uses: Ryarkhewas/domain-security-check@v1.9.0`, inputs `domains`, `file`, `output-dir`, `args`). The [weekly audit template](https://github.com/Ryarkhewas/domain-security-check/blob/main/examples/monitoring/weekly-audit.yml) audits the domains of a `domains.txt` file every Monday, keeps the history of each domain from one week to the next, sends the alerts to your webhook or mailbox (from the repository's secrets), and marks the run as failed when there is an alert, so GitHub emails you as well. Use it in a private repository: the reports describe your clients' weaknesses.
 
 ## Branded reports
 

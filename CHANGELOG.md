@@ -6,6 +6,8 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-11-02
+
 ### Added
 - CORS check, the last Mozilla HTTP Observatory test not yet reproduced: like the Observatory, one preflight request is sent from its origin, and a site that echoes it while allowing credentials (any site can read its pages as the visitor) loses 50 points. The Live check now compares this test too.
 - Third Certificate Transparency source: [ctlogs.dev](https://ctlogs.dev/), used when crt.sh and Cert Spotter both fail (certificates of the last 90 days; the report says so).
@@ -145,6 +147,7 @@ First release.
 - 201 unit tests on Python 3.10 to 3.13, lint (ruff) and type check (mypy) in CI, and a build test of the package.
 - Weekly Live check against real domains, including a test-by-test comparison with the Mozilla HTTP Observatory API.
 
+[1.9.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.9.0
 [1.8.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.8.0
 [1.7.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.7.0
 [1.6.0]: https://github.com/Ryarkhewas/domain-security-check/releases/tag/v1.6.0

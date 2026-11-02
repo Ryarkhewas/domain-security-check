@@ -20,7 +20,7 @@
 
 Le client autorise l'auditeur à réaliser un audit de l'exposition de sécurité visible depuis Internet des domaines
 listés ci-dessous, avec l'outil open source domain-security-check
-(https://github.com/Ryarkhewas/domain-security-check), version [1.x.x].
+(https://github.com/Ryarkhewas/domain-security-check), version [1.9.0 ou plus récente].
 
 ## 3. Périmètre
 

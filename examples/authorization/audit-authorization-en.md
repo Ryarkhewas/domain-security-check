@@ -20,7 +20,7 @@
 
 The client authorizes the auditor to assess the security exposure, as visible from the Internet, of the domains
 listed below, with the open source tool domain-security-check
-(https://github.com/Ryarkhewas/domain-security-check), version [1.x.x].
+(https://github.com/Ryarkhewas/domain-security-check), version [1.9.0 or later].
 
 ## 3. Scope
 
