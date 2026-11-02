@@ -39,11 +39,10 @@ def test_test_missing_on_our_side_counts_as_zero():
     assert [(g.test, g.ours) for g in c.gaps] == [("cross-origin-opener-policy", 0)]
 
 
-def test_not_implemented_tests_only_show_when_they_score():
-    c = compare(result({}), api({"cross-origin-resource-sharing": 0}))
-    assert c.gaps == []
-    c = compare(result({}), api({"cross-origin-resource-sharing": -50}))
-    assert [(g.test, g.ours, g.theirs) for g in c.gaps] == [("cross-origin-resource-sharing", None, -50)]
+def test_cors_is_compared_like_the_other_tests():
+    assert compare(result({"cors": 0}), api({"cross-origin-resource-sharing": 0})).gaps == []
+    c = compare(result({"cors": 0}), api({"cross-origin-resource-sharing": -50}))
+    assert [(g.test, g.ours, g.theirs) for g in c.gaps] == [("cross-origin-resource-sharing", 0, -50)]
 
 
 def test_preload_and_sri_findings_map_to_observatory_tests():

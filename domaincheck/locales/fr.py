@@ -1053,4 +1053,39 @@ FR: dict[str, str] = {
     "Update the file and its Expires date (at most one year ahead).":
         "Mettez à jour le fichier et sa date Expires (au plus un an à l'avance).",
     "Present: contact {contact}, valid until {date}{where}.": "Présent : contact {contact}, valide jusqu'au {date}{where}.",
+    # CORS
+    "Cross-Origin Resource Sharing (CORS)": "Partage de ressources entre origines (CORS)",
+    "MDN: Cross-Origin Resource Sharing (CORS)": "MDN : Cross-Origin Resource Sharing (CORS)",
+    "Not used: other sites cannot read the home page through CORS.":
+        "Non utilisé : les autres sites ne peuvent pas lire la page d'accueil via CORS.",
+    "Public: any site can read the home page, but without the visitor's cookies or session.":
+        "Public : n'importe quel site peut lire la page d'accueil, mais sans les cookies ni la session du visiteur.",
+    "Restricted to specific origins ({value}).": "Limité à des origines précises ({value}).",
+    "The site accepts any origin with credentials: another site can read the pages as the visitor, with their "
+    "cookies and session (data theft, actions on their behalf).":
+        "Le site accepte n'importe quelle origine avec les identifiants : un autre site peut lire les pages comme le "
+        "visiteur, avec ses cookies et sa session (vol de données, actions en son nom).",
+    "Never copy the Origin header into Access-Control-Allow-Origin when credentials are allowed: list the trusted "
+    "origins explicitly.":
+        "Ne recopiez jamais l'en-tête Origin dans Access-Control-Allow-Origin quand les identifiants sont autorisés : "
+        "listez explicitement les origines de confiance.",
+    "Another site can read the pages as the visitor and act on their behalf.":
+        "Un autre site peut lire les pages comme le visiteur et agir en son nom.",
+    "crt.sh and Cert Spotter did not answer, so the names come from ctlogs.dev, which only lists the certificates "
+    "of the last 90 days: forgotten subdomains can be missing. Run the audit again later for a complete check.":
+        "crt.sh et Cert Spotter n'ont pas répondu : les noms viennent de ctlogs.dev, qui ne liste que les certificats "
+        "des 90 derniers jours, donc des sous-domaines oubliés peuvent manquer. Relancez l'audit plus tard pour une "
+        "vérification complète.",
+    "REQUIRETLS": "REQUIRETLS",
+    "RFC 8689 (SMTP REQUIRETLS option)": "RFC 8689 (option SMTP REQUIRETLS)",
+    "Every mail server announces REQUIRETLS: a sender can require that a message is never passed on without "
+    "encryption.":
+        "Tous les serveurs de messagerie annoncent REQUIRETLS : un expéditeur peut exiger qu'un message ne soit jamais "
+        "transmis sans chiffrement.",
+    "Not announced. Optional and still rare: REQUIRETLS lets a sender require that a message is never passed on "
+    "without encryption, all along its way.":
+        "Non annoncé. Facultatif et encore rare : REQUIRETLS permet à un expéditeur d'exiger qu'un message ne soit "
+        "jamais transmis sans chiffrement, sur tout son trajet.",
+    "Enable it if your mail server software supports it (or ask your email provider).":
+        "Activez-le si votre logiciel de messagerie le permet (ou demandez à votre fournisseur de messagerie).",
 }

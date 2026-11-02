@@ -10,14 +10,13 @@ from __future__ import annotations
 
 import contextlib
 import re
-import socket
 import ssl
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import cast
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import dns.dnssec
 import dns.exception
@@ -46,6 +45,7 @@ from .models import (
 )
 from .rdap import load_bootstrap, read_answer, server_for
 from .trackers import TrackerInfo
+from .web_checks import CORS_ORIGIN as WEB_CORS_ORIGIN
 from .web_checks import registrable_domain
 
 DKIM_SELECTORS = [
@@ -73,6 +73,8 @@ BROWSER_HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9,fr;q=0.8",
 }
+# Origin sent in the CORS preflight: the Observatory's own (src/config.js), so that both tools see the same answer
+CORS_ORIGIN = WEB_CORS_ORIGIN
 
 
 class CollectionError(RuntimeError):
@@ -110,6 +112,13 @@ class Collector:
         s = session or netguard.session(self.allow_private)
         kwargs.setdefault("timeout", self.timeout)
         return netguard.read_limited(s.get(url, stream=True, **kwargs), max_bytes)
+
+    def _cors_preflight(self, url: str, session: requests.Session) -> dict[str, str]:
+        """Headers of the answer to a CORS preflight (OPTIONS) sent from a foreign origin, as the Observatory
+        does: a site that echoes any origin and allows credentials lets other sites read its pages as the visitor."""
+        r = session.options(url, stream=True, timeout=self.timeout, allow_redirects=True,
+                            headers={**BROWSER_HEADERS, "Origin": CORS_ORIGIN, "Access-Control-Request-Method": "GET"})
+        return dict(netguard.read_limited(r, 0).headers)
 
     # --- DNS ---------------------------------------------------------------
     def _resolve(self, name: str, rtype: str, resolver: dns.resolver.Resolver | None = None):
@@ -342,7 +351,8 @@ class Collector:
                 self.check_public(host, port)
             except netguard.PrivateAddress as e:
                 return MailServerInfo(host, error=e.args[0])
-            info = smtp_scan.probe(host, timeout=max(self.timeout, 10), port=port)
+            info = smtp_scan.probe(host, timeout=max(self.timeout, 10), port=port,
+                                       allow_private=self.allow_private)
             try:
                 answer = self._resolve(f"_25._tcp.{host}", "TLSA")
                 info.tlsa = len(answer) if answer is not None else 0
@@ -379,7 +389,12 @@ class Collector:
             except (requests.RequestException, ValueError) as e:
                 errors.append(f"Cert Spotter: {_short(e)}")
         if raw is None:
-            info.error = M("CT logs could not be read ({errors})", errors="; ".join(errors[-2:]))
+            try:
+                raw, info.source = self._ctlogs(domain), "ctlogs.dev"
+            except (requests.RequestException, ValueError) as e:
+                errors.append(f"ctlogs.dev: {_short(e)}")
+        if raw is None:
+            info.error = M("CT logs could not be read ({errors})", errors="; ".join(errors[-3:]))
             return info
         info.names = ct.clean_names(raw, domain)
         resolver = dns.resolver.Resolver()
@@ -422,7 +437,8 @@ class Collector:
             audit.cert_expires = cert.expires_at
             for version, name in ((scan.TLS10, "TLSv1"), (scan.TLS11, "TLSv1.1")):
                 try:
-                    hello = scan.probe(host, version, scan.VERSION_PROBE_SUITES, timeout=self.timeout)
+                    hello = scan.probe(host, version, scan.VERSION_PROBE_SUITES, timeout=self.timeout,
+                                       allow_private=self.allow_private)
                 except OSError:
                     continue
                 if hello.accepted and hello.version == version:
@@ -460,12 +476,31 @@ class Collector:
             seen.add(after)
             params["after"] = after
 
+    def _ctlogs(self, domain: str) -> list[str]:
+        names: list[str] = []
+        params: dict[str, str] = {}
+        seen: set[str] = set()
+        for _ in range(ct.CTLOGS_MAX_PAGES):
+            r = requests.get(ct.CTLOGS + quote(domain, safe=""), params=params, timeout=60,
+                             headers={"User-Agent": USER_AGENT})
+            r.raise_for_status()
+            page = r.json()
+            if not isinstance(page, dict):
+                raise ValueError("unexpected answer")
+            names += ct.names_from_ctlogs(page)
+            after = str(page.get("next_cursor") or "")
+            if not page.get("has_next") or not after or after in seen:
+                break
+            seen.add(after)
+            params["after"] = after
+        return names
+
     # --- TLS ---------------------------------------------------------------
     def certificate(self, host: str) -> CertificateInfo | None:
         ctx = ssl.create_default_context()
         try:
             self.check_public(host)
-            with socket.create_connection((host, 443), timeout=self.timeout) as sock, \
+            with netguard.connect(host, 443, self.timeout, self.allow_private) as sock, \
                     ctx.wrap_socket(sock, server_hostname=host) as tls:
                 cert = tls.getpeercert()
                 version = tls.version() or ""
@@ -507,14 +542,15 @@ class Collector:
 
         def version(v: int) -> bool | None:
             try:
-                hello = scan.probe(host, v, scan.VERSION_PROBE_SUITES, timeout=self.timeout, port=port)
+                hello = scan.probe(host, v, scan.VERSION_PROBE_SUITES, timeout=self.timeout, port=port,
+                                   allow_private=self.allow_private)
             except OSError:
                 return None
             return hello.accepted and hello.version == v
 
         with ThreadPoolExecutor(max_workers=6) as pool:
             legacy = {name: pool.submit(version, v) for v, name in scan.VERSION_NAMES.items()}
-            tls13 = pool.submit(scan.accepts_tls13, host, self.timeout, port)
+            tls13 = pool.submit(scan.accepts_tls13, host, self.timeout, port, self.allow_private)
             weak = pool.submit(self._accepted_suites, host, scan.WEAK_SUITES, port)
             static_rsa = pool.submit(self._accepted_suites, host, scan.STATIC_RSA_SUITES, port)
             info.versions = {name: f.result() for name, f in legacy.items()}
@@ -533,7 +569,8 @@ class Collector:
         offered, accepted = list(suites), list[str]()
         while offered:
             try:
-                hello = scan.probe(host, scan.TLS12, offered, timeout=self.timeout, port=port)
+                hello = scan.probe(host, scan.TLS12, offered, timeout=self.timeout, port=port,
+                                   allow_private=self.allow_private)
             except OSError:
                 return accepted or None
             if not hello.accepted or hello.cipher not in offered:
@@ -557,6 +594,8 @@ class Collector:
                 self._get(f"https://{host}/robots.txt", 0, session=https,  # only for its cookies
                           headers={**BROWSER_HEADERS, "Accept": "text/plain,*/*;q=0.8"}, allow_redirects=True)
             info.cookies = _cookies(https.cookies)
+            with contextlib.suppress(requests.RequestException):  # not every server answers OPTIONS
+                info.cors_headers = self._cors_preflight(r.url, https)
         except requests.RequestException as e:
             info = HTTPInfo(https_reachable=False, error=str(e))
 

@@ -12,9 +12,11 @@ follow, for the machine that runs the audit:
 - a server may send an endless answer, or send it a byte at a time. Answers
   are read up to a size limit and within a time limit.
 
-DNS rebinding (an address that changes between the check and the connection)
-is not fully prevented for HTTP: the check narrows the window, it does not
-close it.
+A name is checked before connecting, then the address actually connected to
+is checked again (DNS rebinding: a name whose answer changes between the
+check and the connection). Through an HTTP proxy, the proxy resolves the name,
+so only the first check applies. The optional browser (--browser) resolves
+names itself: Docker isolates it best.
 """
 
 from __future__ import annotations
@@ -26,6 +28,9 @@ from urllib.parse import urlparse
 
 import requests
 from requests.adapters import HTTPAdapter
+from urllib3.connection import HTTPConnection, HTTPSConnection
+from urllib3.connectionpool import HTTPConnectionPool, HTTPSConnectionPool
+from urllib3.exceptions import NewConnectionError
 
 from .i18n import M
 
@@ -62,8 +67,63 @@ def check_public(host: str, port: int = 443) -> None:
                                addresses=", ".join(private)))
 
 
+def check_peer(sock: socket.socket, host: str) -> None:
+    """Raise PrivateAddress (and close sock) if the address actually connected to is not public."""
+    try:
+        peer = str(sock.getpeername()[0])
+    except OSError:
+        return  # already closed: nothing will be read from it
+    if not is_public(peer):
+        sock.close()
+        raise PrivateAddress(M("{host} points to a private or reserved address ({addresses}): not contacted "
+                               "(use --allow-private to audit internal domains)", host=host, addresses=peer))
+
+
+def connect(host: str, port: int, timeout: float, allow_private: bool = False) -> socket.socket:
+    """socket.create_connection, refusing a non-public address even if the name changed since check_public."""
+    sock = socket.create_connection((host, port), timeout=timeout)
+    if not allow_private:
+        check_peer(sock, host)
+    return sock
+
+
+class _PeerChecked:
+    """urllib3 connection that checks the address it connected to (direct connections only: through a proxy,
+    the peer is the proxy)."""
+
+    def _new_conn(self):
+        sock = super()._new_conn()  # type: ignore[misc]
+        if getattr(self, "proxy", None) is None:
+            try:
+                check_peer(sock, self.host)  # type: ignore[attr-defined]
+            except PrivateAddress as e:
+                raise NewConnectionError(self, str(e)) from e  # type: ignore[arg-type]
+        return sock
+
+
+class _GuardedHTTPConnection(_PeerChecked, HTTPConnection):
+    pass
+
+
+class _GuardedHTTPSConnection(_PeerChecked, HTTPSConnection):
+    pass
+
+
+class _GuardedHTTPPool(HTTPConnectionPool):
+    ConnectionCls = _GuardedHTTPConnection
+
+
+class _GuardedHTTPSPool(HTTPSConnectionPool):
+    ConnectionCls = _GuardedHTTPSConnection
+
+
 class GuardedAdapter(HTTPAdapter):
-    """Checks the address of every request, including each redirect, before connecting."""
+    """Checks the address of every request, including each redirect, before connecting, and the address
+    actually connected to."""
+
+    def init_poolmanager(self, *args, **kwargs):
+        super().init_poolmanager(*args, **kwargs)
+        self.poolmanager.pool_classes_by_scheme = {"http": _GuardedHTTPPool, "https": _GuardedHTTPSPool}
 
     def send(self, request, *args, **kwargs):
         parsed = urlparse(request.url)

@@ -35,11 +35,12 @@ TEST_FOR_SOURCE = {
     "referrer": "referrer-policy",
     "cookies": "cookies",
     "corp": "cross-origin-resource-policy",
+    "cors": "cross-origin-resource-sharing",
     "coop": "cross-origin-opener-policy",
     "coep": "cross-origin-embedder-policy",
 }
 # Observatory tests this project does not implement (documented in the README)
-NOT_IMPLEMENTED = {"cross-origin-resource-sharing"}
+NOT_IMPLEMENTED: set[str] = set()
 
 
 class ObservatoryError(Exception):

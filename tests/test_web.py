@@ -281,3 +281,42 @@ def test_meta_csp_does_not_protect_against_framing():
     from domaincheck.web_checks import check_xfo
 
     assert check_xfo({}).points == -20  # frame-ancestors has no effect in a meta tag
+
+
+# --- CORS (Observatory test cross-origin-resource-sharing) ----------------------------------
+def test_cors():
+    from domaincheck.web_checks import CORS_ORIGIN, check_cors
+
+    assert check_cors(None, CORS_ORIGIN) is None  # preflight not answered: no finding
+    assert (check_cors({}, CORS_ORIGIN).points, check_cors({}, CORS_ORIGIN).status) == (0, Status.OK)
+    assert "Public" in check_cors({"Access-Control-Allow-Origin": "*"}, CORS_ORIGIN).detail
+    restricted = check_cors({"access-control-allow-origin": "https://app.example.com",
+                             "Access-Control-Allow-Credentials": "true"}, CORS_ORIGIN)
+    assert (restricted.points, restricted.status) == (0, Status.OK)
+    # the origin is echoed and credentials are allowed: any site reads the pages as the visitor
+    echoed = check_cors({"Access-Control-Allow-Origin": CORS_ORIGIN, "Access-Control-Allow-Credentials": "True "},
+                        CORS_ORIGIN)
+    assert (echoed.points, echoed.status, echoed.source) == (-50, Status.CRITICAL, "cors")
+    # echoed without credentials: only public data, like "*"
+    assert check_cors({"Access-Control-Allow-Origin": CORS_ORIGIN}, CORS_ORIGIN).points == 0
+
+
+def test_cors_preflight_is_sent_from_the_observatory_origin(monkeypatch):
+    from domaincheck import collector as collector_module
+
+    sent = {}
+
+    class Response:
+        headers = {"Access-Control-Allow-Origin": "*"}
+
+    class Session:
+        def options(self, url, headers, **kwargs):
+            sent.update(url=url, **headers)
+            return Response()
+
+    monkeypatch.setattr(collector_module.netguard, "read_limited", lambda r, *a, **k: r)
+    c = collector_module.Collector.__new__(collector_module.Collector)
+    c.timeout, c.allow_private = 1, False
+    assert c._cors_preflight("https://example.com/", Session()) == {"Access-Control-Allow-Origin": "*"}
+    assert sent["Origin"] == "https://http-observatory.security.mozilla.org"
+    assert sent["Access-Control-Request-Method"] == "GET" and sent["url"] == "https://example.com/"

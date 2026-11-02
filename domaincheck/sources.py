@@ -29,6 +29,7 @@ SOURCES: dict[str, tuple[str, str]] = {
     "xcto": ("WHATWG Fetch: X-Content-Type-Options", "https://fetch.spec.whatwg.org/#x-content-type-options-header"),
     "xfo": ("RFC 7034 (X-Frame-Options)", "https://www.rfc-editor.org/rfc/rfc7034"),
     "corp": ("MDN: Cross-Origin-Resource-Policy", f"{MDN}/CORP"),
+    "cors": ("MDN: Cross-Origin Resource Sharing (CORS)", f"{MDN}/CORS"),
     "coop": ("MDN: Cross-Origin-Opener-Policy",
              "https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cross-Origin-Opener-Policy"),
     "coep": ("MDN: Cross-Origin-Embedder-Policy",
@@ -50,6 +51,7 @@ SOURCES: dict[str, tuple[str, str]] = {
     "dkim": ("RFC 6376 (DKIM)", "https://www.rfc-editor.org/rfc/rfc6376"),
     "null-mx": ("RFC 7505 (null MX for domains that receive no email)", "https://www.rfc-editor.org/rfc/rfc7505"),
     "starttls": ("RFC 3207 (STARTTLS for SMTP)", "https://www.rfc-editor.org/rfc/rfc3207"),
+    "requiretls": ("RFC 8689 (SMTP REQUIRETLS option)", "https://www.rfc-editor.org/rfc/rfc8689"),
     "dane": ("RFC 7672 (DANE for SMTP)", "https://www.rfc-editor.org/rfc/rfc7672"),
     "mta-sts": ("RFC 8461 (SMTP MTA Strict Transport Security)", "https://www.rfc-editor.org/rfc/rfc8461"),
     "tls-rpt": ("RFC 8460 (SMTP TLS Reporting)", "https://www.rfc-editor.org/rfc/rfc8460"),
@@ -103,7 +105,9 @@ GUIDE_REFS: dict[str, list[tuple[str, str]]] = {
     "dkim": [("internet", "R46+")],
     "dmarc": [("internet", "R48+")],
     "mta-sts": [("internet", "§5.3")],
+    # numbers checked against the guide's list of recommendations (R42+ is the reinforced level of R42)
     "starttls": [("internet", "R42")],
+    "requiretls": [("internet", "R42+")],
     "dane": [("internet", "§5.3")],
     "tls-rpt": [("internet", "§5.3")],
     # Domain & DNS: BP-038, and PA-066 for the email domains

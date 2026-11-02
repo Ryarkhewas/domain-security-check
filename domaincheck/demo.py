@@ -106,6 +106,7 @@ class DemoCollector:
                   "s.src='https://www.googletagmanager.com/gtag/js?id=G-DEMO';document.head.appendChild(s);})();"
                   "</script></head><body><noscript><img height='1' width='1' "
                   "src='https://www.facebook.com/tr?id=0&ev=PageView&noscript=1'/></noscript></body></html>"),
+            cors_headers={},  # the preflight is answered without CORS headers
         )
 
     def dnssec(self, domain: str) -> DNSSECInfo:

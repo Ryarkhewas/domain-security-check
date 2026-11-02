@@ -18,7 +18,13 @@ def plain_http(monkeypatch):
         def get(self, url, stream=False, **kwargs):
             return collector.requests.get(url, **kwargs)
 
+        def options(self, url, stream=False, **kwargs):
+            return collector.requests.options(url, **kwargs)
+
+    def connect(host, port, timeout, allow_private=False):
+        return netguard.socket.create_connection((host, port), timeout=timeout)
+
     stub = types.SimpleNamespace(session=lambda allow_private=False: Shim(), read_limited=lambda r, *a, **k: r,
-                                 check_public=lambda *a, **k: None, MAX_ANSWER=netguard.MAX_ANSWER,
+                                 check_public=lambda *a, **k: None, connect=connect, MAX_ANSWER=netguard.MAX_ANSWER,
                                  PrivateAddress=netguard.PrivateAddress)
     monkeypatch.setattr(collector, "netguard", stub)

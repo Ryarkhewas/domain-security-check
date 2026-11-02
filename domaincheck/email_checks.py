@@ -466,4 +466,15 @@ def check_mail_servers(servers: list[MailServerInfo], mta_sts: MTASTSInfo | None
                                  if with_dane else ""),
                                "If the domain uses DNSSEC, publish a TLSA record for each mail server "
                                "(_25._tcp.<server>), or ask your email provider.", None, "dane"))
+        encrypted = [s for s in reached if s.starttls and s.tls_version]
+        if encrypted and all(s.requiretls for s in encrypted):
+            findings.append(_f("REQUIRETLS", Status.OK,
+                               "Every mail server announces REQUIRETLS: a sender can require that a message is never "
+                               "passed on without encryption.", source="requiretls"))
+        elif encrypted:
+            findings.append(_f("REQUIRETLS", Status.INFO,
+                               "Not announced. Optional and still rare: REQUIRETLS lets a sender require that a "
+                               "message is never passed on without encryption, all along its way.",
+                               "Enable it if your mail server software supports it (or ask your email provider).",
+                               None, "requiretls"))
     return findings

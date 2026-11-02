@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import functools
 import socket
 import ssl
 import threading
@@ -37,8 +38,8 @@ def cert_files(tmp_path_factory):
     return folder / "cert.pem", folder / "key.pem"
 
 
-def fake_smtp(cert_files=None, starttls=True, banner=b"220 mx.test ESMTP\r\n") -> int:
-    """A tiny SMTP server: greeting, EHLO, optional STARTTLS, QUIT."""
+def fake_smtp(cert_files=None, starttls=True, banner=b"220 mx.test ESMTP\r\n", requiretls=False) -> int:
+    """A tiny SMTP server: greeting, EHLO, optional STARTTLS (then EHLO, with REQUIRETLS if asked), QUIT."""
     ctx = None
     if cert_files:
         ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -68,9 +69,12 @@ def fake_smtp(cert_files=None, starttls=True, banner=b"220 mx.test ESMTP\r\n") -
                 elif line == "STARTTLS" and starttls:
                     conn.sendall(b"220 go ahead\r\n")
                     tls = ctx.wrap_socket(conn, server_side=True)
-                    data = tls.recv(1024)
-                    if data.startswith(b"QUIT"):
-                        tls.sendall(b"221 bye\r\n")
+                    for data in iter(functools.partial(tls.recv, 1024), b""):
+                        if data.upper().startswith(b"EHLO"):
+                            tls.sendall(b"250-mx.test\r\n250 REQUIRETLS\r\n" if requiretls else b"250 mx.test\r\n")
+                        elif data.upper().startswith(b"QUIT"):
+                            tls.sendall(b"221 bye\r\n")
+                            break
                     tls.close()
                     return
                 elif line == "QUIT":
@@ -91,7 +95,7 @@ def fake_smtp(cert_files=None, starttls=True, banner=b"220 mx.test ESMTP\r\n") -
 
 
 def test_server_with_starttls_and_self_signed_certificate(cert_files):
-    info = smtp_scan.probe("localhost", timeout=5, port=fake_smtp(cert_files))
+    info = smtp_scan.probe("localhost", allow_private=True, timeout=5, port=fake_smtp(cert_files))
     assert info.reachable and info.starttls
     assert info.tls_version in ("TLSv1.2", "TLSv1.3")
     assert info.cert_valid is False and "self" in info.cert_error.lower()
@@ -99,7 +103,7 @@ def test_server_with_starttls_and_self_signed_certificate(cert_files):
 
 
 def test_server_without_starttls():
-    info = smtp_scan.probe("localhost", timeout=5, port=fake_smtp(starttls=False))
+    info = smtp_scan.probe("localhost", allow_private=True, timeout=5, port=fake_smtp(starttls=False))
     assert info.reachable and not info.starttls and info.cert_valid is None
 
 
@@ -108,17 +112,17 @@ def test_unreachable_port():
     sock.bind(("127.0.0.1", 0))
     port = sock.getsockname()[1]
     sock.close()
-    info = smtp_scan.probe("localhost", timeout=2, port=port)
+    info = smtp_scan.probe("localhost", allow_private=True, timeout=2, port=port)
     assert not info.reachable and info.error == "connection refused"
 
 
 def test_not_an_smtp_server():
-    info = smtp_scan.probe("localhost", timeout=5, port=fake_smtp(banner=b"SSH-2.0-OpenSSH\r\n"))
+    info = smtp_scan.probe("localhost", allow_private=True, timeout=5, port=fake_smtp(banner=b"SSH-2.0-OpenSSH\r\n"))
     assert not info.reachable and "not an SMTP reply" in info.error
 
 
 def test_multiline_greeting():
-    info = smtp_scan.probe("localhost", timeout=5, port=fake_smtp(starttls=False,
+    info = smtp_scan.probe("localhost", allow_private=True, timeout=5, port=fake_smtp(starttls=False,
                                                                   banner=b"220-mx.test\r\n220 welcome\r\n"))
     assert info.reachable
 
@@ -216,7 +220,7 @@ def test_endless_reply_is_cut():
         while True:
             conn.sendall(b"220-still talking\r\n")
 
-    info = smtp_scan.probe("localhost", timeout=5, port=endless_server(flood))
+    info = smtp_scan.probe("localhost", allow_private=True, timeout=5, port=endless_server(flood))
     assert not info.reachable and "reply too long" in info.error
 
 
@@ -231,6 +235,26 @@ def test_slow_server_is_cut(monkeypatch):
             time.sleep(0.2)
 
     start = time.monotonic()
-    info = smtp_scan.probe("localhost", timeout=5, port=endless_server(drip))
+    info = smtp_scan.probe("localhost", allow_private=True, timeout=5, port=endless_server(drip))
     assert time.monotonic() - start < 4 and not info.reachable
     assert info.error in ("timeout", "the server answers too slowly")
+
+
+def test_requiretls_is_read_over_tls(cert_files):
+    info = smtp_scan.probe("localhost", allow_private=True, timeout=5, port=fake_smtp(cert_files, requiretls=True))
+    assert info.tls_version and info.requiretls
+    info = smtp_scan.probe("localhost", allow_private=True, timeout=5, port=fake_smtp(cert_files))
+    assert info.tls_version and not info.requiretls
+
+
+def test_requiretls_finding():
+    from domaincheck.sources import references
+
+    now = dt.datetime.now(dt.timezone.utc)
+    server = MailServerInfo("mx.example.com", reachable=True, starttls=True, tls_version="TLSv1.3", cert_valid=True)
+    f = {str(f.title): f for f in check_mail_servers([server], None, now)}["REQUIRETLS"]
+    assert (f.status, f.points) == (Status.INFO, None)
+    server.requiretls = True
+    f = {str(f.title): f for f in check_mail_servers([server], None, now)}["REQUIRETLS"]
+    assert f.status == Status.OK
+    assert "R42+" in [r[2] for r in references("requiretls")]

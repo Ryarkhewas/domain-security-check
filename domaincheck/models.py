@@ -79,7 +79,7 @@ class SubdomainInfo:
     """Subdomains read in Certificate Transparency logs, and what their DNS records point to now."""
 
     names: list[str] = field(default_factory=list)
-    source: str = ""  # "crt.sh" or "Cert Spotter"
+    source: str = ""  # "crt.sh", "Cert Spotter" or "ctlogs.dev"
     resolving: list[str] = field(default_factory=list)  # still have an address
     dangling: list[tuple[str, str]] = field(default_factory=list)  # (subdomain, CNAME target that does not exist)
     unknown: int = 0  # names whose DNS lookup failed (timeout)
@@ -99,6 +99,7 @@ class MailServerInfo:
     cert_error: str = ""
     cert_expires: datetime | None = None
     tlsa: int = 0  # TLSA records for _25._tcp.<host> (DANE, RFC 7672)
+    requiretls: bool = False  # announces REQUIRETLS over TLS (RFC 8689)
     error: str = ""
 
 
@@ -141,6 +142,7 @@ class HTTPInfo:
     body: str = ""  # HTTPS home page HTML (truncated), used for the Subresource Integrity check
     hsts_preloaded: bool | None = None  # in the browsers' HSTS preload list (None = list unavailable)
     redirects_preloaded: bool | None = None  # every host of the HTTP redirect chain is preloaded
+    cors_headers: dict[str, str] | None = None  # answer to a CORS preflight from a foreign origin (None = not tested)
 
 
 @dataclass

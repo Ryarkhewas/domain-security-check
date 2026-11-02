@@ -3,10 +3,9 @@
 Each check reproduces one Observatory test and uses its score modifier
 (see https://github.com/mdn/mdn-http-observatory, src/grader/charts.js,
 MPL 2.0), including the HSTS preload list and Subresource Integrity on the
-home page scripts. Not implemented: the CORS test (the only case it
-penalises requires sending a forged Origin header) and Content-Security-Policy
-declared in a <meta http-equiv> tag, which the Observatory also reads. The
-<meta name="referrer"> tag is taken into account.
+home page scripts, and the CORS test (a preflight request sent from a foreign
+origin). A Content-Security-Policy declared in a <meta http-equiv> tag and the
+<meta name="referrer"> tag are taken into account.
 
 Two extra checks (Permissions-Policy, version disclosure) are shown but not
 scored, since the Observatory does not score them.
@@ -26,6 +25,7 @@ from .i18n import Date, M
 from .models import Category, CookieInfo, Finding, HTTPInfo, Status
 
 W = Category.WEB
+CORS_ORIGIN = "https://http-observatory.security.mozilla.org"  # the Observatory's, sent by the collector
 SIX_MONTHS = 15_552_000  # seconds; the Observatory accepts this common value
 
 DANGEROUSLY_BROAD = {"ftp:", "http:", "https:", "*", "http://*", "http://*.*", "https://*", "https://*.*"}
@@ -328,6 +328,29 @@ def check_coep(headers):
                       {"unsafe-none"})
 
 
+# --- CORS -----------------------------------------------------------------------
+def check_cors(cors: Mapping[str, str] | None, origin: str) -> Finding | None:
+    """Answer of the home page to a CORS preflight sent from `origin` (Observatory test
+    cross-origin-resource-sharing). None when the preflight could not be sent."""
+    title, src = "Cross-Origin Resource Sharing (CORS)", "cors"
+    if cors is None:
+        return None
+    allowed = (header(cors, "Access-Control-Allow-Origin") or "").strip()
+    if not allowed:
+        return _f(title, 0, "Not used: other sites cannot read the home page through CORS.", source=src)
+    if allowed == "*":
+        return _f(title, 0, "Public: any site can read the home page, but without the visitor's cookies or session.",
+                  source=src)
+    credentials = (header(cors, "Access-Control-Allow-Credentials") or "").strip().lower() == "true"
+    if allowed == origin and credentials:
+        return _f(title, -50,
+                  "The site accepts any origin with credentials: another site can read the pages as the visitor, "
+                  "with their cookies and session (data theft, actions on their behalf).",
+                  "Never copy the Origin header into Access-Control-Allow-Origin when credentials are allowed: "
+                  "list the trusted origins explicitly.", src)
+    return _f(title, 0, M("Restricted to specific origins ({value}).", value=allowed[:120]), source=src)
+
+
 # --- Cookies --------------------------------------------------------------------
 # Observatory results, from best to worst, with their modifiers
 _COOKIE_RESULTS = [
@@ -534,6 +557,9 @@ def check_website(http: HTTPInfo, host: str) -> list[Finding]:
         check_xcto(h), check_xfo(h), check_corp(h), check_coop(h), check_coep(h),
         check_permissions_policy(h),
     ]
+    cors = check_cors(http.cors_headers, CORS_ORIGIN)
+    if cors:
+        findings.append(cors)
     leak = check_version_disclosure(h)
     if leak:
         findings.append(leak)

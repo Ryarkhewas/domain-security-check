@@ -254,3 +254,20 @@ def test_trackers_in_a_real_browser():
     info = Collector().browser_trackers("www.wikipedia.org")
     assert not info.error, info.error
     assert info.found == {}  # Wikipedia uses no advertising or analytics tracker
+
+
+def test_ctlogs_dev_answers_in_the_expected_format():
+    try:
+        names = Collector()._ctlogs("afnic.fr")
+    except requests.HTTPError as e:
+        if e.response is not None and e.response.status_code in (429, 500, 502, 503, 504):
+            pytest.skip(f"ctlogs.dev unavailable: {e}")
+        raise
+    assert names and all(n.endswith("afnic.fr") for n in names)
+
+
+def test_cors_preflight_is_answered():
+    info = Collector().http("github.com")
+    assert info.cors_headers is not None  # the preflight was sent and answered
+    f = next(f for f in audit("github.com").findings if str(f.title) == "Cross-Origin Resource Sharing (CORS)")
+    assert f.points == 0, f.detail  # github.com does not echo foreign origins with credentials

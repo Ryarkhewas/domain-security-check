@@ -37,10 +37,11 @@ NIS2_MEASURES = {
 MAPPING = {
     # encryption of the site, of the email in transit, signed DNS answers
     "redirection": "h", "hsts": "h", "hsts-preload": "h", "tls-guide": "h", "rfc8996": "h", "tls13": "h",
-    "rfc9325": "h", "starttls": "h", "mta-sts": "h", "tls-rpt": "h", "dane": "h", "dnssec": "h", "caa": "h",
+    "rfc9325": "h", "starttls": "h", "mta-sts": "h", "tls-rpt": "h", "dane": "h", "requiretls": "h",
+    "dnssec": "h", "caa": "h",
     # maintenance of what is exposed, vulnerability disclosure
     "csp": "e", "xfo": "e", "xcto": "e", "referrer": "e", "sri": "e", "cookies": "e", "permissions": "e",
-    "corp": "e", "coop": "e", "coep": "e", "owasp-headers": "e", "eol": "e", "security-txt": "e",
+    "corp": "e", "cors": "e", "coop": "e", "coep": "e", "owasp-headers": "e", "eol": "e", "security-txt": "e",
     # email authentication: basic hygiene against spoofing
     "spf": "g", "dmarc": "g", "dkim": "g", "null-mx": "g",
     # the domain stays registered and under control; subdomains are inventoried

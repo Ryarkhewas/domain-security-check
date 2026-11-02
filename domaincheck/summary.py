@@ -32,8 +32,9 @@ EFFORT = {
     "permissions": QUICK, "owasp-headers": QUICK, "security-txt": QUICK, "caa": QUICK, "transfer-lock": QUICK,
     "rdap": QUICK, "ct": QUICK, "tls-guide": QUICK, "rfc8996": QUICK, "tls13": QUICK, "tls-rpt": QUICK,
     "null-mx": QUICK, "spf": HOURS, "dmarc": HOURS, "dkim": HOURS, "mta-sts": HOURS, "dnssec": HOURS,
-    "rfc9325": HOURS, "starttls": HOURS, "dane": HOURS, "csp": PROJECT, "cookies": PROJECT, "sri": PROJECT,
-    "eol": HOURS, "trackers": HOURS, "corp": HOURS, "coop": HOURS, "coep": PROJECT,
+    "rfc9325": HOURS, "starttls": HOURS, "dane": HOURS, "requiretls": HOURS, "csp": PROJECT, "cookies": PROJECT,
+    "sri": PROJECT,
+    "eol": HOURS, "trackers": HOURS, "corp": HOURS, "cors": HOURS, "coop": HOURS, "coep": PROJECT,
 }
 
 # What the problem means for the business, by finding source
@@ -46,6 +47,7 @@ RISKS = {
     "rfc9325": "Old encryption weakens the protection of visitors' data.",
     "csp": "A flaw in the site or in a third-party script can be used to steal visitors' data (XSS).",
     "sri": "A flaw in the site or in a third-party script can be used to steal visitors' data (XSS).",
+    "cors": "Another site can read the pages as the visitor and act on their behalf.",
     "xfo": "The site can be shown inside a fake site to trick visitors into clicking (clickjacking).",
     "cookies": "Session cookies can be stolen, giving access to users' accounts.",
     "owasp-headers": "Visible software versions make known flaws easier to target.",

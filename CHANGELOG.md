@@ -6,6 +6,15 @@ All notable changes to this project are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+- CORS check, the last Mozilla HTTP Observatory test not yet reproduced: like the Observatory, one preflight request is sent from its origin, and a site that echoes it while allowing credentials (any site can read its pages as the visitor) loses 50 points. The Live check now compares this test too.
+- Third Certificate Transparency source: [ctlogs.dev](https://ctlogs.dev/), used when crt.sh and Cert Spotter both fail (certificates of the last 90 days; the report says so).
+- REQUIRETLS (RFC 8689): the mail servers are asked, over TLS, whether they offer it; shown but not scored, cited with ANSSI PA-066 R42+ ("enable the REQUIRETLS option on SMTP servers"). The PA-066 recommendation numbers already cited (R42, R44, R46+, R48+, R50+) were checked against the guide's list.
+- Audit authorization template to have signed by a client before an audit, in French and English (`examples/authorization/`): scope, options, what the tool does and does not do, contacts and stop, confidentiality, dates.
+
+### Security
+- DNS rebinding: after the address check, the address actually connected to is checked again, for HTTP requests and their redirects, TLS probes and mail servers. A name whose DNS answer changes between the check and the connection can no longer lead the tool to a private address (through an HTTP proxy, which resolves names itself, only the first check applies).
+
 ## [1.8.0] - 2026-11-02
 
 ### Security

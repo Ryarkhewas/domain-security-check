@@ -2,8 +2,9 @@
 
 The tool talks to each mail server exactly as a sending mail server would
 before delivering a message: it connects on port 25, says EHLO, asks for
-STARTTLS if offered, completes the TLS handshake and says QUIT. No message is
-ever sent.
+STARTTLS if offered, completes the TLS handshake, says EHLO again (to see
+the extensions offered over TLS, such as REQUIRETLS) and says QUIT. No
+message is ever sent.
 
 Port 25 is often blocked by the network the audit runs from (home
 connections, cloud providers): then nothing can be concluded, and the report
@@ -18,6 +19,7 @@ import ssl
 import time
 from datetime import datetime, timezone
 
+from . import netguard
 from .models import MailServerInfo
 
 EHLO_NAME = "domain-security-check.localhost"
@@ -70,10 +72,10 @@ def _command(sock: socket.socket, line: str, deadline: float) -> tuple[int, list
     return _read_reply(sock, deadline)
 
 
-def _open(host: str, port: int, timeout: float) -> tuple[socket.socket, bool, float]:
+def _open(host: str, port: int, timeout: float, allow_private: bool) -> tuple[socket.socket, bool, float]:
     """Connect, greet, and return (socket, STARTTLS offered, deadline of the conversation)."""
     deadline = time.monotonic() + CONNECTION_DEADLINE
-    sock = socket.create_connection((host, port), timeout=timeout)
+    sock = netguard.connect(host, port, timeout, allow_private)
     try:
         code, _ = _read_reply(sock, deadline)
         if code != 220:
@@ -87,8 +89,9 @@ def _open(host: str, port: int, timeout: float) -> tuple[socket.socket, bool, fl
         raise
 
 
-def _starttls(host: str, port: int, timeout: float, verify: bool) -> ssl.SSLSocket:
-    sock, offered, deadline = _open(host, port, timeout)
+def _starttls(host: str, port: int, timeout: float, verify: bool,
+              allow_private: bool) -> tuple[ssl.SSLSocket, float]:
+    sock, offered, deadline = _open(host, port, timeout, allow_private)
     try:
         if not offered:
             raise SMTPError("STARTTLS not offered")
@@ -99,7 +102,7 @@ def _starttls(host: str, port: int, timeout: float, verify: bool) -> ssl.SSLSock
         if not verify:
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
-        return ctx.wrap_socket(sock, server_hostname=host)
+        return ctx.wrap_socket(sock, server_hostname=host), deadline
     except BaseException:
         sock.close()
         raise
@@ -111,11 +114,11 @@ def _quit(sock: socket.socket) -> None:
     sock.close()
 
 
-def probe(host: str, timeout: float = 10, port: int = 25) -> MailServerInfo:
+def probe(host: str, timeout: float = 10, port: int = 25, allow_private: bool = False) -> MailServerInfo:
     """STARTTLS support, TLS version and certificate of one mail server."""
     info = MailServerInfo(host)
     try:
-        sock, offered, _ = _open(host, port, timeout)
+        sock, offered, _ = _open(host, port, timeout, allow_private)
     except (OSError, ssl.SSLError) as e:
         info.error = _reason(e)
         return info
@@ -125,23 +128,27 @@ def probe(host: str, timeout: float = 10, port: int = 25) -> MailServerInfo:
         return info
     # First with certificate verification, as a sender applying MTA-STS or DANE would
     try:
-        tls = _starttls(host, port, timeout, verify=True)
+        tls, deadline = _starttls(host, port, timeout, verify=True, allow_private=allow_private)
         info.cert_valid = True
     except ssl.SSLCertVerificationError as e:
         info.cert_valid, info.cert_error = False, e.verify_message or "invalid certificate"
-        tls = None
+        tls, deadline = None, 0.0
     except (OSError, ssl.SSLError) as e:
         info.error = _reason(e)
         return info
     if tls is None:  # then without, to still see the protocol version
         try:
-            tls = _starttls(host, port, timeout, verify=False)
+            tls, deadline = _starttls(host, port, timeout, verify=False, allow_private=allow_private)
         except (OSError, ssl.SSLError) as e:
             info.error = _reason(e)
             return info
     info.tls_version = tls.version() or ""
     info.cipher = (tls.cipher() or ("", "", 0))[0]
     info.cert_expires = _expiry(tls.getpeercert(binary_form=True))
+    # REQUIRETLS (RFC 8689) is only announced once the connection is encrypted
+    with contextlib.suppress(OSError, ssl.SSLError):
+        code, lines = _command(tls, f"EHLO {EHLO_NAME}", deadline)
+        info.requiretls = code == 250 and any(line.upper().split(" ")[0] == "REQUIRETLS" for line in lines)
     _quit(tls)
     return info
 

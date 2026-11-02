@@ -230,5 +230,5 @@ def test_slow_server_is_cut(monkeypatch):
     threading.Thread(target=drip, daemon=True).start()
     start = time.monotonic()
     with pytest.raises(scan.ProbeError, match="too slow|no answer"):
-        scan.probe("127.0.0.1", scan.TLS12, [0xC02F], timeout=5, port=server.getsockname()[1])
+        scan.probe("127.0.0.1", scan.TLS12, [0xC02F], timeout=5, port=server.getsockname()[1], allow_private=True)
     assert time.monotonic() - start < 4

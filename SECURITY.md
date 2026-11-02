@@ -20,6 +20,9 @@ The audited domain's owner controls its DNS records, redirects, certificates and
 - refuses by default to connect to private or reserved addresses (127.0.0.1, 10.0.0.0/8, 192.168.0.0/16,
   169.254.169.254...), including through redirects, mail servers and subdomains; `--allow-private` lifts this
   for an audit of internal domains;
+- checks the address actually connected to as well, so a DNS answer that changes between the check and the
+  connection (DNS rebinding) cannot lead it to a private address (through an HTTP proxy, which resolves names
+  itself, only the first check applies);
 - limits the size (2 MB) and the reading time of every answer, and the duration of the TLS and SMTP probes;
 - escapes everything it shows in the HTML and PDF reports, which also forbid scripts and remote resources
   with a Content-Security-Policy, and removes control characters from what it prints in a terminal or sends
@@ -27,3 +30,7 @@ The audited domain's owner controls its DNS records, redirects, certificates and
 - reads email passwords and webhook URLs from environment variables only, never prints the webhook URL, and
   only sends the SMTP password over an encrypted connection;
 - runs as a non-root user in the Docker image, and refuses downloads in the optional browser.
+
+Known limit: the optional browser (`--browser`) resolves names itself, so the address checks apply to the
+requests it makes but not to its own DNS lookups. Run it through the Docker image (`-browser` tag) for the
+best isolation.

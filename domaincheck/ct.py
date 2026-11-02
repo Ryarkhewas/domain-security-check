@@ -3,7 +3,8 @@
 Every certificate issued by a public authority is published in CT logs
 (RFC 9162), so the names of a domain's subdomains are public, including
 forgotten ones: a test site, an old shop, a former provider. They are read
-from crt.sh, or from Cert Spotter when crt.sh does not answer.
+from crt.sh, or from Cert Spotter when crt.sh does not answer, or from
+ctlogs.dev when neither answers.
 
 A subdomain whose DNS record (CNAME) still points to a name that no longer
 exists is "dangling": whoever registers that name at the provider (a cloud
@@ -20,6 +21,8 @@ import re
 
 CRT_SH = "https://crt.sh/"
 CERT_SPOTTER = "https://api.certspotter.com/v1/issuances"
+CTLOGS = "https://api.ctlogs.dev/v1/hosts/"  # + domain; certificates of the last 90 days without an account
+CTLOGS_MAX_PAGES = 10  # anonymous limit (100 names per page)
 
 # Providers where a deleted resource leaves a name that anyone can register again
 # (sources: provider documentation and the "can-i-take-over-xyz" project)
@@ -78,6 +81,12 @@ def names_from_cert_spotter(issuances: list) -> list[str]:
         if isinstance(issuance, dict):
             names += [str(n) for n in issuance.get("dns_names", [])]
     return names
+
+
+def names_from_ctlogs(page: dict) -> list[str]:
+    """Names from a ctlogs.dev /v1/hosts answer ({"hosts": [{"host": "a.example.com", ...}] or null, ...})."""
+    hosts = page.get("hosts") if isinstance(page, dict) else None
+    return [str(h.get("host", "")) for h in hosts or [] if isinstance(h, dict)]
 
 
 def takeover_provider(target: str) -> str:

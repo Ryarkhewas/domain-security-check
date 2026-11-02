@@ -78,6 +78,7 @@ def test_guarded_session_refuses_private_addresses(server):
 def test_redirects_are_checked_too(server, monkeypatch):
     checked = []
     monkeypatch.setattr(netguard, "check_public", lambda host, port=443: checked.append((host, port)))
+    monkeypatch.setattr(netguard, "check_peer", lambda sock, host: None)  # the local server is on 127.0.0.1
     r = netguard.session().get(server + "/redirect")
     assert r.text == "hello" and len(checked) == 2  # the first address and the redirect target
 
@@ -124,3 +125,46 @@ def test_cli_option(monkeypatch, tmp_path):
         InvalidDomain("stop")))
     cli.main(["intranet.example.com", "--allow-private", "-o", str(tmp_path / "r.html")])
     assert seen == {"allow_private": True}
+
+
+# --- DNS rebinding: the address actually connected to is checked too --------------------------
+def test_rebinding_is_caught_after_the_check(server, monkeypatch):
+    """A name that looked public at check time but leads to 127.0.0.1 at connection time."""
+    monkeypatch.setattr(netguard, "check_public", lambda host, port=443: None)  # the first check is fooled
+    with pytest.raises(requests.ConnectionError, match="private or reserved address"):
+        netguard.session().get(server + "/")
+
+
+def test_raw_connections_check_the_peer(server):
+    import socket
+
+    from domaincheck import smtp_scan, tls_scan
+
+    port = int(server.rsplit(":", 1)[1])
+    with pytest.raises(PrivateAddress):
+        netguard.connect("127.0.0.1", port, 2)
+    netguard.connect("127.0.0.1", port, 2, allow_private=True).close()
+    with pytest.raises(PrivateAddress):
+        tls_scan.probe("127.0.0.1", tls_scan.TLS12, [0xC02F], timeout=2, port=port)
+    assert "private or reserved" in smtp_scan.probe("127.0.0.1", timeout=2, port=port).error
+    assert isinstance(PrivateAddress("x"), socket.error)  # caught where connection errors are
+
+
+def test_proxied_connections_are_not_blocked_by_the_peer_check():
+    """Through a proxy the peer is the proxy (often on 127.0.0.1): only the name check applies."""
+    conn = netguard._GuardedHTTPConnection("example.com", 80)
+    conn.proxy = object()
+
+    class Sock:
+        def getpeername(self):
+            return ("127.0.0.1", 3128)
+
+        def close(self):
+            pass
+
+    with pytest.MonkeyPatch.context() as m:
+        m.setattr(netguard.HTTPConnection, "_new_conn", lambda self: Sock())
+        assert isinstance(conn._new_conn(), Sock)
+        conn.proxy = None
+        with pytest.raises(netguard.NewConnectionError):
+            conn._new_conn()

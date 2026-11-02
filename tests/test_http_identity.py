@@ -44,6 +44,10 @@ class FakeSession:
             self.cookies.append(FakeCookie("home", rest={"HttpOnly": None, "SameSite": "Lax"}))
         return response
 
+    def options(self, url, headers, timeout, allow_redirects=True, stream=False):
+        FakeSession.calls.append(("OPTIONS " + url, headers))
+        return FakeResponse(url, {"Access-Control-Allow-Origin": "*"})
+
 
 @pytest.fixture
 def fake_http(monkeypatch):
@@ -73,7 +77,8 @@ def test_requests_use_browser_headers(fake_http):
     info = make_collector().http("example.com")
 
     urls = [u for u, _ in fake_http.calls]
-    assert urls == ["https://example.com", "https://example.com/robots.txt", "http://example.com"]
+    assert urls == ["https://example.com", "https://example.com/robots.txt", "OPTIONS https://example.com",
+                    "http://example.com"]
     for _, headers in fake_http.calls:
         assert headers["User-Agent"].startswith("Mozilla/5.0")
         assert "Chrome/" in headers["User-Agent"]

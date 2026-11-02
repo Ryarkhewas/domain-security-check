@@ -15,11 +15,12 @@ they can be tested on fixed bytes.
 from __future__ import annotations
 
 import os
-import socket
 import ssl
 import struct
 import time
 from dataclasses import dataclass
+
+from . import netguard
 
 SSL3, TLS10, TLS11, TLS12 = 0x0300, 0x0301, 0x0302, 0x0303
 VERSION_NAMES = {SSL3: "SSLv3", TLS10: "TLSv1", TLS11: "TLSv1.1", TLS12: "TLSv1.2"}
@@ -134,11 +135,14 @@ def read_server_hello(data: bytes) -> Hello | None:
     return None
 
 
-def probe(host: str, version: int, suites: list[int], timeout: float = 8, port: int = 443) -> Hello:
-    """Send a ClientHello and read the answer. A closed connection counts as a refusal."""
+def probe(host: str, version: int, suites: list[int], timeout: float = 8, port: int = 443,
+          allow_private: bool = False) -> Hello:
+    """Send a ClientHello and read the answer. A closed connection counts as a refusal.
+
+    A non-public address is refused (netguard.PrivateAddress) unless allow_private."""
     deadline = time.monotonic() + PROBE_DEADLINE
     try:
-        with socket.create_connection((host, port), timeout=timeout) as sock:
+        with netguard.connect(host, port, timeout, allow_private) as sock:
             sock.sendall(client_hello(host, version, suites))
             data = b""
             while True:
@@ -161,7 +165,7 @@ def probe(host: str, version: int, suites: list[int], timeout: float = 8, port: 
         raise ProbeError("no answer") from e
 
 
-def accepts_tls13(host: str, timeout: float = 8, port: int = 443) -> bool | None:
+def accepts_tls13(host: str, timeout: float = 8, port: int = 443, allow_private: bool = False) -> bool | None:
     """True / False, or None when the local OpenSSL cannot offer TLS 1.3 or the server cannot be reached."""
     if not ssl.HAS_TLSv1_3:
         return None
@@ -170,7 +174,7 @@ def accepts_tls13(host: str, timeout: float = 8, port: int = 443) -> bool | None
     ctx.verify_mode = ssl.CERT_NONE  # only the protocol is tested here; the certificate is checked elsewhere
     ctx.minimum_version = ctx.maximum_version = ssl.TLSVersion.TLSv1_3
     try:
-        with socket.create_connection((host, port), timeout=timeout) as sock, \
+        with netguard.connect(host, port, timeout, allow_private) as sock, \
                 ctx.wrap_socket(sock, server_hostname=host) as tls:
             return tls.version() == "TLSv1.3"
     except ssl.SSLError:

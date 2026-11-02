@@ -101,6 +101,46 @@ def test_collector_falls_back_to_cert_spotter(monkeypatch):
     assert calls.count("https://crt.sh/") == 3
 
 
+def test_ctlogs_when_crt_sh_and_cert_spotter_are_down(monkeypatch):
+    calls = []
+
+    class Answer:
+        def __init__(self, data):
+            self.data = data
+
+        def raise_for_status(self):
+            if self.data is None:
+                raise collector_module.requests.HTTPError("503 Service Unavailable")
+
+        def json(self):
+            return self.data
+
+    pages = {"": {"hosts": [{"host": "www.example.com"}], "has_next": True, "next_cursor": "c1"},
+             "c1": {"hosts": [{"host": "*.shop.example.com"}], "has_next": True, "next_cursor": "c1"}}  # repeats
+
+    def fake_get(url, params=None, **kwargs):
+        calls.append(url)
+        if "ctlogs.dev" in url:
+            return Answer(pages[(params or {}).get("after", "")])
+        return Answer(None)
+
+    monkeypatch.setattr(collector_module.requests, "get", fake_get)
+    monkeypatch.setattr(collector_module.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(collector_module, "_subdomain_state", lambda resolver, name: ("resolving", ""))
+    info = collector_module.Collector().subdomains("example.com")
+    assert (info.source, info.names) == ("ctlogs.dev", ["shop.example.com", "www.example.com"])
+    assert calls.count("https://api.ctlogs.dev/v1/hosts/example.com") == 2  # stopped when the cursor repeated
+    assert "last 90 days" in check_subdomains(info)[0].detail
+
+
+def test_ctlogs_answer():
+    from domaincheck.ct import names_from_ctlogs
+
+    assert names_from_ctlogs({"hosts": None, "has_next": False, "next_cursor": ""}) == []
+    assert names_from_ctlogs({"hosts": [{"host": "a.example.com", "certs": 2}, "junk"]}) == ["a.example.com"]
+    assert names_from_ctlogs(["not", "a", "dict"]) == []
+
+
 def test_both_logs_down(monkeypatch):
     def fake_get(url, **kwargs):
         raise collector_module.requests.ConnectionError("down")
