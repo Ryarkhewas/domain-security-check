@@ -7,7 +7,7 @@
 # - "browser": the same, plus Playwright and Chromium for --browser (much larger).
 #   docker build --target browser -t domain-security-check:browser .
 
-FROM python:3.12-slim AS standard
+FROM python:3.15-slim AS standard
 LABEL org.opencontainers.image.title="domain-security-check" \
       org.opencontainers.image.description="Passive security audit of a domain name, with HTML and PDF reports" \
       org.opencontainers.image.source="https://github.com/Ryarkhewas/domain-security-check" \
